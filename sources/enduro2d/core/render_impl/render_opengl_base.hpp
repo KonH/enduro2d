@@ -11,8 +11,7 @@
 #if defined(E2D_RENDER_MODE)
 #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
 
-#define GLEW_STATIC
-#include <GL/glew.h>
+#include <glew.h>
 
 #if defined(E2D_BUILD_MODE) && E2D_BUILD_MODE == E2D_BUILD_MODE_DEBUG
 #   define GL_FLUSH_ERRORS(dbg)\

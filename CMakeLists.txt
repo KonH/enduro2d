@@ -101,18 +101,6 @@ file(GLOB_RECURSE E2D_3RDPARTY
 # e2d external 3rd party
 #
 
-set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(modules/glfw)
-set_target_properties(glfw PROPERTIES FOLDER modules)
-
-set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(glew-cmake_BUILD_MULTI_CONTEXT OFF CACHE BOOL "" FORCE)
-add_subdirectory(modules/glew)
-set_target_properties(libglew_static PROPERTIES FOLDER modules)
-
 add_subdirectory(modules/enduro2d-external)
 include(modules/enduro2d-external/engine-integration.cmake)
 
@@ -132,7 +120,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE glfw
-    PRIVATE libglew_static
+    PRIVATE glew
     PRIVATE $<$<CXX_COMPILER_ID:MSVC>:winmm.lib>)
 
 if(${E2D_ENABLE_BASS})
@@ -156,9 +144,7 @@ target_compile_options(${PROJECT_NAME}
         -Wall -Wextra -Wpedantic>
     PRIVATE
     $<$<PLATFORM_ID:Darwin>:
-        -Wno-deprecated-declarations>
-    PRIVATE
-        -DGLEW_NO_GLU)
+        -Wno-deprecated-declarations>)
 
 target_compile_features(${PROJECT_NAME}
     PUBLIC cxx_std_17)
