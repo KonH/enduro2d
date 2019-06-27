@@ -38,21 +38,7 @@
 #define E2D_PLATFORM_IOS     2
 #define E2D_PLATFORM_MACOSX  3
 #define E2D_PLATFORM_WINDOWS 4
-
-#ifndef E2D_PLATFORM
-#  if defined(__linux__) || defined(__linux) || defined(linux)
-#    define E2D_PLATFORM E2D_PLATFORM_LINUX
-#  elif defined(macintosh) || defined(Macintosh) || defined(__APPLE__)
-#    include <TargetConditionals.h>
-#    if (TARGET_OS_SIMULATOR == 1) || (TARGET_OS_IPHONE == 1)
-#      define E2D_PLATFORM E2D_PLATFORM_IOS
-#    elif (TARGET_OS_MAC == 1)
-#      define E2D_PLATFORM E2D_PLATFORM_MACOSX
-#    endif
-#  elif defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
-#    define E2D_PLATFORM E2D_PLATFORM_WINDOWS
-#  endif
-#endif
+#define E2D_PLATFORM_ANDROID 5
 
 #ifndef E2D_PLATFORM
 #  error E2D_PLATFORM not detected

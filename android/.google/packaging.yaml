@@ -1,0 +1,7 @@
+status:       PUBLISHED
+technologies: [Android, NDK]
+categories:   [NDK]
+languages:    [C++]
+solutions:    [Mobile]
+github:       enduro2d/enduro2d
+license:      MIT
