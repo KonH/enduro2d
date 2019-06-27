@@ -6,7 +6,7 @@
 
 #include "filesystem.hpp"
 
-#if defined(E2D_PLATFORM) && E2D_PLATFORM == E2D_PLATFORM_LINUX
+#if defined(E2D_PLATFORM) && (E2D_PLATFORM == E2D_PLATFORM_LINUX || E2D_PLATFORM == E2D_PLATFORM_ANDROID)
 
 #include <unistd.h>
 #include <dirent.h>

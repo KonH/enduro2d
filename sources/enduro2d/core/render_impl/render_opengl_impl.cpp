@@ -252,7 +252,7 @@ namespace e2d
             return *this;
         }
 
-        GL_CHECK_CODE(debug_, glDepthRange(
+        GL_CHECK_CODE(debug_, glDepthRangef(
             math::numeric_cast<GLclampd>(math::saturate(ds.range_near())),
             math::numeric_cast<GLclampd>(math::saturate(ds.range_far()))));
         GL_CHECK_CODE(debug_, glDepthMask(

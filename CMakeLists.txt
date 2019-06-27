@@ -214,7 +214,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
     ${E2D_3RDPARTY})
 
 target_link_libraries(${PROJECT_NAME}
-    PRIVATE GLES
+    PRIVATE GLESv2
     PRIVATE libglew_static
     PRIVATE $<$<CXX_COMPILER_ID:MSVC>:winmm.lib>)
 
