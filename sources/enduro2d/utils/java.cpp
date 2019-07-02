@@ -14,11 +14,15 @@ namespace e2d
     // java_vm
     //
     
-    JavaVM* java_vm::get() noexcept {
-        return get_jvm();
+    JavaVM* detail::java_vm::get() noexcept {
+        return get_jvm_();
+    }
+    
+    void detail::java_vm::set(JavaVM* vm) noexcept {
+        get_jvm_() = vm;
     }
 
-    JavaVM*& java_vm::get_jvm() noexcept {
+    JavaVM*& detail::java_vm::get_jvm_() noexcept {
         static JavaVM* instance;
         return instance;
     }
@@ -46,7 +50,7 @@ namespace e2d
     }
 
     void java_env::attach() {
-        JavaVM* jvm = java_vm::get();
+        JavaVM* jvm = detail::java_vm::get();
         if ( !jvm ) {
             throw std::runtime_error("JavaVM is null");
         }
@@ -70,7 +74,7 @@ namespace e2d
 
     void java_env::detach() {
         if ( must_be_detached_ ) {
-            JavaVM* jvm = java_vm::get();
+            JavaVM* jvm = detail::java_vm::get();
             if ( !jvm ) {
                 throw std::runtime_error("JavaVM is null");
             }
@@ -110,18 +114,25 @@ namespace e2d
         return jni_env_;
     }
 
-    //
-    // java_method_sig
-    //
-
-    java_method_sig::java_method_sig(str_view sig)
-    : signature_(sig) {
-    }
-    
-    const str& java_method_sig::signature() const noexcept {
-        return signature_;
+    void java_env::inc_ref(jobject obj, bool global) const {
+        E2D_ASSERT(jni_env_);
+        E2D_ASSERT(obj);
+        if ( global ) {
+            jni_env_->NewGlobalRef(obj);
+        } else {
+            jni_env_->NewLocalRef(obj);
+        }
     }
 
+    void java_env::dec_ref(jobject obj, bool global) const {
+        E2D_ASSERT(jni_env_);
+        E2D_ASSERT(obj);
+        if ( global ) {
+            jni_env_->DeleteGlobalRef(obj);
+        } else {
+            jni_env_->DeleteLocalRef(obj);
+        }
+    }
 
     //
     // java_class
@@ -133,12 +144,14 @@ namespace e2d
         if ( !class_ ) {
             throw std::runtime_error("java class is not found");
         }
-        inc_ref();
+        global_ = (je.env()->GetObjectRefType(class_) == JNIGlobalRefType);
+        inc_ref_();
     }
 
-    java_class::java_class(jclass jc) noexcept
-    : class_(jc) {
-        inc_ref();
+    java_class::java_class(jclass jc, bool global_ref) noexcept
+    : class_(jc)
+    , global_(global_ref) {
+        inc_ref_();
     }
     
     java_class::java_class(const java_obj& obj) {
@@ -150,58 +163,61 @@ namespace e2d
         if ( !class_ ) {
             throw std::runtime_error("failed to get object class");
         }
-        inc_ref();
+        global_ = (je.env()->GetObjectRefType(class_) == JNIGlobalRefType);
+        inc_ref_();
     }
 
     java_class::java_class(java_class&& jc) noexcept
-    : class_(jc.class_) {
+    : class_(jc.class_)
+    , global_(jc.global_) {
         jc.class_ = nullptr;
     }
     
     java_class::java_class(const java_class& jc) noexcept
-    : class_(jc.class_) {
-        inc_ref();
+    : class_(jc.class_)
+    , global_(jc.global_) {
+        inc_ref_();
     }
 
     java_class::~java_class() noexcept {
-        dec_ref();
+        dec_ref_();
     }
     
+    java_class& java_class::operator = (const java_class& jc) noexcept {
+        dec_ref_();
+        class_ = jc.data();
+        global_ = jc.global_;
+        inc_ref_();
+        return *this;
+    }
+
+    java_class& java_class::operator = (java_class&& jc) noexcept {
+        dec_ref_();
+        global_ = jc.global_;
+        class_ = jc.class_;
+        jc.class_ = nullptr;
+        return *this;
+    }
+
     java_class::operator bool() const noexcept {
         return class_ != nullptr;
     }
 
-    void java_class::inc_ref() noexcept {
+    void java_class::inc_ref_() noexcept {
         if ( class_ ) {
-            java_env().inc_global_ref(static_cast<jobject>(class_));
+            java_env().inc_ref(static_cast<jobject>(class_), global_);
         }
     }
 
-    void java_class::dec_ref() noexcept {
+    void java_class::dec_ref_() noexcept {
         if ( class_ ) {
-            java_env().dec_global_ref(static_cast<jobject>(class_));
+            java_env().dec_ref(static_cast<jobject>(class_), global_);
             class_ = nullptr;
         }
     }
     
     jclass java_class::data() const noexcept {
         return class_;
-    }
-
-    jmethodID java_class::method_id(str_view name, const java_method_sig& sig) const {
-        if ( !class_ ) {
-            throw std::runtime_error("invalid java class");
-        }
-        java_env je;
-        return je.env()->GetMethodID(class_, name.data(), sig.signature().data());
-    }
-
-    jmethodID java_class::static_method_id(str_view name, const java_method_sig& sig) const {
-        if ( !class_ ) {
-            throw std::runtime_error("invalid java class");
-        }
-        java_env je;
-        return je.env()->GetStaticMethodID(class_, name.data(), sig.signature().data());
     }
     
     //
@@ -213,30 +229,43 @@ namespace e2d
     }
     
     java_obj::java_obj(const java_obj& obj) noexcept
-    : obj_(obj.obj_) {
-        inc_ref();
+    : obj_(obj.data()) {
+        inc_ref_();
     }
 
     java_obj::java_obj(java_obj&& obj) noexcept
-    : obj_(obj.obj_) {
+    : obj_(obj.data()) {
         obj.obj_ = nullptr;
     }
 
     java_obj::java_obj(jobject obj) noexcept
     : obj_(obj) {
-        inc_ref();
+        inc_ref_();
     }
 
     java_obj::~java_obj() noexcept {
+        dec_ref_();
+    }
+    
+    java_obj& java_obj::operator = (const java_obj& obj) noexcept {
+        dec_ref_();
+        obj_ = obj.data();
+        inc_ref_();
+        return *this;
     }
 
-    void java_obj::inc_ref() noexcept {
+    java_obj& java_obj::operator = (java_obj&& obj) noexcept {
+        std::swap(obj_, obj.obj_);
+        return *this;
+    }
+
+    void java_obj::inc_ref_() noexcept {
         if ( obj_ ) {
             java_env().inc_global_ref(obj_);
         }
     }
 
-    void java_obj::dec_ref() noexcept {
+    void java_obj::dec_ref_() noexcept {
         if ( obj_ ) {
             java_env().dec_global_ref(obj_);
             obj_ = nullptr;
@@ -250,6 +279,7 @@ namespace e2d
     java_obj::operator bool() const noexcept {
         return obj_ != nullptr;
     }
+ 
 }
 
 #endif

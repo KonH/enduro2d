@@ -120,90 +120,19 @@ file(GLOB_RECURSE E2D_3RDPARTY
 # e2d external 3rd party
 #
 
-set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(modules/glfw)
-set_target_properties(glfw PROPERTIES FOLDER modules)
-
 set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(glew-cmake_BUILD_MULTI_CONTEXT OFF CACHE BOOL "" FORCE)
 add_subdirectory(modules/glew)
 set_target_properties(libglew_static PROPERTIES FOLDER modules)
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-        add_library(bass SHARED IMPORTED)
-        set_target_properties(bass PROPERTIES IMPORTED_IMPLIB
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/linux/x86/libbass.so)
-        set_target_properties(bass PROPERTIES IMPORTED_LOCATION
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/linux/x86/libbass.so)
-    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        add_library(bass SHARED IMPORTED)
-        set_target_properties(bass PROPERTIES IMPORTED_IMPLIB
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/linux/x64/libbass.so)
-        set_target_properties(bass PROPERTIES IMPORTED_LOCATION
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/linux/x64/libbass.so)
-    endif()
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-    add_library(bass SHARED IMPORTED)
-    set_target_properties(bass PROPERTIES IMPORTED_LOCATION
-        ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/macosx/libbass.dylib)
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-        add_library(bass SHARED IMPORTED)
-        set_target_properties(bass PROPERTIES IMPORTED_IMPLIB
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/windows/x86/bass.lib)
-        set_target_properties(bass PROPERTIES IMPORTED_LOCATION
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/windows/x86/bass.dll)
-    elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        add_library(bass SHARED IMPORTED)
-        set_target_properties(bass PROPERTIES IMPORTED_IMPLIB
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/windows/x64/bass.lib)
-        set_target_properties(bass PROPERTIES IMPORTED_LOCATION
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/windows/x64/bass.dll)
-    endif()
-endif()
-
 function(add_e2d_shared_libraries_to_target TO)
-    if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-        if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-            add_custom_command(TARGET ${TO} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy
-                ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/linux/x86/libbass.so
-                $<TARGET_FILE_DIR:${TO}>)
-        elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-            add_custom_command(TARGET ${TO} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy
-                ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/linux/x64/libbass.so
-                $<TARGET_FILE_DIR:${TO}>)
-        endif()
-    elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-        add_custom_command(TARGET ${TO} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy
-            ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/macosx/libbass.dylib
-            $<TARGET_FILE_DIR:${TO}>)
-    elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-        if(CMAKE_SIZEOF_VOID_P EQUAL 4)
-            add_custom_command(TARGET ${TO} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy
-                ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/windows/x86/bass.dll
-                $<TARGET_FILE_DIR:${TO}>)
-        elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
-            add_custom_command(TARGET ${TO} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy
-                ${E2D_ROOT_DIRECTORY}/sources/3rdparty/bass/windows/x64/bass.dll
-                $<TARGET_FILE_DIR:${TO}>)
-        endif()
-    endif()
 endfunction(add_e2d_shared_libraries_to_target)
 
 #
 # e2d library target
 #
 
-add_library(${PROJECT_NAME} STATIC
+add_library(${PROJECT_NAME} SHARED
     ${E2D_HEADERS}
     ${E2D_SOURCES}
     ${E2D_3RDPARTY})
@@ -214,7 +143,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
     ${E2D_3RDPARTY})
 
 target_link_libraries(${PROJECT_NAME}
-    PRIVATE GLESv2
+    PRIVATE android log
     PRIVATE libglew_static
     PRIVATE $<$<CXX_COMPILER_ID:MSVC>:winmm.lib>)
 

@@ -1,21 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          package="com.enduro2d.sample"
-          android:versionCode="1"
-          android:versionName="1.0">
+          package="enduro2d.engine">
   <application
       android:allowBackup="false"
       android:fullBackupContent="false"
       android:icon="@mipmap/ic_launcher"
-      android:label="@string/app_name"
-      android:hasCode="false">
-    <activity android:name="android.app.NativeActivity"
-              android:label="@string/app_name">
-      <meta-data android:name="android.app.lib_name"
-                 android:value="enduro2d" />
+      android:label="label">
+    <activity android:name="E2DActivity"
+              android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+              android:launchMode="singleTask"
+              android:configChanges="orientation|keyboardHidden">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
-        <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity>
   </application>
