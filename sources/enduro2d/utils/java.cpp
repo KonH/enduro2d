@@ -4,9 +4,9 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#include <enduro2d/utils/java.hpp>
+#include "java.hpp"
 
-#if 1 //def E2D_JNI
+#ifdef E2D_JNI
 
 namespace e2d
 {
