@@ -1,0 +1,12 @@
+{
+    "texture" : "asteroids.png",
+    "sprites" : [{
+        "name" : "playerShip1_green.png",
+        "pivot" : { "x" : 286, "y" : 609.5 },
+        "texrect" : { "x" : 237, "y" : 572, "w" : 98, "h" : 75 }
+    },{
+        "name" : "laserGreen07.png",
+        "pivot" : { "x" : 853.5, "y" : 660 },
+        "texrect" : { "x" : 849, "y" : 660, "w" : 9, "h" : 57 }
+    }]
+}

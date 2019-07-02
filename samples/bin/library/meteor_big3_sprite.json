@@ -1,0 +1,5 @@
+{
+    "texture" : "asteroids.png",
+    "pivot" : { "x" : 562.5, "y" : 173 },
+    "texrect" : { "x" : 518, "y" : 132, "w" : 89, "h" : 82 }
+}
