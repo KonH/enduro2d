@@ -12,7 +12,10 @@ using namespace e2d;
 namespace
 {
     struct player {
-        f32 speed = 100.f;
+        f32 speed{120.f};
+        f32 shoot_counter{0};
+        f32 shoot_interval{0.25f};
+        bool trigger_pressed{false};
     };
     
     struct distance {
@@ -135,9 +138,23 @@ namespace
                         if ( k.is_key_pressed(keyboard_key::down) ) {
                             body.velocity_value = -p.speed;
                         }
-                        
-                        if ( k.is_key_just_released(keyboard_key::space) ) {
-                            owner.for_each_component<laser_generator>(
+
+                        if ( k.is_key_pressed(keyboard_key::space) ) {
+                            bool need_create_laser = false;
+                            if ( p.trigger_pressed ) {
+                                p.shoot_counter += dt;
+                                if ( p.shoot_counter >= p.shoot_interval ) {
+                                    p.shoot_counter -= p.shoot_interval;
+                                    need_create_laser = true;
+                                }
+                            } else {
+                                p.trigger_pressed = true;
+                                p.shoot_counter = 0;
+                                need_create_laser = true;
+                            }
+
+                            if ( need_create_laser ) {
+                                owner.for_each_component<laser_generator>(
                                 [&node,&body](const ecs::const_entity& e, laser_generator& lg){
                                     lg.need_generate = true;
                                     lg.translation = node->translation();
@@ -145,6 +162,11 @@ namespace
                                     lg.velocity_angle = body.velocity_angle;
                                     lg.parentNode = node->parent();
                                 });
+                            }
+                        }
+
+                        if ( k.is_key_just_released(keyboard_key::space) ) {
+                            p.trigger_pressed = false;
                         }
                     }
                 });
