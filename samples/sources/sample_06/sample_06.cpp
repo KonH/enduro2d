@@ -11,6 +11,9 @@ using namespace e2d;
 
 namespace
 {
+    sound_source_ptr sound_laser;
+    sound_source_ptr sound_meteor_boom;
+
     struct player {
         f32 speed{120.f};
         f32 shoot_counter{0};
@@ -235,6 +238,9 @@ namespace
                         switch (o.type) {
                             case object_generator::object_data::object_type::meteor: {
                                 auto meteor_big3_prefab_ref = the<library>().load_asset<prefab_asset>("meteor_big3_prefab.json");
+                                if ( !meteor_big3_prefab_ref ) {
+                                    break;
+                                }
                                 auto meteor_i = the<world>().instantiate(meteor_big3_prefab_ref->content());
                                 meteor_i->entity_filler()
                                     .component<actor>(node::create(meteor_i, o.parentNode))
@@ -258,6 +264,9 @@ namespace
 
                             case object_generator::object_data::object_type::laser: {
                                 auto laser_prefab_ref = the<library>().load_asset<prefab_asset>("laser_prefab.json");
+                                if ( !laser_prefab_ref ) {
+                                    break;
+                                }
                                 auto laser_i = the<world>().instantiate(laser_prefab_ref->content());
                                 laser_i->entity_filler()
                                     .component<actor>(node::create(laser_i, o.parentNode))
@@ -278,6 +287,7 @@ namespace
                                 node_iptr laser_n = laser_i->get_component<actor>().get().node();
                                 laser_n->translation(o.translation);
                                 laser_n->rotation(o.rotation);
+                                sound_laser->play();
                             } break;
 
                             case object_generator::object_data::object_type::none: {
@@ -435,6 +445,10 @@ namespace
             owner.for_joined_components<collision_detected, actor>(
                   [](const ecs::entity& e, collision_detected& c, actor& act){
                       if ( !e.exists_component<player>() ) {
+                          if ( c.mask_group & collision::flag_group::laser ) {
+                              sound_meteor_boom->play();
+                          }
+
                           const node_iptr node = act.node();
                           if ( node ) {
                               the<world>().destroy_instance(node->owner());
@@ -453,12 +467,18 @@ namespace
         }
     private:
         bool create_scene() {
+
+            auto sstream_laser_sound = the<audio>().create_stream(the<vfs>().read(url("resources://bin/library/sfx_laser1.ogg")));
+            auto sstream_meteor_boom_sound = the<audio>().create_stream(the<vfs>().read(url("resources://bin/library/sfx_zap.ogg")));
             auto spaceship_prefab_ref = the<library>().load_asset<prefab_asset>("player_spaceship_prefab.json");
             auto asteroids_bg_prefab_ref = the<library>().load_asset<prefab_asset>("asteroids_bg_prefab.json");
 
-            if ( !spaceship_prefab_ref || !asteroids_bg_prefab_ref ) {
+            if ( !spaceship_prefab_ref || !asteroids_bg_prefab_ref || !sstream_laser_sound || !sstream_meteor_boom_sound ) {
                 return false;
             }
+
+            sound_laser = the<audio>().create_source(sstream_laser_sound);
+            sound_meteor_boom = the<audio>().create_source(sstream_meteor_boom_sound);
 
             auto scene_i = the<world>().instantiate();
 
