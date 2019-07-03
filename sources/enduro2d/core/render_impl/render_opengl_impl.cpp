@@ -7,7 +7,7 @@
 #include "render_opengl_impl.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
 
 namespace
 {
@@ -205,10 +205,13 @@ namespace e2d
     , window_(window)
     , default_sp_(gl_program_id::current(debug))
     , default_fb_(gl_framebuffer_id::current(debug, GL_FRAMEBUFFER))
+    , is_available_(false)
     {
+    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
         if ( glewInit() != GLEW_OK ) {
             throw bad_render_operation();
         }
+    #endif
 
         gl_trace_info(debug_);
         gl_trace_limits(debug_);
@@ -253,8 +256,8 @@ namespace e2d
         }
 
         GL_CHECK_CODE(debug_, glDepthRangef(
-            math::numeric_cast<GLclampd>(math::saturate(ds.range_near())),
-            math::numeric_cast<GLclampd>(math::saturate(ds.range_far()))));
+            math::numeric_cast<GLclampf>(math::saturate(ds.range_near())),
+            math::numeric_cast<GLclampf>(math::saturate(ds.range_far()))));
         GL_CHECK_CODE(debug_, glDepthMask(
             ds.write() ? GL_TRUE : GL_FALSE));
         GL_CHECK_CODE(debug_, glDepthFunc(

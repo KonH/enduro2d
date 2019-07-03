@@ -9,7 +9,7 @@
 #include "render_opengl_impl.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
 
 namespace
 {
@@ -136,10 +136,10 @@ namespace
                         texture_id.target(),
                         GL_TEXTURE_WRAP_T,
                         convert_sampler_wrap(sampler.t_wrap())));
-                    GL_CHECK_CODE(debug, glTexParameteri(
-                        texture_id.target(),
-                        GL_TEXTURE_WRAP_R,
-                        convert_sampler_wrap(sampler.r_wrap())));
+                    //GL_CHECK_CODE(debug, glTexParameteri(
+                    //    texture_id.target(),
+                    //    GL_TEXTURE_WRAP_R,
+                    //    convert_sampler_wrap(sampler.r_wrap())));
                     GL_CHECK_CODE(debug, glTexParameteri(
                         texture_id.target(),
                         GL_TEXTURE_MIN_FILTER,
@@ -953,7 +953,7 @@ namespace e2d
             #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
                 GL_CHECK_CODE(state_->dbg(), glClearDepth(
                     math::numeric_cast<GLclampd>(math::saturate(command.depth_value()))));
-            #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
+            #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
                 GL_CHECK_CODE(state_->dbg(), glClearDepthf(
                     math::numeric_cast<GLclampf>(math::saturate(command.depth_value()))));
             #else
@@ -1008,41 +1008,34 @@ namespace e2d
 
     bool render::is_pixel_supported(const pixel_declaration& decl) const noexcept {
         E2D_ASSERT(is_in_main_thread());
+        auto& caps = device_capabilities();
         switch ( decl.type() ) {
             case pixel_declaration::pixel_type::depth16:
-                return true;
+                return caps.depth16_supported;
             case pixel_declaration::pixel_type::depth24:
-                return !!GLEW_OES_depth24;
+                return caps.depth24_supported;
             case pixel_declaration::pixel_type::depth32:
-                return !!GLEW_OES_depth32;
+                return caps.depth32_supported;
             case pixel_declaration::pixel_type::depth24_stencil8:
-                return GLEW_OES_packed_depth_stencil
-                    || GLEW_EXT_packed_depth_stencil;
+                return caps.depth24_stencil8_supported;
             case pixel_declaration::pixel_type::rgb8:
             case pixel_declaration::pixel_type::rgba8:
                 return true;
             case pixel_declaration::pixel_type::rgb_dxt1:
             case pixel_declaration::pixel_type::rgba_dxt1:
-                return GLEW_ANGLE_texture_compression_dxt1
-                    || GLEW_EXT_texture_compression_dxt1
-                    || GLEW_EXT_texture_compression_s3tc
-                    || GLEW_NV_texture_compression_s3tc;
+                return caps.dxt1_compression_supported;
             case pixel_declaration::pixel_type::rgba_dxt3:
-                return GLEW_ANGLE_texture_compression_dxt3
-                    || GLEW_EXT_texture_compression_s3tc
-                    || GLEW_NV_texture_compression_s3tc;
+                return caps.dxt3_compression_supported;
             case pixel_declaration::pixel_type::rgba_dxt5:
-                return GLEW_ANGLE_texture_compression_dxt5
-                    || GLEW_EXT_texture_compression_s3tc
-                    || GLEW_NV_texture_compression_s3tc;
+                return caps.dxt5_compression_supported;
             case pixel_declaration::pixel_type::rgb_pvrtc2:
             case pixel_declaration::pixel_type::rgb_pvrtc4:
             case pixel_declaration::pixel_type::rgba_pvrtc2:
             case pixel_declaration::pixel_type::rgba_pvrtc4:
-                return !!GLEW_IMG_texture_compression_pvrtc;
+                return caps.pvrtc_compression_supported;
             case pixel_declaration::pixel_type::rgba_pvrtc2_v2:
             case pixel_declaration::pixel_type::rgba_pvrtc4_v2:
-                return !!GLEW_IMG_texture_compression_pvrtc2;
+                return caps.pvrtc2_compression_supported;
             default:
                 E2D_ASSERT_MSG(false, "unexpected pixel type");
                 return false;
@@ -1056,13 +1049,7 @@ namespace e2d
             case index_declaration::index_type::unsigned_short:
                 return true;
             case index_declaration::index_type::unsigned_int:
-        #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
-                return true;
-        #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
-                return GLEW_OES_element_index_uint;
-        #else
-        #   error unknown render mode
-        #endif
+                return device_capabilities().element_index_uint;
             default:
                 E2D_ASSERT_MSG(false, "unexpected index type");
                 return false;

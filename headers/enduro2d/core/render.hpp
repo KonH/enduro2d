@@ -892,6 +892,16 @@ namespace e2d
             bool npot_texture_supported = false;
             bool depth_texture_supported = false;
             bool render_target_supported = false;
+            bool element_index_uint = false;
+            bool depth16_supported = false;
+            bool depth24_supported = false;
+            bool depth32_supported = false;
+            bool depth24_stencil8_supported = false;
+            bool dxt1_compression_supported = false;
+            bool dxt3_compression_supported = false;
+            bool dxt5_compression_supported = false;
+            bool pvrtc_compression_supported = false;
+            bool pvrtc2_compression_supported = false;
         };
     public:
         render(debug& d, window& w);
@@ -944,6 +954,7 @@ namespace e2d
         bool is_pixel_supported(const pixel_declaration& decl) const noexcept;
         bool is_index_supported(const index_declaration& decl) const noexcept;
         bool is_vertex_supported(const vertex_declaration& decl) const noexcept;
+		bool is_enabled() const noexcept;
     private:
         class internal_state;
         std::unique_ptr<internal_state> state_;
