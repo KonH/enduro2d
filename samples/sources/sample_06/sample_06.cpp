@@ -5,6 +5,8 @@
  ******************************************************************************/
 
 #include "../common.hpp"
+#include <random>
+
 using namespace e2d;
 
 namespace
@@ -48,13 +50,16 @@ namespace
     
     struct meteor_generator_timer {
         f32 counter{0};
-        f32 max_counter{2.f};
+        f32 max_counter{0.5f};
     };
     
     struct meteor_generator {
         bool need_generate{false};
         v3f translation;
-        node_iptr node;
+        q4f rotation;
+        f32 velocity_value{80.f};
+        rad<f32> velocity_angle;
+        node_iptr parentNode;
     };
     
     struct laser_generator {
@@ -62,7 +67,7 @@ namespace
         v3f translation;
         q4f rotation;
         rad<f32> velocity_angle;
-        node_iptr node;
+        node_iptr parentNode;
     };
 
     class game_system final : public ecs::system {
@@ -138,7 +143,7 @@ namespace
                                     lg.translation = node->translation();
                                     lg.rotation = node->rotation();
                                     lg.velocity_angle = body.velocity_angle;
-                                    lg.node = node->parent();
+                                    lg.parentNode = node->parent();
                                 });
                         }
                     }
@@ -157,8 +162,32 @@ namespace
                         timer.counter = 0;
                         auto& mg = e.get_component<meteor_generator>();
                         mg.need_generate = true;
-                        mg.translation = v3f();
-                        mg.node = act.node();
+
+                        v2u win_size = the<window>().real_size();
+                        f32 outer_radius = 1.3f * math::maximum(win_size);
+                        f32 inner_radius = 0.3f * math::minimum(win_size);
+
+                        std::random_device rd;
+                        std::mt19937 gen(rd());
+                        std::uniform_real_distribution<f32> dis(-M_PI, M_PI);
+                        auto outer_angle = make_rad(dis(gen));
+                        auto inner_angle = make_rad(dis(gen));
+
+                        auto r_mat = math::make_rotation_matrix3(outer_angle,0.f,0.f,1.f);
+                        mg.translation = v3f::unit_x() * r_mat * outer_radius;
+
+                        r_mat = math::make_rotation_matrix3(inner_angle,0.f,0.f,1.f);
+                        auto target = v3f::unit_x() * r_mat * inner_radius;
+                        auto dir = math::normalized(mg.translation - target);
+                        auto unit_x = v3f::unit_x();
+                        f32 dz = dir.x * unit_x.y - dir.y * unit_x.x;
+                        f32 move_angle = -std::atan2f( std::fabsf(dz) + 1.0e-37f, math::dot(dir, unit_x));
+                        mg.velocity_angle = rad<f32>(move_angle + M_PI_2);
+
+                        std::uniform_real_distribution<f32> vel(80.f, 200.f);
+                        mg.velocity_value = vel(gen);
+
+                        mg.parentNode = act.node();
                     }
                 });
         }
@@ -174,11 +203,11 @@ namespace
                         auto meteor_big3_prefab_ref = the<library>().load_asset<prefab_asset>("meteor_big3_prefab.json");
                         auto meteor_i = the<world>().instantiate(meteor_big3_prefab_ref->content());
                         meteor_i->entity_filler()
-                            .component<actor>(node::create(meteor_i, mg.node))
-                            .component<distance>(distance(1000.f))
+                            .component<actor>(node::create(meteor_i, mg.parentNode))
+                            .component<distance>(distance(2000.f))
                             .component<physical_body>(physical_body{
-                                80.f,
-                                rad<f32>(0),
+                                mg.velocity_value,
+                                mg.velocity_angle,
                                 rad<f32>(0),
                                 e2d::math::quarter_pi<f32>()
                             })
@@ -198,7 +227,7 @@ namespace
                         auto laser_prefab_ref = the<library>().load_asset<prefab_asset>("laser_prefab.json");
                         auto laser_i = the<world>().instantiate(laser_prefab_ref->content());
                         laser_i->entity_filler()
-                            .component<actor>(node::create(laser_i, lg.node))
+                            .component<actor>(node::create(laser_i, lg.parentNode))
                             .component<distance>(distance(1000.f))
                             .component<physical_body>(physical_body{
                                 500.f,
