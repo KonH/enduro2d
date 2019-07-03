@@ -48,29 +48,34 @@ namespace
     };
     
     struct collision_detected {
-        u32 mask_group{0u}; //collision::flag_group
+        u32 mask_group{0u};
     };
     
     struct meteor_generator_timer {
         f32 counter{0};
         f32 max_counter{0.5f};
     };
-    
-    struct meteor_generator {
-        bool need_generate{false};
-        v3f translation;
-        q4f rotation;
-        f32 velocity_value{80.f};
-        rad<f32> velocity_angle;
-        node_iptr parentNode;
-    };
-    
-    struct laser_generator {
-        bool need_generate{false};
-        v3f translation;
-        q4f rotation;
-        rad<f32> velocity_angle;
-        node_iptr parentNode;
+
+    struct object_generator {
+        struct object_data {
+            enum object_type { none, laser, meteor };
+            object_type type{object_type::none};
+            f32 velocity_value{0.f};
+            v3f translation;
+            q4f rotation;
+            rad<f32> velocity_angle;
+            node_iptr parentNode;
+        };
+
+        void addObject (const object_generator::object_data& d) {
+            E2D_ASSERT(count < max_size);
+            objects[count] = d;
+            count++;
+        }
+
+        object_data objects[5];
+        i32 count{0};
+        i32 max_size{5};
     };
 
     class game_system final : public ecs::system {
@@ -154,14 +159,16 @@ namespace
                             }
 
                             if ( need_create_laser ) {
-                                owner.for_each_component<laser_generator>(
-                                [&node,&body](const ecs::const_entity& e, laser_generator& lg){
-                                    lg.need_generate = true;
-                                    lg.translation = node->translation();
-                                    lg.rotation = node->rotation();
-                                    lg.velocity_angle = body.velocity_angle;
-                                    lg.parentNode = node->parent();
-                                });
+                                owner.for_joined_components<scene, object_generator>(
+                                    [&node,&body](const ecs::const_entity& e, const scene& s, object_generator& og){
+                                        object_generator::object_data data;
+                                        data.type = object_generator::object_data::object_type::laser;
+                                        data.translation = node->translation();
+                                        data.rotation = node->rotation();
+                                        data.velocity_angle = body.velocity_angle;
+                                        data.parentNode = node->parent();
+                                        og.addObject(data);
+                                    });
                             }
                         }
 
@@ -182,8 +189,8 @@ namespace
                     timer.counter += dt;
                     if ( timer.counter >= timer.max_counter  ) {
                         timer.counter = 0;
-                        auto& mg = e.get_component<meteor_generator>();
-                        mg.need_generate = true;
+                        object_generator::object_data data;
+                        data.type = object_generator::object_data::object_type::meteor;
 
                         v2u win_size = the<window>().real_size();
                         f32 outer_radius = 1.3f * math::maximum(win_size);
@@ -196,20 +203,23 @@ namespace
                         auto inner_angle = make_rad(dis(gen));
 
                         auto r_mat = math::make_rotation_matrix3(outer_angle,0.f,0.f,1.f);
-                        mg.translation = v3f::unit_x() * r_mat * outer_radius;
+                        data.translation = v3f::unit_x() * r_mat * outer_radius;
 
                         r_mat = math::make_rotation_matrix3(inner_angle,0.f,0.f,1.f);
                         auto target = v3f::unit_x() * r_mat * inner_radius;
-                        auto dir = math::normalized(mg.translation - target);
+                        auto dir = math::normalized(data.translation - target);
                         auto unit_x = v3f::unit_x();
                         f32 dz = dir.x * unit_x.y - dir.y * unit_x.x;
                         f32 move_angle = -std::atan2f( std::fabsf(dz) + 1.0e-37f, math::dot(dir, unit_x));
-                        mg.velocity_angle = rad<f32>(move_angle + M_PI_2);
+                        data.velocity_angle = rad<f32>(move_angle + M_PI_2);
 
                         std::uniform_real_distribution<f32> vel(80.f, 200.f);
-                        mg.velocity_value = vel(gen);
+                        data.velocity_value = vel(gen);
 
-                        mg.parentNode = act.node();
+                        data.parentNode = act.node();
+
+                        auto& og = e.get_component<object_generator>();
+                        og.addObject(data);
                     }
                 });
         }
@@ -218,55 +228,64 @@ namespace
     class object_generation_system final : public ecs::system {
     public:
         void process(ecs::registry& owner) override {
-            owner.for_joined_components<scene, meteor_generator, laser_generator>(
-                [](const ecs::const_entity& e, const scene& s, meteor_generator& mg, laser_generator& lg){
-                    if ( mg.need_generate ) {
-                        mg.need_generate = false;
-                        auto meteor_big3_prefab_ref = the<library>().load_asset<prefab_asset>("meteor_big3_prefab.json");
-                        auto meteor_i = the<world>().instantiate(meteor_big3_prefab_ref->content());
-                        meteor_i->entity_filler()
-                            .component<actor>(node::create(meteor_i, mg.parentNode))
-                            .component<distance>(distance(2000.f))
-                            .component<physical_body>(physical_body{
-                                mg.velocity_value,
-                                mg.velocity_angle,
-                                rad<f32>(0),
-                                e2d::math::quarter_pi<f32>()
-                            })
-                            .component<collision>(collision{
-                                collision::shape_type::circle,
-                                45,
-                                collision::flag_group::meteor,
-                                collision::flag_group::laser | collision::flag_group::player
-                            });
+            owner.for_joined_components<scene, object_generator>(
+                [](const ecs::const_entity& e, const scene& s, object_generator& og){
+                    for ( int i = 0; i < og.count; i++ ) {
+                        auto& o = og.objects[i];
+                        switch (o.type) {
+                            case object_generator::object_data::object_type::meteor: {
+                                auto meteor_big3_prefab_ref = the<library>().load_asset<prefab_asset>("meteor_big3_prefab.json");
+                                auto meteor_i = the<world>().instantiate(meteor_big3_prefab_ref->content());
+                                meteor_i->entity_filler()
+                                    .component<actor>(node::create(meteor_i, o.parentNode))
+                                    .component<distance>(distance(2000.f))
+                                    .component<physical_body>(physical_body{
+                                        o.velocity_value,
+                                        o.velocity_angle,
+                                        rad<f32>(0),
+                                        e2d::math::quarter_pi<f32>()
+                                    })
+                                    .component<collision>(collision{
+                                        collision::shape_type::circle,
+                                        45,
+                                        collision::flag_group::meteor,
+                                        collision::flag_group::laser | collision::flag_group::player
+                                    });
 
-                        node_iptr sprite_n = meteor_i->get_component<actor>().get().node();
-                        sprite_n->translation(mg.translation);
-                    }
+                                node_iptr sprite_n = meteor_i->get_component<actor>().get().node();
+                                sprite_n->translation(o.translation);
+                            } break;
 
-                    if ( lg.need_generate ) {
-                        lg.need_generate = false;
-                        auto laser_prefab_ref = the<library>().load_asset<prefab_asset>("laser_prefab.json");
-                        auto laser_i = the<world>().instantiate(laser_prefab_ref->content());
-                        laser_i->entity_filler()
-                            .component<actor>(node::create(laser_i, lg.parentNode))
-                            .component<distance>(distance(1000.f))
-                            .component<physical_body>(physical_body{
-                                500.f,
-                                lg.velocity_angle,
-                                rad<f32>(0),
-                                rad<f32>(0)
-                            })
-                            .component<collision>(collision{
-                                collision::shape_type::line,
-                                57,
-                                collision::flag_group::laser,
-                                collision::flag_group::meteor
-                            });
+                            case object_generator::object_data::object_type::laser: {
+                                auto laser_prefab_ref = the<library>().load_asset<prefab_asset>("laser_prefab.json");
+                                auto laser_i = the<world>().instantiate(laser_prefab_ref->content());
+                                laser_i->entity_filler()
+                                    .component<actor>(node::create(laser_i, o.parentNode))
+                                    .component<distance>(distance(1000.f))
+                                    .component<physical_body>(physical_body{
+                                        500.f,
+                                        o.velocity_angle,
+                                        rad<f32>(0),
+                                        rad<f32>(0)
+                                    })
+                                    .component<collision>(collision{
+                                        collision::shape_type::line,
+                                        57,
+                                        collision::flag_group::laser,
+                                        collision::flag_group::meteor
+                                    });
 
-                        node_iptr laser_n = laser_i->get_component<actor>().get().node();
-                        laser_n->translation(lg.translation);
-                        laser_n->rotation(lg.rotation);
+                                node_iptr laser_n = laser_i->get_component<actor>().get().node();
+                                laser_n->translation(o.translation);
+                                laser_n->rotation(o.rotation);
+                            } break;
+
+                            case object_generator::object_data::object_type::none: {
+                                E2D_ASSERT(false);
+                            } break;
+                        }
+
+                        og.count = 0;
                     }
               });
         }
@@ -446,8 +465,7 @@ namespace
             scene_i->entity_filler()
                 .component<scene>()
                 .component<meteor_generator_timer>()
-                .component<meteor_generator>()
-                .component<laser_generator>()
+                .component<object_generator>()
                 .component<actor>(node::create(scene_i));
 
             auto scene_r = scene_i->get_component<actor>().get().node();
