@@ -14,10 +14,6 @@ namespace
 {
     using namespace e2d;
 
-    //
-    // platform_internal_state_impl_android
-    //
-
     class platform_internal_state_impl_android final : public platform_internal_state_impl {
     public:
         platform_internal_state_impl_android() = default;
@@ -41,8 +37,4 @@ namespace e2d
     }
 }
 
-// TODO: remove
-int e2d_main(int argc, char *argv[]) {
-    return 0;
-}
 #endif

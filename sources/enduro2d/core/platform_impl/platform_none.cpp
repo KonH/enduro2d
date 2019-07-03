@@ -26,4 +26,8 @@ namespace e2d
     }
 }
 
+int main(int argc, char *argv[]) {
+    return e2d_main(argc, argv);
+}
+
 #endif
