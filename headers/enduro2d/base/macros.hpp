@@ -17,6 +17,15 @@
 #    include <crtdbg.h>
 #    define E2D_ASSERT(expr)          _ASSERT_EXPR((expr), nullptr)
 #    define E2D_ASSERT_MSG(expr, msg) _ASSERT_EXPR((expr), _CRT_WIDE(msg))
+#  elif defined(E2D_PLATFORM) && E2D_PLATFORM == E2D_PLATFORM_ANDROID
+#    include <android/log.h>
+#    include <csignal>
+#    define E2D_ASSERT(expr)          E2D_ASSERT_MSG((expr), #expr)
+#    define E2D_ASSERT_MSG(expr, msg) \
+       (void)( \
+         (!!(expr)) || \
+         (__android_log_print(ANDROID_LOG_WARN, "E2D_ASSERT", "%s (%d): %s", __FILE__, __LINE__, (msg)) && std::raise(SIGINT)) \
+       )
 #  else
 #    define E2D_ASSERT(expr)          assert((expr))
 #    define E2D_ASSERT_MSG(expr, msg) assert((expr) && (msg))

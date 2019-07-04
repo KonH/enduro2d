@@ -71,7 +71,7 @@ if(E2D_BUILD_WITH_UBSAN AND (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
 endif()
 
 #
-#
+# e2d config
 #
 
 # detect target platform
@@ -136,8 +136,6 @@ if(WIN32)
 endif()
 
 function(e2d_add_executable target_name source_list)
-    message(STATUS "e2d_add_executable: target_name: ${target_name}")
-    message(STATUS "e2d_add_executable: source_list: ${${source_list}}")
     if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
         add_library(${target_name} SHARED ${${source_list}})
     else()

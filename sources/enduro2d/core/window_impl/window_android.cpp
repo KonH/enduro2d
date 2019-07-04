@@ -43,15 +43,18 @@ namespace
         enum class msg_type : u32 {
             set_orientation,
         };
+
         struct orientation {
             int value;
         };
+
         struct message {
             msg_type type;
             union {
                 orientation orient;
             };
         };
+
         using msg_queue_t = message_queue<message>;
     public:
         android_activity() noexcept;
@@ -75,13 +78,13 @@ namespace
         ~android_surface() noexcept;
         void create_context(v4i rgba_size, i32 depth, i32 stencil, i32 samples);
         void destroy_context() noexcept;
-        void create_surface(jobject window);
+        void create_surface(ANativeWindow* window);
         void destroy_surface() noexcept;
-        void bind_context() noexcept;
-        void swap_buffers() noexcept;
+        void bind_context() const noexcept;
+        void swap_buffers() const noexcept;
         [[nodiscard]] bool has_context() const noexcept;
         [[nodiscard]] bool has_surface() const noexcept;
-        [[nodiscard]] v2u size() const noexcept;
+        [[nodiscard]] v2u framebuffer_size() const noexcept;
     private:
         EGLConfig config_ = nullptr;
         EGLDisplay display_ = EGL_NO_DISPLAY;
@@ -112,7 +115,7 @@ namespace
         };
 
         struct surface_data {
-            jobject surface;
+            ANativeWindow* window;
             int width;
             int height;
         };
@@ -139,6 +142,7 @@ namespace
                 touch touch;
             };
         };
+
         using event_listener_uptr = window::event_listener_uptr;
         using listeners_t = vector<event_listener_uptr>;
         using msg_queue_t = message_queue<message>;
@@ -146,13 +150,14 @@ namespace
         android_window() noexcept;
         void quit();
         void push_msg(const message& msg);
+        void process_messages();
         [[nodiscard]] bool is_current_thread() const noexcept;
+        [[nodiscard]] const android_surface& surface() const noexcept;
     
         template < typename F, typename... Args >
         void for_all_listeners(const F& f, const Args&... args) noexcept;
     private:
         void render_loop_() noexcept;
-        void process_messages_();
         void on_destroy_();
         void on_surface_changed_(const surface_data&);
         void on_key_(const key&);
@@ -168,6 +173,7 @@ namespace
         bool enabled = true;
         bool visible = true;
         bool focused = true;
+        bool should_close = false;
     private:
         android_surface surface_;
         msg_queue_t messages_;
@@ -220,6 +226,7 @@ namespace
                 if ( queue_.empty() )
                     return;
                 temp = std::move(queue_.front());
+                queue_.erase(queue_.begin());
             }
             fn(temp);
         }
@@ -312,21 +319,22 @@ namespace
     }
 
     android_surface::~android_surface() noexcept {
-        E2D_ASSERT(!context_);
+        E2D_ASSERT(context_ == EGL_NO_CONTEXT);
         E2D_ASSERT(!window_);
     }
 
     void android_surface::create_context(v4i rgba_size, i32 depth, i32 stencil, i32 samples) {
+        E2D_ASSERT(context_ == EGL_NO_CONTEXT);
         EGL_CHECK_CODE(debug_, display_ = eglGetDisplay(EGL_DEFAULT_DISPLAY));
-        if ( display_ == EGL_NO_DISPLAY )
+        if ( display_ == EGL_NO_DISPLAY ) {
             throw std::runtime_error("failed to get EGL display");
-
+        }
         EGLint maj_ver, min_ver;
         EGLBoolean ok;
         EGL_CHECK_CODE(debug_, ok = eglInitialize(display_, &maj_ver, &min_ver));
-        if ( ok != EGL_TRUE )
+        if ( ok != EGL_TRUE ) {
             throw std::runtime_error("failed to initialize EGL");
-
+        }
         egl_version_ = maj_ver * 100 + min_ver * 10;
         EGL_CHECK_CODE(debug_, eglBindAPI(EGL_OPENGL_ES_API));
 
@@ -349,9 +357,9 @@ namespace
             throw std::runtime_error("failed to get EGL display configs");
 
         EGL_CHECK_CODE(debug_, ok = eglChooseConfig(display_, required_config, configs, std::size(configs), &num_configs));
-        if ( ok != EGL_TRUE || num_configs == 0 )
+        if ( ok != EGL_TRUE || num_configs == 0 ) {
             throw std::runtime_error("failed to choose EGL display config");
-
+        }
         const auto get_attrib = [this] (EGLConfig cfg, EGLint attrib) {
             EGLint result = 0;
             EGLBoolean ok;
@@ -377,8 +385,10 @@ namespace
             EGL_NONE
         };
         EGL_CHECK_CODE(debug_, context_ = eglCreateContext(display_, config_, EGL_NO_CONTEXT, context_attribs));
-        if ( context_ == EGL_NO_CONTEXT )
+        if ( context_ == EGL_NO_CONTEXT ) {
             throw std::runtime_error("failed to create EGL context");
+        }
+        __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "create_context - ok\n");
     }
 
     void android_surface::destroy_context() noexcept {
@@ -393,30 +403,33 @@ namespace
         }
     }
 
-    void android_surface::create_surface(jobject window) {
+    void android_surface::create_surface(ANativeWindow* window) {
+        if ( context_ == EGL_NO_CONTEXT ) {
+            throw std::runtime_error("can't create surface without EGL context");
+        }
         destroy_surface();
-
-        java_env je;
-        window_ = ANativeWindow_fromSurface(je.env(), window);
+        window_ = window;
         
         EGLint format = 0;
         EGL_CHECK_CODE(debug_, eglGetConfigAttrib(display_, config_, EGL_NATIVE_VISUAL_ID, &format));
 
-        if ( !ANativeWindow_setBuffersGeometry(window_, 0, 0, format) )
+        if ( ANativeWindow_setBuffersGeometry(window_, 0, 0, format) ) {
             throw std::runtime_error("failed to set pixel format to native window");
-
+        }
         const EGLint surface_attribs[] = {
             EGL_RENDER_BUFFER, EGL_BACK_BUFFER,
             EGL_NONE
         };
         EGL_CHECK_CODE(debug_,  surface_ = eglCreateWindowSurface(display_, config_, window_, surface_attribs));
-        if ( surface_ == EGL_NO_SURFACE )
+        if ( surface_ == EGL_NO_SURFACE ) {
             throw std::runtime_error("failed to create window surface");
-            
+        }
         EGLBoolean ok;
         EGL_CHECK_CODE(debug_, ok = eglMakeCurrent(display_, surface_, surface_, context_));
-        if ( ok != EGL_TRUE )
+        if ( ok != EGL_TRUE ) {
             throw std::runtime_error("failed to make EGL context current");
+        }
+        __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "create_surface - ok\n");
     }
 
     void android_surface::destroy_surface() noexcept {
@@ -431,11 +444,11 @@ namespace
         }
     }
 
-    void android_surface::bind_context() noexcept {
+    void android_surface::bind_context() const noexcept {
         EGL_CHECK_CODE(debug_, eglMakeCurrent(display_, surface_, surface_, context_));
     }
 
-    void android_surface::swap_buffers() noexcept {
+    void android_surface::swap_buffers() const noexcept {
         E2D_ASSERT(display_ != EGL_NO_DISPLAY);
         E2D_ASSERT(surface_ != EGL_NO_SURFACE);
         E2D_ASSERT(context_ != EGL_NO_CONTEXT && context_ == eglGetCurrentContext());
@@ -447,10 +460,10 @@ namespace
     }
     
     bool android_surface::has_surface() const noexcept {
-        return surface_ != EGL_NO_SURFACE;
+        return surface_ != EGL_NO_SURFACE && window_ != nullptr;
     }
 
-    v2u android_surface::size() const noexcept {
+    v2u android_surface::framebuffer_size() const noexcept {
         E2D_ASSERT(display_ != EGL_NO_DISPLAY);
         E2D_ASSERT(surface_ != EGL_NO_SURFACE);
         v2u result;
@@ -478,11 +491,12 @@ namespace
 
         for (; !exit_loop_.load(std::memory_order_relaxed); ) {
             try {
-                process_messages_();
-            } catch(...) {
-                // TODO
+                process_messages();
+            } catch(const std::exception &e) {
+                __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "android_window::render_loop_ exception: %s\n", e.what());
             }
             if ( !main_was_called && surface_.has_surface() ) {
+                __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "e2d_main======================================================\n");
                 main_was_called = true;
                 e2d_main(0, nullptr);
             }
@@ -493,7 +507,8 @@ namespace
         messages_.push(msg);
     }
 
-    void android_window::process_messages_() {
+    void android_window::process_messages() {
+        std::unique_lock<std::recursive_mutex> guard_(this->rmutex);
         messages_.process([this] (auto& msg) {
             switch( msg.type ) {
                 case msg_type::app_create :
@@ -530,17 +545,22 @@ namespace
         // ...
         surface_.destroy_context();
         exit_loop_.store(true, std::memory_order_relaxed);
+        should_close = true;
     }
 
     void android_window::on_surface_changed_(const surface_data& data) {
-        if ( data.surface ) {
+        if ( data.window ) {
             if ( !surface_.has_context() ) {
                 surface_.create_context(v4i(8,8,8,0), 16, 0, 0);
-                __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "egl context initialized\n");
             }
-            surface_.create_surface(data.surface);
+            surface_.create_surface(data.window);
+            framebuffer_size = surface_.framebuffer_size();
+            real_size = surface_.framebuffer_size(); // temp
+            the<debug>().error("on_surface_changed_, real(%0, %1), framebuffer(%2, %3)", real_size.x, real_size.y, framebuffer_size.x, framebuffer_size.y);
         } else {
             surface_.destroy_surface();
+            framebuffer_size = v2u(0,0);
+            real_size = v2u(0,0);
         }
     }
      
@@ -565,6 +585,11 @@ namespace
             }
         }
     }
+    
+    const android_surface& android_window::surface() const noexcept {
+        E2D_ASSERT(is_current_thread());
+        return surface_;
+    }
 
     bool android_window::is_current_thread() const noexcept {
         return std::this_thread::get_id() == thread_.get_id();
@@ -579,21 +604,38 @@ namespace e2d
 
     class window::state final : private e2d::noncopyable {
     public:
-        state() noexcept = default;
+        state(const v2u& size) noexcept;
         ~state() noexcept = default;
-
-        std::recursive_mutex& rmutex() noexcept {
-            return java_interface::instance().window.rmutex;
-        }
-
-        auto& listeners() noexcept {
-            return java_interface::instance().window.listeners;
-        }
+        android_window& native_window() noexcept;
+        std::recursive_mutex& rmutex() noexcept;
+        auto& listeners() noexcept;
     };
+    
+    window::state::state(const v2u& size) noexcept {
+        auto& wnd = java_interface::instance().window;
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        wnd.virtual_size = size;
+    }
+    
+    android_window& window::state::native_window() noexcept {
+        return java_interface::instance().window;
+    }
+
+    std::recursive_mutex& window::state::rmutex() noexcept {
+        return java_interface::instance().window.rmutex;
+    }
+
+    auto& window::state::listeners() noexcept {
+        return java_interface::instance().window.listeners;
+    }
+
+    //
+    // window
+    //
 
     window::window(const v2u& size, str_view title, bool vsync, bool fullscreen)
-    : state_(new state()) {
-        E2D_UNUSED(size, title, vsync, fullscreen);
+    : state_(new state(size)) {
+        E2D_UNUSED(title, vsync, fullscreen);
     }
 
     window::~window() noexcept = default;
@@ -621,31 +663,37 @@ namespace e2d
     bool window::enabled() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return true;
     }
 
     bool window::visible() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return true;
     }
 
     bool window::focused() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return true;
     }
 
     bool window::minimized() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return false;
     }
 
     bool window::fullscreen() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return true;
     }
 
     bool window::toggle_fullscreen(bool yesno) noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return true;
     }
 
     void window::hide_cursor() noexcept {
@@ -661,26 +709,32 @@ namespace e2d
     bool window::is_cursor_hidden() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        return true;
     }
 
     v2u window::real_size() const noexcept {
-        std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
-        // TODO
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        return wnd.real_size;
     }
 
     v2u window::virtual_size() const noexcept {
-        std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
-        // TODO
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        return wnd.virtual_size;
     }
 
     v2u window::framebuffer_size() const noexcept {
-        std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
-        // TODO
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        return wnd.framebuffer_size;
     }
 
     const str& window::title() const noexcept {
         std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
         // TODO
+        static str result;
+        return result;
     }
 
     void window::set_title(str_view title) {
@@ -689,8 +743,9 @@ namespace e2d
     }
 
     bool window::should_close() const noexcept {
-        std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
-        // TODO
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        return wnd.should_close;
     }
 
     void window::set_should_close(bool yesno) noexcept {
@@ -699,13 +754,20 @@ namespace e2d
     }
 
     void window::bind_context() noexcept {
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        wnd.surface().bind_context();
     }
 
     void window::swap_buffers() noexcept {
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        wnd.surface().swap_buffers();
     }
 
     bool window::poll_events() noexcept {
-        return false;
+        java_interface::instance().window.process_messages();
+        return true;
     }
 
     window::event_listener& window::register_event_listener(event_listener_uptr listener) {
@@ -743,8 +805,8 @@ namespace
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_create;
             inst.window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -758,8 +820,8 @@ namespace
             auto& inst = java_interface::instance();
             inst.window.push_msg(msg);
             inst.window.quit();
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -770,8 +832,8 @@ namespace
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_start;
             java_interface::instance().window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -782,8 +844,8 @@ namespace
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_stop;
             java_interface::instance().window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -794,8 +856,8 @@ namespace
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_pause;
             java_interface::instance().window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -806,23 +868,23 @@ namespace
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_resume;
             java_interface::instance().window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceChanged (JNIEnv* env, jobject obj, jobject surface, jint w, jint h) noexcept {
         try {
             __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_surfaceChanged\n");
-
+            
             android_window::message msg = {};
             msg.type = android_window::msg_type::surface_changed;
-            msg.surface_data.surface = surface;
+            msg.surface_data.window = ANativeWindow_fromSurface(env, surface);
             msg.surface_data.width = w;
             msg.surface_data.height = h;
             java_interface::instance().window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -833,40 +895,40 @@ namespace
             android_window::message msg = {};
             msg.type = android_window::msg_type::surface_changed;
             java_interface::instance().window.push_msg(msg);
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_visibilityChanged (JNIEnv* env, jobject obj) noexcept {
         try {
             __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_visibilityChanged\n");
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_orientationChanged (JNIEnv* env, jobject obj) noexcept {
         try {
             __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_orientationChanged\n");
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onLowMemory (JNIEnv* env, jobject obj) noexcept {
         try {
             __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_onLowMemory\n");
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTrimMemory (JNIEnv* env, jobject obj) noexcept {
         try {
             __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_onTrimMemory\n");
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 
@@ -874,8 +936,8 @@ namespace
         try {
             __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_tick\n");
             java_interface::instance().activity.process_messages();
-        } catch(...) {
-            // TODO ?
+        } catch(const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
     }
 }
