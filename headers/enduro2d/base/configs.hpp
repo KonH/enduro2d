@@ -17,16 +17,6 @@
 #define E2D_COMPILER_MSVC  3
 
 #ifndef E2D_COMPILER
-#  if defined(__clang__)
-#    define E2D_COMPILER E2D_COMPILER_CLANG
-#  elif defined(__GNUC__)
-#    define E2D_COMPILER E2D_COMPILER_GCC
-#  elif defined(_MSC_VER)
-#    define E2D_COMPILER E2D_COMPILER_MSVC
-#  endif
-#endif
-
-#ifndef E2D_COMPILER
 #  error E2D_COMPILER not detected
 #endif
 

@@ -74,17 +74,40 @@ endif()
 # e2d config
 #
 
+# detect compiler
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    set(E2D_COMPILER "E2D_COMPILER_MSVC")
+    set(E2D_COMPILER_FLAGS /W3 /MP)
+    set(E2D_DEFINITIONS -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set(E2D_COMPILER "E2D_COMPILER_GCC")
+    set(E2D_COMPILER_FLAGS -Wall -Wextra -Wpedantic)
+    set(E2D_DEFINITIONS "")
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+    set(E2D_COMPILER "E2D_COMPILER_CLANG")
+    set(E2D_COMPILER_FLAGS -Wall -Wextra -Wpedantic -Werror=return-type -Werror=multichar -Werror=odr)
+    set(E2D_DEFINITIONS "")
+else()
+    message(FATAL_ERROR "unsupported compiler ${CMAKE_CXX_COMPILER_ID}")
+endif()
+
 # detect target platform
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(E2D_PLATFORM "E2D_PLATFORM_LINUX")
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
+    set(E2D_PLATFORM_LIBS glfw libglew_static)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(E2D_PLATFORM "E2D_PLATFORM_ANDROID")
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set(E2D_PLATFORM_LIBS GLESv2 EGL android log)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(E2D_PLATFORM "E2D_PLATFORM_MACOSX")
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
+    set(E2D_PLATFORM_LIBS glfw libglew_static)
+    set(E2D_COMPILER_FLAGS ${E2D_COMPILER_FLAGS} -Wno-deprecated-declarations)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(E2D_PLATFORM "E2D_PLATFORM_IOS")
-elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(E2D_PLATFORM_LIBS "")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(E2D_PLATFORM "E2D_PLATFORM_WINDOWS")
+    set(E2D_PLATFORM_LIBS glfw libglew_static)
 else()
     message(FATAL_ERROR "unsupported platform ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 endif()
@@ -152,14 +175,8 @@ add_library(${PROJECT_NAME} STATIC
     ${E2D_SOURCES}
     ${E2D_3RDPARTY})
 
-if(WIN32)
-    target_link_libraries(${PROJECT_NAME}
-        PRIVATE glfw
-        PRIVATE libglew_static)
-else()
-    target_link_libraries(${PROJECT_NAME}
-        PRIVATE GLESv2 EGL android log)
-endif()
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE ${E2D_PLATFORM_LIBS})
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
     ${E2D_HEADERS}
@@ -174,25 +191,15 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE sources)
 
 target_compile_options(${PROJECT_NAME}
-    PRIVATE
-    $<$<CXX_COMPILER_ID:MSVC>:
-        /W3 /MP>
-    PRIVATE
-    $<$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>:
-        -Wall -Wextra -Wpedantic>
-    PRIVATE
-    $<$<PLATFORM_ID:Darwin>:
-        -Wno-deprecated-declarations>)
+    PRIVATE ${E2D_COMPILER_FLAGS})
 
 target_compile_features(${PROJECT_NAME}
     PUBLIC cxx_std_17)
 
 target_compile_definitions(${PROJECT_NAME}
-    PUBLIC
-    $<$<CXX_COMPILER_ID:MSVC>:
-        -D_CRT_SECURE_NO_WARNINGS
-        -D_SCL_SECURE_NO_WARNINGS>
-    PUBLIC -DE2D_PLATFORM=${E2D_PLATFORM})
+    PUBLIC ${E2D_DEFINITIONS}
+    PUBLIC -DE2D_PLATFORM=${E2D_PLATFORM}
+    PUBLIC -DE2D_COMPILER=${E2D_COMPILER})
 
 #
 # subdirectories
