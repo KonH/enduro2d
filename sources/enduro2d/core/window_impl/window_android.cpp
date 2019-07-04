@@ -350,13 +350,6 @@ namespace
         const EGLint required_config[] = {
             EGL_SURFACE_TYPE,     EGL_WINDOW_BIT,
             EGL_RENDERABLE_TYPE,  EGL_OPENGL_ES2_BIT,
-            EGL_RED_SIZE,         rgba_size[0],
-            EGL_GREEN_SIZE,       rgba_size[1],
-            EGL_BLUE_SIZE,        rgba_size[2],
-            EGL_ALPHA_SIZE,       rgba_size[2],
-            EGL_DEPTH_SIZE,       depth,
-            EGL_STENCIL_SIZE,     stencil,
-            EGL_SAMPLES,          samples,
             EGL_NONE
         };
         EGLConfig configs[1024];
@@ -376,15 +369,50 @@ namespace
             return ok == EGL_TRUE ? result : 0;
         };
         config_ = nullptr;
-
+        EGLint best_match_rgb = -1;
+        EGLint best_match_rgb_d = -1;
+        EGLint best_match_rgb_ds = -1;
+        EGLint best_match_rgb_samp = -1;
         for ( EGLint i = 0; i < num_configs; ++i ) {
-            EGLint depth = get_attrib(configs[i], EGL_DEPTH_SIZE);
-            EGLint stencil = get_attrib(configs[i], EGL_STENCIL_SIZE);
+            EGLint d = get_attrib(configs[i], EGL_DEPTH_SIZE);
+            EGLint s = get_attrib(configs[i], EGL_STENCIL_SIZE);
             EGLint r = get_attrib(configs[i], EGL_RED_SIZE);
             EGLint g = get_attrib(configs[i], EGL_GREEN_SIZE);
             EGLint b = get_attrib(configs[i], EGL_BLUE_SIZE);
             EGLint a = get_attrib(configs[i], EGL_ALPHA_SIZE);
-            EGLint samples = get_attrib(configs[i], EGL_SAMPLES);
+            EGLint samp = get_attrib(configs[i], EGL_SAMPLES);
+            bool rgb_match = v3i(rgba_size) <= v3i(r,g,b);
+            bool depth_match = (!depth == !d);
+            bool stencil_match = (!stencil == !s);
+            bool samp_match = ((samples > 1) == (samp > 1));
+
+            if ( rgba_size == v4i(r,g,b,a) && depth == d && stencil == s && samples == samp ) {
+                config_ = configs[i];
+            }
+            if ( rgb_match ) {
+                best_match_rgb = i;
+            }
+            if ( rgb_match && depth_match ) {
+                best_match_rgb_d = i;
+            }
+            if ( rgb_match && depth_match && stencil_match ) {
+                best_match_rgb_ds = i;
+            }
+            if ( rgb_match && depth_match && stencil_match && samp_match ) {
+                best_match_rgb_samp = i;
+            }
+        }
+        if ( !config_ && best_match_rgb_samp >= 0 ) {
+            config_ = configs[best_match_rgb_samp];
+        }
+        if ( !config_ && best_match_rgb_ds >= 0 ) {
+            config_ = configs[best_match_rgb_ds];
+        }
+        if ( !config_ && best_match_rgb_d >= 0 ) {
+            config_ = configs[best_match_rgb_d];
+        }
+        if ( !config_ && best_match_rgb >= 0 ) {
+            config_ = configs[best_match_rgb];
         }
         if ( !config_ ) {
             config_ = configs[0];
@@ -397,7 +425,21 @@ namespace
         if ( context_ == EGL_NO_CONTEXT ) {
             throw std::runtime_error("failed to create EGL context");
         }
-        __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "create_context - ok\n");
+        debug_.trace("ANDROID: selected EGL surface config:\n"
+            "--> EGL_DEPTH_SIZE: %0\n"
+            "--> EGL_STENCIL_SIZE: %1\n"
+            "--> EGL_RED_SIZE: %2\n"
+            "--> EGL_GREEN_SIZE: %3\n"
+            "--> EGL_BLUE_SIZE: %4\n"
+            "--> EGL_ALPHA_SIZE: %5\n"
+            "--> EGL_SAMPLES: %6",
+            get_attrib(config_, EGL_DEPTH_SIZE),
+            get_attrib(config_, EGL_STENCIL_SIZE),
+            get_attrib(config_, EGL_RED_SIZE),
+            get_attrib(config_, EGL_GREEN_SIZE),
+            get_attrib(config_, EGL_BLUE_SIZE),
+            get_attrib(config_, EGL_ALPHA_SIZE),
+            get_attrib(config_, EGL_SAMPLES));
     }
 
     void android_surface::destroy_context() noexcept {
@@ -438,7 +480,6 @@ namespace
         if ( ok != EGL_TRUE ) {
             throw std::runtime_error("failed to make EGL context current");
         }
-        __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "create_surface - ok\n");
     }
 
     void android_surface::destroy_surface() noexcept {
@@ -505,7 +546,6 @@ namespace
                 __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "android_window::render_loop_ exception: %s\n", e.what());
             }
             if ( !main_was_called && surface_.has_surface() ) {
-                __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "e2d_main======================================================\n");
                 main_was_called = true;
                 e2d_main(0, nullptr);
             }
@@ -985,8 +1025,6 @@ namespace
 {
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_create(JNIEnv* env, jobject, jobject activity) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_create\n");
-
             if ( !modules::is_initialized<debug>() ) {
                 modules::initialize<debug>();
                 the<debug>().register_sink<debug_native_log_sink>();
@@ -1004,8 +1042,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_destroy(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_destroy\n");
-
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_destroy;
 
@@ -1019,8 +1055,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_start(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_start\n");
-
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_start;
             java_interface::instance().window.push_msg(msg);
@@ -1031,8 +1065,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_stop(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_stop\n");
-
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_stop;
             java_interface::instance().window.push_msg(msg);
@@ -1043,8 +1075,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_pause(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_pause\n");
-
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_pause;
             java_interface::instance().window.push_msg(msg);
@@ -1055,8 +1085,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_resume(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_resume\n");
-
             android_window::message msg = {};
             msg.type = android_window::msg_type::app_resume;
             java_interface::instance().window.push_msg(msg);
@@ -1067,8 +1095,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceChanged(JNIEnv* env, jobject obj, jobject surface, jint w, jint h) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_surfaceChanged\n");
-            
             android_window::message msg = {};
             msg.type = android_window::msg_type::surface_changed;
             msg.surface_data.window = ANativeWindow_fromSurface(env, surface);
@@ -1082,8 +1108,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceDestroyed(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_surfaceDestroyed\n");
-
             android_window::message msg = {};
             msg.type = android_window::msg_type::surface_changed;
             java_interface::instance().window.push_msg(msg);
@@ -1094,7 +1118,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_visibilityChanged(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_visibilityChanged\n");
+
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1102,7 +1126,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_orientationChanged(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_orientationChanged\n");
+
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1110,7 +1134,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onLowMemory(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_onLowMemory\n");
+
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1118,7 +1142,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTrimMemory(JNIEnv* env, jobject obj) noexcept {
         try {
-            __android_log_write(ANDROID_LOG_ERROR, "enduro2d", "E2DNativeLib_onTrimMemory\n");
+
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
