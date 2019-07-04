@@ -28,6 +28,8 @@ public class E2DNativeLib {
      public static native void surfaceDestroyed();
      public static native void visibilityChanged();
      public static native void orientationChanged();
+     public static native void onKey(int keycode, int action);
+     public static native void onTouch(int action, int num_pointers, float data[]);
      public static native void onLowMemory();
      public static native void onTrimMemory();
 }

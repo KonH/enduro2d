@@ -94,28 +94,50 @@ public class E2DActivity
 
     // SurfaceHolder.Callback
     @Override public final void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-        Log.e(TAG, "surfaceChanged");
         E2DNativeLib.surfaceChanged(holder.getSurface(), w, h);
     }
 
     @Override public final void surfaceCreated(SurfaceHolder holder) {
-        Log.e(TAG, "surfaceCreated");
     }
 
     @Override public final void surfaceDestroyed(SurfaceHolder holder) {
-        Log.e(TAG, "surfaceDestroyed");
         E2DNativeLib.surfaceDestroyed();
     }
 
     // View.OnKeyListener
     @Override public final boolean onKey(View v, int keyCode, KeyEvent ev) {
-        Log.e(TAG, "onKey");
-        return false;
+        if ( keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+             keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+             keyCode == KeyEvent.KEYCODE_VOLUME_MUTE ) {
+            // android will change volume
+            return false;
+        }
+        if ( keyCode == KeyEvent.KEYCODE_BACK ) {
+            return false;
+        }
+        E2DNativeLib.onKey(keyCode, ev.getAction());
+        return true;
     }
 
     // View.OnTouchListener
     @Override public final boolean onTouch(View vw, MotionEvent ev) {
-        Log.e(TAG, "onTouch");
+        int num_pointers = Math.min(ev.getPointerCount(), max_touches_);
+        int action = ev.getActionMasked();
+        if ( action == MotionEvent.ACTION_MOVE && num_pointers > 1 ) {
+            for ( int i = 0, j = 0; i < num_pointers; ++i ) {
+                touch_data_[j++] = (float)ev.getPointerId(i);
+                touch_data_[j++] = ev.getX(i);
+                touch_data_[j++] = ev.getY(i);
+                touch_data_[j++] = ev.getPressure(i);
+            }
+        } else {
+            int index = ev.getActionIndex();
+            touch_data_[0] = (float)ev.getPointerId(index);
+            touch_data_[1] = ev.getX(index);
+            touch_data_[2] = ev.getY(index);
+            touch_data_[3] = ev.getPressure(index);
+        }
+        E2DNativeLib.onTouch(action, num_pointers, touch_data_);
         return true;
     }
 
@@ -126,6 +148,9 @@ public class E2DActivity
             handler_.postDelayed(native_tick_, 1000/30);
         }
     };
+
+    private static final int max_touches_ = 8;
+    private float touch_data_[] = new float[max_touches_ * 4]; // packed: {id, x, y, pressure}
 
     private Handler handler_ = new Handler();
     private SurfaceView opengl_view_;

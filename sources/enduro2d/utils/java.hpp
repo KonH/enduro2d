@@ -242,6 +242,105 @@ namespace e2d
         };
     }
     
+    //
+    // java_array
+    //
+
+    template < typename T >
+    class java_array;
+
+    #define DEFINE_JAVE_ARRAY(type, jtype) \
+        template <> \
+        class java_array<type> { \
+        public: \
+            using value_type = type; \
+            using jarray_t = type ## Array; \
+        public: \
+            java_array() noexcept \
+            : from_native_code_(false) {} \
+            \
+            explicit java_array(jarray_t arr, bool read_only = false) noexcept \
+            : jarray_(arr) \
+            , read_only_(read_only) \
+            , from_native_code_(false) { \
+                java_env je; \
+                data_ = je.env()->Get ## jtype ## ArrayElements(jarray_, 0); \
+                count_ = je.env()->GetArrayLength(jarray_); \
+            } \
+            \
+            explicit java_array(const std::vector<type>& vec) noexcept \
+            : from_native_code_(true) { \
+                java_env je; \
+                jarray_ = je.env()->New ## jtype ## Array(vec.size()); \
+                data_ = je.env()->Get ## jtype ## ArrayElements(jarray_, nullptr); \
+                count_ = je.env()->GetArrayLength(jarray_); \
+                E2D_ASSERT(vec.size() == count_); \
+                for ( size_t i = 0; i < vec.size(); ++i ) { \
+                    data_[i] = vec[i]; \
+                } \
+            } \
+            \
+            ~java_array() noexcept { \
+                java_env je; \
+                if ( from_native_code_ ) { \
+                    if ( jarray_ ) { \
+                        je.env()->DeleteLocalRef(jarray_); \
+                    } \
+                } else if ( data_ && jarray_ ) { \
+                    je.env()->Release ## jtype ## ArrayElements(jarray_, data_, read_only_ ? JNI_ABORT : 0); \
+                } \
+            } \
+            \
+            [[nodiscard]] const type* data() const noexcept { \
+                return data_; \
+            } \
+            \
+            /*[[nodiscard]] type* data() { \
+                if ( read_only_ ) { \
+                    throw std::runtime_exception("can not modify read-only memory!"); \
+                } \
+                return data_; \
+            }*/ \
+            \
+            [[nodiscard]] const type& operator [] (size_t i) const noexcept { \
+                E2D_ASSERT(i < count_); \
+                return data_[i]; \
+            } \
+            \
+            [[nodiscard]] size_t size() const noexcept { \
+                return count_; \
+            } \
+            \
+            [[nodiscard]] bool read_only() const noexcept { \
+                return read_only_; \
+            } \
+            \
+            [[nodiscard]] const type* begin() const noexcept { \
+                return data_; \
+            } \
+            \
+            [[nodiscard]] const type* end() const noexcept { \
+                return data_ + count_; \
+            } \
+            \
+        private: \
+            type* data_ = nullptr; \
+            jarray_t jarray_ = nullptr; \
+            size_t count_ = 0; \
+            bool read_only_ = false; \
+            bool const from_native_code_; \
+        }
+
+    DEFINE_JAVE_ARRAY(jbyte, Byte);
+    DEFINE_JAVE_ARRAY(jchar, Char);
+    DEFINE_JAVE_ARRAY(jshort, Short);
+    DEFINE_JAVE_ARRAY(jint, Int);
+    DEFINE_JAVE_ARRAY(jlong, Long);
+    DEFINE_JAVE_ARRAY(jfloat, Float);
+    DEFINE_JAVE_ARRAY(jdouble, Double);
+
+    #undef DEFINE_JAVE_ARRAY
+
     template < typename FN >
     class java_static_method;
 

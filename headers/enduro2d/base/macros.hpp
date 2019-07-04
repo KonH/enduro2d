@@ -24,7 +24,7 @@
 #    define E2D_ASSERT_MSG(expr, msg) \
        (void)( \
          (!!(expr)) || \
-         (__android_log_print(ANDROID_LOG_WARN, "E2D_ASSERT", "%s (%d): %s", __FILE__, __LINE__, (msg)) && std::raise(SIGINT)) \
+         (__android_log_print(ANDROID_LOG_WARN, "E2D_ASSERT", "%s (%d): %s", __FILE__, __LINE__, (msg)) /*&& std::raise(SIGINT)*/) \
        )
 #  else
 #    define E2D_ASSERT(expr)          assert((expr))
