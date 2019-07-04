@@ -60,7 +60,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
                              -Werror=user-defined-literals
                              -Werror=parentheses
                              -Werror=address
-                             -Werror=return-stack-address)
+                             -Werror=return-stack-address
+                             -Werror=return-type
+                             -Werror=multichar
+                             -Werror=odr)
     string(REPLACE ";" " " E2D_SHARED_CXX_FLAGS "${E2D_SHARED_CXX_FLAGS}")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -113,15 +116,26 @@ endif()
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(E2D_COMPILER "E2D_COMPILER_MSVC")
     set(E2D_COMPILER_FLAGS /W3 /MP)
-    set(E2D_DEFINITIONS -D_CRT_SECURE_NO_WARNINGS -D_SCL_SECURE_NO_WARNINGS)
+    set(E2D_DEFINITIONS
+        -D_CRT_SECURE_NO_WARNINGS
+        -D_SCL_SECURE_NO_WARNINGS)
+
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     set(E2D_COMPILER "E2D_COMPILER_GCC")
-    set(E2D_COMPILER_FLAGS -Wall -Wextra -Wpedantic)
+    set(E2D_COMPILER_FLAGS
+        -Wall
+        -Wextra
+        -Wpedantic)
     set(E2D_DEFINITIONS "")
+
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
     set(E2D_COMPILER "E2D_COMPILER_CLANG")
-    set(E2D_COMPILER_FLAGS -Wall -Wextra -Wpedantic -Werror=return-type -Werror=multichar -Werror=odr)
+    set(E2D_COMPILER_FLAGS
+        -Wall
+        -Wextra
+        -Wpedantic)
     set(E2D_DEFINITIONS "")
+
 else()
     message(FATAL_ERROR "unsupported compiler ${CMAKE_CXX_COMPILER_ID}")
 endif()
@@ -129,20 +143,35 @@ endif()
 # detect target platform
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(E2D_PLATFORM "E2D_PLATFORM_LINUX")
-    set(E2D_PLATFORM_LIBS glfw glew)
+    set(E2D_PLATFORM_LIBS
+        glfw
+        glew)
+
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(E2D_PLATFORM "E2D_PLATFORM_ANDROID")
-    set(E2D_PLATFORM_LIBS GLESv2 EGL android log)
+    set(E2D_PLATFORM_LIBS
+        GLESv2
+        EGL
+        android
+        log)
+
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(E2D_PLATFORM "E2D_PLATFORM_MACOSX")
-    set(E2D_PLATFORM_LIBS glfw glew)
-    set(E2D_COMPILER_FLAGS ${E2D_COMPILER_FLAGS} -Wno-deprecated-declarations)
+    set(E2D_PLATFORM_LIBS
+        glfw
+        glew)
+    set(E2D_COMPILER_FLAGS ${E2D_COMPILER_FLAGS}
+        -Wno-deprecated-declarations)
+
 elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(E2D_PLATFORM "E2D_PLATFORM_IOS")
     set(E2D_PLATFORM_LIBS "")
+
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(E2D_PLATFORM "E2D_PLATFORM_WINDOWS")
-    set(E2D_PLATFORM_LIBS glfw glew)
+    set(E2D_PLATFORM_LIBS
+        glfw
+        glew)
 else()
     message(FATAL_ERROR "unsupported platform ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 endif()
