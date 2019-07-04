@@ -18,6 +18,7 @@ package enduro2d.engine;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -34,6 +35,9 @@ public class E2DActivity
                     View.OnKeyListener,
                     View.OnTouchListener
 {
+    static {
+        System.loadLibrary("sample_00");
+    }
     private	static final String TAG = "Enduro2D";
 
     @Override protected void onCreate(Bundle icicle) {
@@ -47,7 +51,6 @@ public class E2DActivity
 
         SurfaceHolder holder = opengl_view_.getHolder();
         holder.addCallback(this);
-        holder.setFormat(android.graphics.PixelFormat.RGBA_8888);
 
         opengl_view_.setFocusable(true);
         opengl_view_.setFocusableInTouchMode(true);
@@ -78,12 +81,15 @@ public class E2DActivity
         super.onStart();
         Log.e(TAG, "onStart");
         E2DNativeLib.start();
+        native_tick_.run();
     }
 
     @Override protected void onStop() {
         super.onStop();
         Log.e(TAG, "onStop");
         E2DNativeLib.stop();
+        native_tick_.run();
+        handler_.removeCallbacks(native_tick_);
     }
 
     // SurfaceHolder.Callback
@@ -98,6 +104,7 @@ public class E2DActivity
 
     @Override public final void surfaceDestroyed(SurfaceHolder holder) {
         Log.e(TAG, "surfaceDestroyed");
+        E2DNativeLib.surfaceDestroyed();
     }
 
     // View.OnKeyListener
@@ -112,5 +119,14 @@ public class E2DActivity
         return true;
     }
 
+    private Runnable native_tick_ = new Runnable() {
+        @Override
+        public void run() {
+            E2DNativeLib.tick();
+            handler_.postDelayed(native_tick_, 1000/30);
+        }
+    };
+
+    private Handler handler_ = new Handler();
     private SurfaceView opengl_view_;
 }

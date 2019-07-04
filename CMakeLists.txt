@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 project(enduro2d)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set(E2D_SYSTEM_NAME ${CMAKE_SYSTEM_NAME})
 set(E2D_ROOT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -75,17 +76,17 @@ endif()
 
 # detect target platform
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-	set(E2D_PLATFORM "E2D_PLATFORM_LINUX")
+    set(E2D_PLATFORM "E2D_PLATFORM_LINUX")
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
-	set(E2D_PLATFORM "E2D_PLATFORM_ANDROID")
+    set(E2D_PLATFORM "E2D_PLATFORM_ANDROID")
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-	set(E2D_PLATFORM "E2D_PLATFORM_MACOSX")
+    set(E2D_PLATFORM "E2D_PLATFORM_MACOSX")
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
-	set(E2D_PLATFORM "E2D_PLATFORM_IOS")
+    set(E2D_PLATFORM "E2D_PLATFORM_IOS")
 elseif(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-	set(E2D_PLATFORM "E2D_PLATFORM_WINDOWS")
+    set(E2D_PLATFORM "E2D_PLATFORM_WINDOWS")
 else()
-	message(FATAL_ERROR "unsupported platform ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
+    message(FATAL_ERROR "unsupported platform ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 endif()
 
 #
@@ -120,22 +121,47 @@ file(GLOB_RECURSE E2D_3RDPARTY
 # e2d external 3rd party
 #
 
-set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(glew-cmake_BUILD_MULTI_CONTEXT OFF CACHE BOOL "" FORCE)
-add_subdirectory(modules/glew)
-set_target_properties(libglew_static PROPERTIES FOLDER modules)
+if(WIN32)
+    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    add_subdirectory(modules/glfw)
+    set_target_properties(glfw PROPERTIES FOLDER modules)
 
-function(add_e2d_shared_libraries_to_target TO)
-endfunction(add_e2d_shared_libraries_to_target)
+    set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(glew-cmake_BUILD_MULTI_CONTEXT OFF CACHE BOOL "" FORCE)
+    add_subdirectory(modules/glew)
+    set_target_properties(libglew_static PROPERTIES FOLDER modules)
+endif()
+
+function(e2d_add_executable target_name source_list)
+    message(STATUS "e2d_add_executable: target_name: ${target_name}")
+    message(STATUS "e2d_add_executable: source_list: ${${source_list}}")
+    if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
+        add_library(${target_name} SHARED ${${source_list}})
+    else()
+        add_executable(${target_name} ${${source_list}})
+    endif()
+endfunction(e2d_add_executable)
 
 #
 # e2d library target
 #
 
-add_library(${PROJECT_NAME} SHARED
+add_library(${PROJECT_NAME} STATIC
     ${E2D_HEADERS}
     ${E2D_SOURCES}
     ${E2D_3RDPARTY})
+
+if(WIN32)
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE glfw
+        PRIVATE libglew_static)
+else()
+    target_link_libraries(${PROJECT_NAME}
+        PRIVATE GLESv2 EGL android log)
+endif()
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
     ${E2D_HEADERS}
@@ -143,8 +169,6 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
     ${E2D_3RDPARTY})
 
 target_link_libraries(${PROJECT_NAME}
-    PRIVATE android log
-    PRIVATE libglew_static
     PRIVATE $<$<CXX_COMPILER_ID:MSVC>:winmm.lib>)
 
 target_include_directories(${PROJECT_NAME}
@@ -160,8 +184,7 @@ target_compile_options(${PROJECT_NAME}
         -Wall -Wextra -Wpedantic>
     PRIVATE
     $<$<PLATFORM_ID:Darwin>:
-        -Wno-deprecated-declarations>
-    -DGLEW_NO_GLU)
+        -Wno-deprecated-declarations>)
 
 target_compile_features(${PROJECT_NAME}
     PUBLIC cxx_std_17)
@@ -181,9 +204,10 @@ option(E2D_BUILD_SAMPLES "Build samples" ON)
 if(E2D_BUILD_SAMPLES)
     add_subdirectory(samples)
 endif()
-
+#[[
 option(E2D_BUILD_UNTESTS "Build untests" ON)
 if(E2D_BUILD_UNTESTS)
     enable_testing()
     add_subdirectory(untests)
 endif()
+]]

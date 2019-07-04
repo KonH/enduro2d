@@ -15,7 +15,7 @@ function(add_e2d_tests NAME)
     # executable
     #
 
-    add_executable(${TESTS_NAME} ${TESTS_SOURCES})
+    e2d_add_executable(${TESTS_NAME} TESTS_SOURCES)
     target_link_libraries(${TESTS_NAME} enduro2d)
     set_target_properties(${TESTS_NAME} PROPERTIES FOLDER untests)
 

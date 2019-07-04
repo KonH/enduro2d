@@ -17,15 +17,13 @@
 package enduro2d.engine;
 
 public class E2DNativeLib {
-     static {
-          System.loadLibrary("enduro2d");
-     }
      public static native void create(Object activity);
      public static native void destroy();
      public static native void start();
      public static native void stop();
      public static native void pause();
      public static native void resume();
+     public static native void tick();
      public static native void surfaceChanged(Object surface, int width, int height);
      public static native void surfaceDestroyed();
      public static native void visibilityChanged();

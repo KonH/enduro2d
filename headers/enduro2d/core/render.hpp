@@ -954,7 +954,7 @@ namespace e2d
         bool is_pixel_supported(const pixel_declaration& decl) const noexcept;
         bool is_index_supported(const index_declaration& decl) const noexcept;
         bool is_vertex_supported(const vertex_declaration& decl) const noexcept;
-		bool is_enabled() const noexcept;
+        bool is_enabled() const noexcept;
     private:
         class internal_state;
         std::unique_ptr<internal_state> state_;

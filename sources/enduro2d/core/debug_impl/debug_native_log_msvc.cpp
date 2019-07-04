@@ -12,12 +12,12 @@
 
 namespace e2d
 {
-	bool debug_native_log_sink::on_message(debug::level lvl, str_view text) noexcept {
-		// TODO: should be <file>(<line>): <message> <newline>
-		OutputDebugStringA(text.data());
-		OutputDebugStringA("\n");
-		return true;
-	}
+    bool debug_native_log_sink::on_message(debug::level lvl, str_view text) noexcept {
+        // TODO: should be <file>(<line>): <message> <newline>
+        OutputDebugStringA(text.data());
+        OutputDebugStringA("\n");
+        return true;
+    }
 }
 
 #endif

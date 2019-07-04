@@ -8,9 +8,9 @@
 
 #include <enduro2d/utils/_utils.hpp>
 
-//#if defined(E2D_PLATFORM) && E2D_PLATFORM == E2D_PLATFORM_ANDROID
+#if defined(E2D_PLATFORM) && E2D_PLATFORM == E2D_PLATFORM_ANDROID
 #  define E2D_JNI
-//#endif
+#endif
 
 #ifdef E2D_JNI
 

@@ -1213,7 +1213,7 @@ namespace e2d::opengl
         }
         return false;
     #else
-    #	error unknown render mode!
+    #   error unknown render mode!
     #endif
     }
 
@@ -1249,7 +1249,7 @@ namespace e2d::opengl
         E2D_UNUSED(debug);
         return gl_version::gles_200;
     #else
-    #	error unknown render mode!
+    #   error unknown render mode!
     #endif
     }
 }

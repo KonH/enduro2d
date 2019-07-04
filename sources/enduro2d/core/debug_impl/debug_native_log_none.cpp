@@ -10,10 +10,10 @@
 
 namespace e2d
 {
-	bool debug_native_log_sink::on_message(debug::level lvl, str_view text) noexcept {
-		E2D_UNUSED(lvl, text);
-		return true;
-	}
+    bool debug_native_log_sink::on_message(debug::level lvl, str_view text) noexcept {
+        E2D_UNUSED(lvl, text);
+        return true;
+    }
 }
 
 #endif

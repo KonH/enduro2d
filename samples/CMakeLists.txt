@@ -15,7 +15,7 @@ function(add_e2d_sample NAME)
     # executable
     #
 
-    add_executable(${SAMPLE_NAME} ${SAMPLE_SOURCES})
+    e2d_add_executable(${SAMPLE_NAME} SAMPLE_SOURCES)
     target_link_libraries(${SAMPLE_NAME} enduro2d)
     set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER samples)
 
