@@ -54,3 +54,19 @@
 
 template < typename... Ts >
 constexpr void E2D_UNUSED(Ts&&...) noexcept {}
+
+//
+// E2D_MESSAGE
+//
+
+#ifdef E2D_COMPILER
+#  define E2D_MESSAGE_TOSTR(x) #x
+#  if E2D_COMPILER == E2D_COMPILER_CLANG || E2D_COMPILER == E2D_COMPILER_GCC
+#    define E2D_MESSAGE(message_)    _Pragma(E2D_MESSAGE_TOSTR(GCC warning ("" message_) ))
+#  elif E2D_COMPILER == E2D_COMPILER_MSVC
+#    define E2D_MESSAGE(message_)    __pragma(message(message_))
+#  endif
+#endif
+#ifndef E2D_MESSAGE
+#  define E2D_MESSAGE(...)
+#endif

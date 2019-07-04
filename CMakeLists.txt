@@ -129,20 +129,20 @@ endif()
 # detect target platform
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(E2D_PLATFORM "E2D_PLATFORM_LINUX")
-    set(E2D_PLATFORM_LIBS glfw libglew_static)
+    set(E2D_PLATFORM_LIBS glfw glew)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(E2D_PLATFORM "E2D_PLATFORM_ANDROID")
     set(E2D_PLATFORM_LIBS GLESv2 EGL android log)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(E2D_PLATFORM "E2D_PLATFORM_MACOSX")
-    set(E2D_PLATFORM_LIBS glfw libglew_static)
+    set(E2D_PLATFORM_LIBS glfw glew)
     set(E2D_COMPILER_FLAGS ${E2D_COMPILER_FLAGS} -Wno-deprecated-declarations)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(E2D_PLATFORM "E2D_PLATFORM_IOS")
     set(E2D_PLATFORM_LIBS "")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(E2D_PLATFORM "E2D_PLATFORM_WINDOWS")
-    set(E2D_PLATFORM_LIBS glfw libglew_static)
+    set(E2D_PLATFORM_LIBS glfw glew)
 else()
     message(FATAL_ERROR "unsupported platform ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 endif()
@@ -179,19 +179,8 @@ file(GLOB_RECURSE E2D_3RDPARTY
 # e2d external 3rd party
 #
 
-if(WIN32)
-    set(GLFW_INSTALL OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    add_subdirectory(modules/glfw)
-    set_target_properties(glfw PROPERTIES FOLDER modules)
-
-    set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-    set(glew-cmake_BUILD_MULTI_CONTEXT OFF CACHE BOOL "" FORCE)
-    add_subdirectory(modules/glew)
-    set_target_properties(libglew_static PROPERTIES FOLDER modules)
-endif()
+add_subdirectory(modules/enduro2d-external)
+include(modules/enduro2d-external/engine-integration.cmake)
 
 function(e2d_add_executable target_name source_list)
     if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
@@ -221,6 +210,14 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
 target_link_libraries(${PROJECT_NAME}
     PRIVATE $<$<CXX_COMPILER_ID:MSVC>:winmm.lib>)
 
+if(${E2D_ENABLE_BASS})
+    target_link_libraries(${PROJECT_NAME} PRIVATE bass)
+endif()
+
+if(${E2D_ENABLE_CURL})
+    target_link_libraries(${PROJECT_NAME} PRIVATE curl)
+endif()
+
 target_include_directories(${PROJECT_NAME}
     PUBLIC headers
     PRIVATE sources)
@@ -244,10 +241,8 @@ option(E2D_BUILD_SAMPLES "Build samples" ON)
 if(E2D_BUILD_SAMPLES)
     add_subdirectory(samples)
 endif()
-#[[
 option(E2D_BUILD_UNTESTS "Build untests" ON)
 if(E2D_BUILD_UNTESTS)
     enable_testing()
     add_subdirectory(untests)
 endif()
-]]
