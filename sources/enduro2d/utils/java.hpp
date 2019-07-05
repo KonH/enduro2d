@@ -30,12 +30,6 @@ namespace e2d
         ~java_env() noexcept;
         void attach();
         void detach();
-        void inc_ref(jobject, bool global) const;
-        void dec_ref(jobject, bool global) const;
-        void inc_global_ref(jobject) const;
-        void dec_global_ref(jobject) const;
-        void inc_local_ref(jobject) const;
-        void dec_local_ref(jobject) const;
         [[nodiscard]] bool has_exception() const noexcept;
         [[nodiscard]] JNIEnv* env() const noexcept;
     private:
@@ -354,12 +348,13 @@ namespace e2d
     class java_class final {
     public:
         explicit java_class(str_view);
-        explicit java_class(jclass cl, bool global_ref = true) noexcept;
+        explicit java_class(jclass jc) noexcept;
         explicit java_class(const class java_obj&);
         template < typename T >
         explicit java_class(stdex::in_place_type_t<T>);
         java_class(java_class&&) noexcept;
         java_class(const java_class&) noexcept;
+        java_class() noexcept = default;
         ~java_class() noexcept;
         java_class& operator = (const java_class&) noexcept;
         java_class& operator = (java_class&&) noexcept;
@@ -368,11 +363,10 @@ namespace e2d
         [[nodiscard]] java_static_method<FN> static_method_id(str_view name) const;
         [[nodiscard]] explicit operator bool() const noexcept;
     private:
-        void inc_ref_() noexcept;
+        void set_(const java_env&, jclass) noexcept;
         void dec_ref_() noexcept;
     private:
-        jclass class_ {nullptr};
-        bool global_ {true};
+        jclass class_ = nullptr;
     };
     
     template < typename T >
@@ -388,11 +382,11 @@ namespace e2d
         if ( class_name.length() and class_name.back() == ';' ) {
             class_name.erase(class_name.end()-1);
         }
-        class_ = je.env()->FindClass(class_name.data());
-        if ( !class_ ) {
+        jclass jc = je.env()->FindClass(class_name.data());
+        if ( !jc ) {
             throw std::runtime_error("java class is not found");
         }
-        inc_ref_();
+        set_(je, jc);
     }
 
     //
@@ -401,7 +395,7 @@ namespace e2d
 
     class java_obj final {
     public:
-        java_obj() noexcept;
+        java_obj() noexcept = default;
         java_obj(java_obj&&) noexcept;
         java_obj(const java_obj&) noexcept;
         explicit java_obj(jobject) noexcept;
@@ -417,10 +411,10 @@ namespace e2d
         [[nodiscard]] java_static_method<FN> static_method_id(str_view name) const;
         [[nodiscard]] explicit operator bool() const noexcept;
     private:
-        void inc_ref_() noexcept;
+        void set_(const java_env&, jobject) noexcept;
         void dec_ref_() noexcept;
     private:
-        jobject obj_;
+        jobject obj_ = nullptr;
     };
     
     namespace detail
@@ -679,11 +673,11 @@ namespace e2d
         if ( !ctor_id ) {
             throw std::runtime_error("constructor doesn't exists");
         }
-        obj_ = je.env()->NewObjectV(jc.data(), std::forward<Args>(args)...);
-        if ( !obj_ ) {
+        jobject jo = je.env()->NewObjectV(jc.data(), std::forward<Args>(args)...);
+        if ( !jo ) {
             throw std::runtime_error("failed to create java object");
         }
-        inc_ref_();
+        set_(je, jo);
     }
 }
 

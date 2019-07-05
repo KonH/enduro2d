@@ -83,26 +83,6 @@ namespace e2d
             must_be_detached_ = false;
         }
     }
-
-    void java_env::inc_global_ref(jobject obj) const {
-        E2D_ASSERT(jni_env_);
-        jni_env_->NewGlobalRef(obj);
-    }
-
-    void java_env::dec_global_ref(jobject obj) const {
-        E2D_ASSERT(jni_env_);
-        jni_env_->DeleteGlobalRef(obj);
-    }
-
-    void java_env::inc_local_ref(jobject obj) const {
-        E2D_ASSERT(jni_env_);
-        jni_env_->NewLocalRef(obj);
-    }
-
-    void java_env::dec_local_ref(jobject obj) const {
-        E2D_ASSERT(jni_env_);
-        jni_env_->DeleteLocalRef(obj);
-    }
     
     bool java_env::has_exception() const noexcept {
         E2D_ASSERT(jni_env_);
@@ -114,44 +94,21 @@ namespace e2d
         return jni_env_;
     }
 
-    void java_env::inc_ref(jobject obj, bool global) const {
-        E2D_ASSERT(jni_env_);
-        E2D_ASSERT(obj);
-        if ( global ) {
-            jni_env_->NewGlobalRef(obj);
-        } else {
-            jni_env_->NewLocalRef(obj);
-        }
-    }
-
-    void java_env::dec_ref(jobject obj, bool global) const {
-        E2D_ASSERT(jni_env_);
-        E2D_ASSERT(obj);
-        if ( global ) {
-            jni_env_->DeleteGlobalRef(obj);
-        } else {
-            jni_env_->DeleteLocalRef(obj);
-        }
-    }
-
     //
     // java_class
     //
 
     java_class::java_class(str_view class_name) {
         java_env je;
-        class_ = je.env()->FindClass(class_name.data());
-        if ( !class_ ) {
+        jclass jc = je.env()->FindClass(class_name.data());
+        if ( !jc ) {
             throw std::runtime_error("java class is not found");
         }
-        global_ = (je.env()->GetObjectRefType(class_) == JNIGlobalRefType);
-        inc_ref_();
+        set_(je, jc);
     }
 
-    java_class::java_class(jclass jc, bool global_ref) noexcept
-    : class_(jc)
-    , global_(global_ref) {
-        inc_ref_();
+    java_class::java_class(jclass jc) noexcept {
+        set_(java_env(), jc);
     }
     
     java_class::java_class(const java_obj& obj) {
@@ -159,41 +116,34 @@ namespace e2d
             throw std::runtime_error("java object is null");
         }
         java_env je;
-        class_ = je.env()->GetObjectClass(obj.data());
-        if ( !class_ ) {
+        jclass jc = je.env()->GetObjectClass(obj.data());
+        if ( !jc ) {
             throw std::runtime_error("failed to get object class");
         }
-        global_ = (je.env()->GetObjectRefType(class_) == JNIGlobalRefType);
-        inc_ref_();
+        set_(je, jc);
     }
 
     java_class::java_class(java_class&& jc) noexcept
-    : class_(jc.class_)
-    , global_(jc.global_) {
+    : class_(jc.class_) {
         jc.class_ = nullptr;
     }
     
-    java_class::java_class(const java_class& jc) noexcept
-    : class_(jc.class_)
-    , global_(jc.global_) {
-        inc_ref_();
+    java_class::java_class(const java_class& jc) noexcept {
+        set_(java_env(), jc.data());
     }
 
     java_class::~java_class() noexcept {
         dec_ref_();
     }
-    
+
     java_class& java_class::operator = (const java_class& jc) noexcept {
         dec_ref_();
-        class_ = jc.data();
-        global_ = jc.global_;
-        inc_ref_();
+        set_(java_env(), jc.data());
         return *this;
     }
 
     java_class& java_class::operator = (java_class&& jc) noexcept {
         dec_ref_();
-        global_ = jc.global_;
         class_ = jc.class_;
         jc.class_ = nullptr;
         return *this;
@@ -202,16 +152,16 @@ namespace e2d
     java_class::operator bool() const noexcept {
         return class_ != nullptr;
     }
-
-    void java_class::inc_ref_() noexcept {
-        if ( class_ ) {
-            java_env().inc_ref(static_cast<jobject>(class_), global_);
+    
+    void java_class::set_(const java_env& je, jclass jc) noexcept {
+        if ( jc ) {
+            class_ = static_cast<jclass>(je.env()->NewGlobalRef(jc));
         }
     }
 
     void java_class::dec_ref_() noexcept {
         if ( class_ ) {
-            java_env().dec_ref(static_cast<jobject>(class_), global_);
+            java_env().env()->DeleteGlobalRef(class_);
             class_ = nullptr;
         }
     }
@@ -224,50 +174,45 @@ namespace e2d
     // java_obj
     //
     
-    java_obj::java_obj() noexcept
-    : obj_(nullptr) {
-    }
-    
-    java_obj::java_obj(const java_obj& obj) noexcept
-    : obj_(obj.data()) {
-        inc_ref_();
+    java_obj::java_obj(const java_obj& jo) noexcept {
+        set_(java_env(), jo.data());
     }
 
-    java_obj::java_obj(java_obj&& obj) noexcept
-    : obj_(obj.data()) {
-        obj.obj_ = nullptr;
+    java_obj::java_obj(java_obj&& jo) noexcept
+    : obj_(jo.data()) {
+        jo.obj_ = nullptr;
     }
 
-    java_obj::java_obj(jobject obj) noexcept
-    : obj_(obj) {
-        inc_ref_();
+    java_obj::java_obj(jobject jo) noexcept {
+        set_(java_env(), jo);
     }
 
     java_obj::~java_obj() noexcept {
         dec_ref_();
     }
     
-    java_obj& java_obj::operator = (const java_obj& obj) noexcept {
+    java_obj& java_obj::operator = (const java_obj& jo) noexcept {
         dec_ref_();
-        obj_ = obj.data();
-        inc_ref_();
+        set_(java_env(), jo.data());
         return *this;
     }
 
-    java_obj& java_obj::operator = (java_obj&& obj) noexcept {
-        std::swap(obj_, obj.obj_);
+    java_obj& java_obj::operator = (java_obj&& jo) noexcept {
+        dec_ref_();
+        obj_ = jo.data();
+        jo.obj_ = nullptr;
         return *this;
     }
-
-    void java_obj::inc_ref_() noexcept {
-        if ( obj_ ) {
-            java_env().inc_global_ref(obj_);
+    
+    void java_obj::set_(const java_env& je, jobject jo) noexcept {
+        if ( jo ) {
+            obj_ = je.env()->NewGlobalRef(jo);
         }
     }
 
     void java_obj::dec_ref_() noexcept {
         if ( obj_ ) {
-            java_env().dec_global_ref(obj_);
+            java_env().env()->DeleteGlobalRef(obj_);
             obj_ = nullptr;
         }
     }
