@@ -14,6 +14,7 @@
 #include <android/log.h>
 #include <android/keycodes.h>
 #include <EGL/egl.h>
+#include <deque>
 
 namespace
 {
@@ -23,16 +24,14 @@ namespace
     // message_queue
     //
 
-    template < typename T >
     class message_queue {
     public:
         message_queue();
-        template < typename FN >
-        void process(FN&&);
-        void push(const T&);
+        void process();
+        void push(std::function<void()>&& fn);
     private:
         std::mutex lock_;
-        std::vector<T> queue_;  // TODO: optimize
+        std::deque<std::function<void()>> queue_;
     };
 
     //
@@ -41,31 +40,17 @@ namespace
 
     class android_activity {
     public:
-        enum class msg_type : u32 {
-            set_orientation,
-        };
-
-        struct orientation {
-            int value;
-        };
-
-        struct message {
-            msg_type type;
-            union {
-                orientation orient;
-            };
-        };
-
-        using msg_queue_t = message_queue<message>;
-    public:
         android_activity() noexcept;
-        void push_msg(const message& msg);
         void process_messages();
         void set_activity(jobject);
         [[nodiscard]] bool is_current_thread() const noexcept;
     public:
+        void set_orientation();
+        void show_toast(str);
+        void set_title(str);
+    public:
         java_obj main_activity_;
-        msg_queue_t messages_;
+        message_queue messages_;
         std::thread::id thread_id_ = std::this_thread::get_id();
     };
 
@@ -102,34 +87,6 @@ namespace
 
     class android_window {
     public:
-        enum class msg_type : u32 {
-            app_create,
-            app_destroy,
-            app_start,
-            app_stop,
-            app_pause,
-            app_resume,
-            surface_changed,
-            orientation_changed,
-            key,
-            touch,
-        };
-
-        struct surface_data {
-            ANativeWindow* window;
-            i32 width;
-            i32 height;
-        };
-
-        struct orientation {
-            i32 value;
-        };
-
-        struct key {
-            i32 code;
-            i32 action;
-        };
-
         struct touch {
             struct pointer {
                 u32 id;
@@ -141,36 +98,24 @@ namespace
             std::array<pointer, 8> pointers;
         };
 
-        struct message {
-            msg_type type;
-            union {
-                surface_data surface_data;
-                orientation orientation;
-                key key;
-                touch touch;
-            };
-        };
-
         using event_listener_uptr = window::event_listener_uptr;
         using listeners_t = vector<event_listener_uptr>;
-        using msg_queue_t = message_queue<message>;
     public:
         android_window() noexcept;
         void quit();
-        void push_msg(const message& msg);
         void process_messages();
         [[nodiscard]] bool is_current_thread() const noexcept;
         [[nodiscard]] const android_surface& surface() const noexcept;
     
         template < typename F, typename... Args >
         void for_all_listeners(const F& f, const Args&... args) noexcept;
+    public:
+        void on_surface_changed(ANativeWindow* wnd);
+        void on_destroy();
+        void on_key(i32 code, i32 action);
+        void on_touch(const touch&);
     private:
         void render_loop_() noexcept;
-        void on_destroy_();
-        void on_surface_changed_(const surface_data&);
-        void on_key_(const key&);
-        void on_touch_(const touch&);
-        void on_orientation_changed_(const orientation&);
     public:
         std::recursive_mutex rmutex;
         listeners_t listeners;
@@ -178,15 +123,16 @@ namespace
         v2u virtual_size;
         v2u framebuffer_size;
         bool fullscreen = false;
-        bool enabled = true;
+        bool enabled = false;
         bool visible = true;
         bool focused = true;
         bool should_close = false;
     private:
         android_surface surface_;
-        msg_queue_t messages_;
+        message_queue messages_;
         std::thread thread_;
         std::atomic<bool> exit_loop_ = false;
+        std::atomic<bool> surface_destoyed_ = false;
         u32 last_touch_id_ = ~0u;
     };
 
@@ -219,32 +165,27 @@ namespace
     // message_queue
     //
     
-    template < typename T >
-    message_queue<T>::message_queue() {
+    message_queue::message_queue() {
         std::unique_lock<std::mutex> guard(lock_);
-        queue_.reserve(64);
     }
     
-    template < typename T >
-    template < typename FN >
-    void message_queue<T>::process(FN&& fn) {
+    void message_queue::process() {
         for (;;) {
-            T temp;
+            std::function<void ()> fn;
             {
                 std::unique_lock<std::mutex> guard(lock_);
                 if ( queue_.empty() )
                     return;
-                temp = std::move(queue_.front());
-                queue_.erase(queue_.begin());
+                fn = std::move(queue_.front());
+                queue_.pop_front();
             }
-            fn(temp);
+            fn();
         }
     }
     
-    template < typename T >
-    void message_queue<T>::push(const T& msg) {
+    void message_queue::push(std::function<void ()>&& fn) {
         std::unique_lock<std::mutex> guard(lock_);
-        queue_.push_back(std::move(msg));
+        queue_.push_back(std::move(fn));
     }
     
     //
@@ -258,18 +199,25 @@ namespace
         E2D_ASSERT(is_current_thread());
         main_activity_ = java_obj(obj);
     }
-    
-    void android_activity::push_msg(const message& msg) {
-        messages_.push(msg);
-    }
 
     void android_activity::process_messages() {
         E2D_ASSERT(is_current_thread());
-        messages_.process([this] (auto& msg) {
-            switch( msg.type ) {
-                case msg_type::set_orientation :
-                    break;
-            }
+        messages_.process();
+    }
+
+    void android_activity::set_orientation() {
+        // TODO
+    }
+
+    void android_activity::show_toast(str value) {
+        messages_.push([this, msg = std::move(value)] () {
+            // TODO
+        });
+    }
+
+    void android_activity::set_title(str value) {
+        messages_.push([this, title = std::move(value)] () {
+            // TODO
         });
     }
     
@@ -523,95 +471,8 @@ namespace
     }
     
     //
-    // android_window
+    // convert_*
     //
-    
-    android_window::android_window() noexcept
-    : surface_(the<debug>()) {
-        thread_ = std::thread([this]() { render_loop_(); });
-    }
-    
-    void android_window::quit() {
-        thread_.join();
-    }
-
-    void android_window::render_loop_() noexcept {
-        E2D_ASSERT(is_current_thread());
-        bool main_was_called = false;
-
-        for (; !exit_loop_.load(std::memory_order_relaxed); ) {
-            try {
-                process_messages();
-            } catch(const std::exception &e) {
-                __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "android_window::render_loop_ exception: %s\n", e.what());
-            }
-            if ( !main_was_called && surface_.has_surface() ) {
-                main_was_called = true;
-                e2d_main(0, nullptr);
-            }
-        }
-    }
-
-    void android_window::push_msg(const message& msg) {
-        messages_.push(msg);
-    }
-
-    void android_window::process_messages() {
-        std::unique_lock<std::recursive_mutex> guard_(this->rmutex);
-        messages_.process([this] (auto& msg) {
-            switch( msg.type ) {
-                case msg_type::app_create :
-                    break;
-                case msg_type::app_destroy :
-                    on_destroy_();
-                    break;
-                case msg_type::app_start :
-                    break;
-                case msg_type::app_stop :
-                    break;
-                case msg_type::app_pause :
-                    break;
-                case msg_type::app_resume :
-                    break;
-                case msg_type::surface_changed :
-                    on_surface_changed_(msg.surface_data);
-                    break;
-                case msg_type::orientation_changed :
-                    on_orientation_changed_(msg.orientation);
-                    break;
-                case msg_type::key :
-                    on_key_(msg.key);
-                    break;
-                case msg_type::touch :
-                    on_touch_(msg.touch);
-                    break;
-            }
-        });
-    }
-    
-    void android_window::on_destroy_() {
-        // TODO
-        // ...
-        surface_.destroy_context();
-        exit_loop_.store(true, std::memory_order_relaxed);
-        should_close = true;
-    }
-
-    void android_window::on_surface_changed_(const surface_data& data) {
-        if ( data.window ) {
-            if ( !surface_.has_context() ) {
-                surface_.create_context(v4i(8,8,8,0), 16, 0, 0);
-            }
-            surface_.create_surface(data.window);
-            framebuffer_size = surface_.framebuffer_size();
-            real_size = surface_.framebuffer_size(); // temp
-            the<debug>().error("on_surface_changed_, real(%0, %1), framebuffer(%2, %3)", real_size.x, real_size.y, framebuffer_size.x, framebuffer_size.y);
-        } else {
-            surface_.destroy_surface();
-            framebuffer_size = v2u(0,0);
-            real_size = v2u(0,0);
-        }
-    }
 
     keyboard_key convert_android_keyboard_key(int code) noexcept {
         switch ( code ) {
@@ -747,65 +608,140 @@ namespace
                 return keyboard_key_action::unknown;
         }
     }
-     
-    void android_window::on_key_(const key& data) {
-        for_all_listeners(
-            &window::event_listener::on_keyboard_key,
-            convert_android_keyboard_key(data.code),
-            data.code,
-            convert_android_keyboard_key_act(data.action));
+
+    //
+    // android_window
+    //
+    
+    android_window::android_window() noexcept
+    : surface_(the<debug>()) {
+        thread_ = std::thread([this]() { render_loop_(); });
+    }
+    
+    void android_window::quit() {
+        thread_.join();
     }
 
-    void android_window::on_touch_(const touch& data) {
-        // from MotionEvent.java
-        constexpr int ACTION_DOWN = 0;
-        constexpr int ACTION_UP = 1;
-        constexpr int ACTION_MOVE = 2;
-        constexpr int ACTION_CANCEL = 3;
-        constexpr int ACTION_OUTSIDE = 4;
+    void android_window::render_loop_() noexcept {
+        E2D_ASSERT(is_current_thread());
+        bool main_was_called = false;
 
-        switch ( data.action ) {
-            case ACTION_DOWN : {
-                auto& ptr = data.pointers.front();
-                if ( last_touch_id_ == ~0u ) {
-                    last_touch_id_ = ptr.id;
-                    for_all_listeners(
-                        &window::event_listener::on_mouse_button,
-                        mouse_button(last_touch_id_),
-                        mouse_button_action::press);
-                }
-                break;
+        for (; !exit_loop_.load(std::memory_order_relaxed); ) {
+            try {
+                process_messages();
+            } catch(const std::exception &e) {
+                __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "android_window::render_loop_ exception: %s\n", e.what());
             }
-            case ACTION_UP :
-            case ACTION_CANCEL :
-            case ACTION_OUTSIDE : {
-                auto& ptr = data.pointers.front();
-                if ( last_touch_id_ == ptr.id ) {
-                    for_all_listeners(
-                        &window::event_listener::on_mouse_button,
-                        mouse_button(last_touch_id_),
-                        mouse_button_action::release);
-                    last_touch_id_ = ~0u;
-                }
-                break;
-            }
-            case ACTION_MOVE : {
-                for ( int i = 0; i < data.pointer_count; ++i ) {
-                    auto& ptr = data.pointers[i];
-                    if ( last_touch_id_ == ptr.id ) {
-                        for_all_listeners(
-                            &window::event_listener::on_move_cursor,
-                            v2f(ptr.x, ptr.y));
-                        break;
-                    }
-                }
-                break;
+            if ( !main_was_called && surface_.has_surface() ) {
+                main_was_called = true;
+                e2d_main(0, nullptr);
             }
         }
     }
+
+    void android_window::process_messages() {
+        std::unique_lock<std::recursive_mutex> guard_(this->rmutex);
+        messages_.process();
+    }
     
-    void android_window::on_orientation_changed_(const orientation& data) {
-        // TODO
+    void android_window::on_surface_changed(ANativeWindow* wnd) {
+        using time_point = std::chrono::steady_clock::time_point;
+        using millis = std::chrono::milliseconds;
+
+        constexpr millis timeout = millis(2000);
+        const time_point start = time_point::clock::now();
+        surface_destoyed_ = false;
+
+        messages_.push([this, wnd] () {
+            if ( wnd ) {
+                if ( !surface_.has_context() ) {
+                    surface_.create_context(v4i(8,8,8,0), 16, 0, 0);
+                }
+                surface_.create_surface(wnd);
+                framebuffer_size = surface_.framebuffer_size();
+                real_size = surface_.framebuffer_size(); // TODO
+                the<debug>().error("on_surface_changed_, real(%0, %1), framebuffer(%2, %3)", real_size.x, real_size.y, framebuffer_size.x, framebuffer_size.y);
+            } else {
+                surface_.destroy_surface();
+                framebuffer_size = v2u(0,0);
+                real_size = v2u(0,0);
+                surface_destoyed_ = true;
+                the<debug>().error("on_surface_destroyed");
+            }
+            enabled = surface_.has_surface();
+        });
+
+        // if surface destroyed then block UI thread until rendering thread complete frame
+        if ( !wnd ) {
+            for (; !surface_destoyed_; ) {
+                millis dt = std::chrono::duration_cast<millis>(time_point::clock::now() - start);
+                if ( dt > timeout ) {
+                    the<debug>().error("on_surface_destroyed - timeout");
+                }
+            }
+        }
+    }
+
+    void android_window::on_destroy() {
+        messages_.push([this] () {
+            surface_.destroy_context();
+            exit_loop_.store(true, std::memory_order_relaxed);
+            should_close = true;
+        });
+    }
+
+    void android_window::on_key(i32 code, i32 action) {
+        messages_.push([this, code, action] () {
+            for_all_listeners(
+                &window::event_listener::on_keyboard_key,
+                convert_android_keyboard_key(code),
+                code,
+                convert_android_keyboard_key_act(action));
+        });
+    }
+
+    void android_window::on_touch(const touch& data) {
+        messages_.push([this, data] () {
+            // from MotionEvent.java
+            constexpr int ACTION_DOWN = 0;
+            constexpr int ACTION_UP = 1;
+            constexpr int ACTION_MOVE = 2;
+            constexpr int ACTION_CANCEL = 3;
+            constexpr int ACTION_OUTSIDE = 4;
+        
+            auto& ptr = data.pointers.front();
+            switch ( data.action ) {
+                case ACTION_DOWN :
+                    if ( last_touch_id_ == ~0u ) {
+                        last_touch_id_ = ptr.id;
+                        for_all_listeners(
+                            &window::event_listener::on_mouse_button,
+                            mouse_button(last_touch_id_),
+                            mouse_button_action::press);
+                    }
+                    break;
+                case ACTION_UP :
+                case ACTION_CANCEL :
+                case ACTION_OUTSIDE :
+                    if ( last_touch_id_ == ptr.id ) {
+                        for_all_listeners(
+                            &window::event_listener::on_mouse_button,
+                            mouse_button(last_touch_id_),
+                            mouse_button_action::release);
+                        last_touch_id_ = ~0u;
+                    }
+                    break;
+            }
+            for ( int i = 0; i < data.pointer_count; ++i ) {
+                auto& ptr = data.pointers[i];
+                if ( last_touch_id_ == ptr.id ) {
+                    for_all_listeners(
+                        &window::event_listener::on_move_cursor,
+                        v2f(ptr.x, ptr.y));
+                    break;
+                }
+            }
+        });
     }
 
     template < typename F, typename... Args >
@@ -893,9 +829,9 @@ namespace e2d
     }
 
     bool window::enabled() const noexcept {
-        std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
-        // TODO
-        return true;
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        return wnd.enabled;
     }
 
     bool window::visible() const noexcept {
@@ -1032,9 +968,6 @@ namespace
             auto& inst = java_interface::instance();
             inst.activity.set_activity(activity);
 
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::app_create;
-            inst.window.push_msg(msg);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1042,11 +975,9 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_destroy(JNIEnv* env, jobject obj) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::app_destroy;
-
             auto& inst = java_interface::instance();
-            inst.window.push_msg(msg);
+            inst.activity.set_activity(nullptr);
+            inst.window.on_destroy();
             inst.window.quit();
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
@@ -1055,9 +986,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_start(JNIEnv* env, jobject obj) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::app_start;
-            java_interface::instance().window.push_msg(msg);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1065,9 +993,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_stop(JNIEnv* env, jobject obj) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::app_stop;
-            java_interface::instance().window.push_msg(msg);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1075,9 +1000,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_pause(JNIEnv* env, jobject obj) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::app_pause;
-            java_interface::instance().window.push_msg(msg);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1085,9 +1007,6 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_resume(JNIEnv* env, jobject obj) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::app_resume;
-            java_interface::instance().window.push_msg(msg);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1095,12 +1014,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceChanged(JNIEnv* env, jobject obj, jobject surface, jint w, jint h) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::surface_changed;
-            msg.surface_data.window = ANativeWindow_fromSurface(env, surface);
-            msg.surface_data.width = w;
-            msg.surface_data.height = h;
-            java_interface::instance().window.push_msg(msg);
+            java_interface::instance().window.on_surface_changed(ANativeWindow_fromSurface(env, surface));
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1108,9 +1022,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceDestroyed(JNIEnv* env, jobject obj) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::surface_changed;
-            java_interface::instance().window.push_msg(msg);
+            java_interface::instance().window.on_surface_changed(nullptr);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1158,11 +1070,7 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onKey(JNIEnv* env, jobject obj, jint keycode, jint action) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::key;
-            msg.key.code = keycode;
-            msg.key.action = action;
-            java_interface::instance().window.push_msg(msg);
+            java_interface::instance().window.on_key(keycode, action);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
@@ -1170,18 +1078,17 @@ namespace
 
     extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTouch(JNIEnv* env, jobject obj, jint action, jint num_pointers, jfloatArray touch_data_array) noexcept {
         try {
-            android_window::message msg = {};
-            msg.type = android_window::msg_type::touch;
-            msg.touch.action = action;
-            msg.touch.pointer_count = num_pointers;
+            android_window::touch touch;
+            touch.action = action;
+            touch.pointer_count = num_pointers;
             java_array<jfloat> touch_data(touch_data_array);
             for ( int i = 0, j = 0; i < num_pointers; ++i ) {
-                msg.touch.pointers[i].id = u32(touch_data[j++]);
-                msg.touch.pointers[i].x = touch_data[j++];
-                msg.touch.pointers[i].y = touch_data[j++];
-                msg.touch.pointers[i].pressure = touch_data[j++];
+                touch.pointers[i].id = u32(touch_data[j++]);
+                touch.pointers[i].x = touch_data[j++];
+                touch.pointers[i].y = touch_data[j++];
+                touch.pointers[i].pressure = touch_data[j++];
             }
-            java_interface::instance().window.push_msg(msg);
+            java_interface::instance().window.on_touch(touch);
         } catch(const std::exception& e) {
             __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         }
