@@ -93,6 +93,65 @@ namespace e2d
         E2D_ASSERT(jni_env_);
         return jni_env_;
     }
+    
+    //
+    // java_string
+    //
+
+    java_string::java_string(jstring jstr) noexcept {
+        java_env je;
+        jstr_ = jstr;
+        data_ = je.env()->GetStringUTFChars(jstr, 0);
+        length_ = je.env()->GetStringUTFLength(jstr);
+    }
+
+    java_string::java_string(str_view strv) noexcept
+    : from_native_code_(true) {
+        java_env je;
+        jstr_ = je.env()->NewStringUTF(strv.data());
+    }
+
+    java_string::java_string(java_string&& other) noexcept
+    : from_native_code_(other.from_native_code_) {
+        std::swap(data_, other.data_);
+        std::swap(jstr_, other.jstr_);
+        std::swap(length_, other.length_);
+    }
+    
+    java_string::~java_string() noexcept {
+        release_();
+    }
+    
+    void java_string::release_() noexcept {
+        java_env je;
+        if ( from_native_code_ ) {
+            if ( jstr_ ) {
+                je.env()->DeleteLocalRef(jstr_);
+            }
+        } else if ( data_ && jstr_ ) {
+            je.env()->ReleaseStringUTFChars(jstr_, data_);
+        }
+        data_ = nullptr;
+        jstr_ = nullptr;
+        length_ = 0;
+    }
+    
+    const char* java_string::data() const noexcept {
+        return data_;
+    }
+    
+    size_t java_string::length() const noexcept {
+        return length_;
+    }
+    
+    jstring java_string::get() const noexcept {
+        return jstr_;
+    }
+    
+    java_string::operator str_view() const noexcept {
+        E2D_ASSERT(data_);
+        return str_view(data_, length_);
+    }
 
     //
     // java_class
@@ -116,7 +175,7 @@ namespace e2d
             throw std::runtime_error("java object is null");
         }
         java_env je;
-        jclass jc = je.env()->GetObjectClass(obj.data());
+        jclass jc = je.env()->GetObjectClass(obj.get());
         if ( !jc ) {
             throw std::runtime_error("failed to get object class");
         }
@@ -129,7 +188,7 @@ namespace e2d
     }
     
     java_class::java_class(const java_class& jc) noexcept {
-        set_(java_env(), jc.data());
+        set_(java_env(), jc.get());
     }
 
     java_class::~java_class() noexcept {
@@ -138,7 +197,7 @@ namespace e2d
 
     java_class& java_class::operator = (const java_class& jc) noexcept {
         dec_ref_();
-        set_(java_env(), jc.data());
+        set_(java_env(), jc.get());
         return *this;
     }
 
@@ -166,7 +225,7 @@ namespace e2d
         }
     }
     
-    jclass java_class::data() const noexcept {
+    jclass java_class::get() const noexcept {
         return class_;
     }
     
@@ -175,11 +234,11 @@ namespace e2d
     //
     
     java_obj::java_obj(const java_obj& jo) noexcept {
-        set_(java_env(), jo.data());
+        set_(java_env(), jo.get());
     }
 
     java_obj::java_obj(java_obj&& jo) noexcept
-    : obj_(jo.data()) {
+    : obj_(jo.get()) {
         jo.obj_ = nullptr;
     }
 
@@ -193,13 +252,13 @@ namespace e2d
     
     java_obj& java_obj::operator = (const java_obj& jo) noexcept {
         dec_ref_();
-        set_(java_env(), jo.data());
+        set_(java_env(), jo.get());
         return *this;
     }
 
     java_obj& java_obj::operator = (java_obj&& jo) noexcept {
         dec_ref_();
-        obj_ = jo.data();
+        obj_ = jo.get();
         jo.obj_ = nullptr;
         return *this;
     }
@@ -217,7 +276,7 @@ namespace e2d
         }
     }
     
-    jobject java_obj::data() const noexcept {
+    jobject java_obj::get() const noexcept {
         return obj_;
     }
 

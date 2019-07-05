@@ -57,125 +57,38 @@ namespace e2d
 
         template < typename T >
         struct jni_type_name;
+
+        #define JNI_TYPE_NAME(type_name, signature) \
+            template <> \
+            struct jni_type_name<type_name> { \
+                using type = type_name; \
+                static void append(str& s) { s += signature; } \
+            }
+        JNI_TYPE_NAME(void, 'V');
+        JNI_TYPE_NAME(jboolean, 'Z');
+        JNI_TYPE_NAME(jbyte, 'B');
+        JNI_TYPE_NAME(jchar, 'C');
+        JNI_TYPE_NAME(jshort, 'S');
+        JNI_TYPE_NAME(jint, 'I');
+        JNI_TYPE_NAME(jlong, 'J');
+        JNI_TYPE_NAME(jfloat, 'F');
+        JNI_TYPE_NAME(jdouble, 'D');
+        JNI_TYPE_NAME(jstring, "Ljava/lang/String;");
+        JNI_TYPE_NAME(jobject, "Ljava/lang/Object;");
+        JNI_TYPE_NAME(jthrowable, "Ljava/lang/Throwable;");
+        JNI_TYPE_NAME(jbyteArray, "[B");
+        JNI_TYPE_NAME(jcharArray, "[C");
+        JNI_TYPE_NAME(jshortArray, "[S");
+        JNI_TYPE_NAME(jintArray, "[I");
+        JNI_TYPE_NAME(jlongArray, "[J");
+        JNI_TYPE_NAME(jfloatArray, "[F");
+        JNI_TYPE_NAME(jdoubleArray, "[D");
+        #undef JNI_TYPE_NAME
     
         template < typename T >
         struct jni_type_name<T*> {
             using type = T*;
             static void append(str& s) { s += '[';  jni_type_name<T>::append(s); }
-        };
-
-        template <>
-        struct jni_type_name<void> {
-            using type = void;
-            static void append(str& s) { s += 'V'; }
-        };
-    
-        template <>
-        struct jni_type_name<jboolean> {
-            using type = jboolean;
-            static void append(str& s) { s += 'Z'; }
-        };
-    
-        template <>
-        struct jni_type_name<jbyte> {
-            using type = jbyte;
-            static void append(str& s) { s += 'B'; }
-        };
-    
-        template <>
-        struct jni_type_name<jchar> {
-            using type = jchar;
-            static void append(str& s) { s += 'C'; }
-        };
-    
-        template <>
-        struct jni_type_name<jshort> {
-            using type = jshort;
-            static void append(str& s) { s += 'S'; }
-        };
-    
-        template <>
-        struct jni_type_name<jint> {
-            using type = jint;
-            static void append(str& s) { s += 'I'; }
-        };
-    
-        template <>
-        struct jni_type_name<jlong> {
-            using type = jlong;
-            static void append(str& s) { s += 'J'; }
-        };
-    
-        template <>
-        struct jni_type_name<jfloat> {
-            using type = jfloat;
-            static void append(str& s) { s += 'F'; }
-        };
-    
-        template <>
-        struct jni_type_name<jdouble> {
-            using type = jdouble;
-            static void append(str& s) { s += 'D'; }
-        };
-    
-        template <>
-        struct jni_type_name<jstring> {
-            using type = jstring;
-            static void append(str& s) { s += "Ljava/lang/String;"; }
-        };
-    
-        template <>
-        struct jni_type_name<jobject> {
-            using type = jobject;
-            static void append(str& s) { s += "Ljava/lang/Object;"; }
-        };
-    
-        template <>
-        struct jni_type_name<jthrowable> {
-            using type = jthrowable;
-            static void append(str& s) { s += "Ljava/lang/Throwable;"; }
-        };
-    
-        template <>
-        struct jni_type_name<jbyteArray> {
-            using type = jbyteArray;
-            static void append(str& s) { s += "[B"; }
-        };
-    
-        template <>
-        struct jni_type_name<jcharArray> {
-            using type = jcharArray;
-            static void append(str& s) { s += "[C"; }
-        };
-    
-        template <>
-        struct jni_type_name<jshortArray> {
-            using type = jshortArray;
-            static void append(str& s) { s += "[S"; }
-        };
-    
-        template <>
-        struct jni_type_name<jintArray> {
-            using type = jintArray;
-            static void append(str& s) { s += "[I"; }
-        };
-    
-        template <>
-        struct jni_type_name<jlongArray> {
-            using type = jlongArray;
-            static void append(str& s) { s += "[J"; }
-        };
-    
-        template <>
-        struct jni_type_name<jfloatArray> {
-            using type = jfloatArray;
-            static void append(str& s) { s += "[F"; }
-        };
-    
-        template <>
-        struct jni_type_name<jdoubleArray> {
-            using type = jdoubleArray;
-            static void append(str& s) { s += "[D"; }
         };
 
         //
@@ -250,13 +163,11 @@ namespace e2d
             using value_type = type; \
             using jarray_t = type ## Array; \
         public: \
-            java_array() noexcept \
-            : from_native_code_(false) {} \
+            java_array() noexcept = default; \
             \
             explicit java_array(jarray_t arr, bool read_only = false) noexcept \
             : jarray_(arr) \
-            , read_only_(read_only) \
-            , from_native_code_(false) { \
+            , read_only_(read_only) { \
                 java_env je; \
                 data_ = je.env()->Get ## jtype ## ArrayElements(jarray_, 0); \
                 count_ = je.env()->GetArrayLength(jarray_); \
@@ -269,20 +180,21 @@ namespace e2d
                 data_ = je.env()->Get ## jtype ## ArrayElements(jarray_, nullptr); \
                 count_ = je.env()->GetArrayLength(jarray_); \
                 E2D_ASSERT(vec.size() == count_); \
-                for ( size_t i = 0; i < vec.size(); ++i ) { \
+                for ( size_t i = 0; i < count_; ++i ) { \
                     data_[i] = vec[i]; \
                 } \
             } \
             \
+            java_array(java_array&& other) noexcept \
+            : from_native_code_(other.from_native_code_) { \
+                std::swap(data_, other.data_); \
+                std::swap(jarray_, other.jarray_); \
+                std::swap(count_, other.count_); \
+                std::swap(read_only_, other.read_only_); \
+            } \
+            \
             ~java_array() noexcept { \
-                java_env je; \
-                if ( from_native_code_ ) { \
-                    if ( jarray_ ) { \
-                        je.env()->DeleteLocalRef(jarray_); \
-                    } \
-                } else if ( data_ && jarray_ ) { \
-                    je.env()->Release ## jtype ## ArrayElements(jarray_, data_, read_only_ ? JNI_ABORT : 0); \
-                } \
+                release_(); \
             } \
             \
             [[nodiscard]] const type* data() const noexcept { \
@@ -317,14 +229,32 @@ namespace e2d
                 return data_ + count_; \
             } \
             \
+            [[nodiscard]] jarray_t get() const noexcept { \
+                return jarray_; \
+            } \
+            \
+        private: \
+            void release_() noexcept { \
+                java_env je; \
+                if ( from_native_code_ ) { \
+                    if ( jarray_ ) { \
+                        je.env()->DeleteLocalRef(jarray_); \
+                    } \
+                } else if ( data_ && jarray_ ) { \
+                    je.env()->Release ## jtype ## ArrayElements(jarray_, data_, read_only_ ? JNI_ABORT : 0); \
+                } \
+                data_ = nullptr; \
+                jarray_ = nullptr; \
+                count_ = 0; \
+                read_only_ = false; \
+            } \
         private: \
             type* data_ = nullptr; \
             jarray_t jarray_ = nullptr; \
             size_t count_ = 0; \
             bool read_only_ = false; \
-            bool const from_native_code_; \
+            bool from_native_code_ = false; \
         }
-
     DEFINE_JAVE_ARRAY(jbyte, Byte);
     DEFINE_JAVE_ARRAY(jchar, Char);
     DEFINE_JAVE_ARRAY(jshort, Short);
@@ -332,8 +262,31 @@ namespace e2d
     DEFINE_JAVE_ARRAY(jlong, Long);
     DEFINE_JAVE_ARRAY(jfloat, Float);
     DEFINE_JAVE_ARRAY(jdouble, Double);
-
     #undef DEFINE_JAVE_ARRAY
+
+    //
+    // java_string
+    //
+
+    class java_string {
+    public:
+        java_string() noexcept;
+        explicit java_string(jstring) noexcept;
+        explicit java_string(str_view) noexcept;
+        java_string(java_string&&) noexcept;
+        ~java_string() noexcept;
+        [[nodiscard]] const char* data() const noexcept;
+        [[nodiscard]] size_t length() const noexcept;
+        [[nodiscard]] jstring get() const noexcept;
+        explicit operator str_view() const noexcept;
+    private:
+        void release_() noexcept;
+    private:
+        const char* data_ = nullptr;
+        size_t length_ = 0;
+        jstring jstr_ = nullptr;
+        bool from_native_code_ = false;
+    };
 
     template < typename FN >
     class java_static_method;
@@ -358,9 +311,9 @@ namespace e2d
         ~java_class() noexcept;
         java_class& operator = (const java_class&) noexcept;
         java_class& operator = (java_class&&) noexcept;
-        [[nodiscard]] jclass data() const noexcept;
+        [[nodiscard]] jclass get() const noexcept;
         template < typename FN >
-        [[nodiscard]] java_static_method<FN> static_method_id(str_view name) const;
+        [[nodiscard]] java_static_method<FN> static_method(str_view name) const;
         [[nodiscard]] explicit operator bool() const noexcept;
     private:
         void set_(const java_env&, jclass) noexcept;
@@ -404,11 +357,11 @@ namespace e2d
         ~java_obj() noexcept;
         java_obj& operator = (const java_obj&) noexcept;
         java_obj& operator = (java_obj&&) noexcept;
-        [[nodiscard]] jobject data() const noexcept;
+        [[nodiscard]] jobject get() const noexcept;
         template < typename FN >
-        [[nodiscard]] java_method<FN> method_id(str_view name) const;
+        [[nodiscard]] java_method<FN> method(str_view name) const;
         template < typename FN >
-        [[nodiscard]] java_static_method<FN> static_method_id(str_view name) const;
+        [[nodiscard]] java_static_method<FN> static_method(str_view name) const;
         [[nodiscard]] explicit operator bool() const noexcept;
     private:
         void set_(const java_env&, jobject) noexcept;
@@ -430,166 +383,83 @@ namespace e2d
         struct java_method_caller<void> {
             template < typename ...Args >
             static java_method_result<void> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                java_env().env()->CallStaticVoidMethod(jc.data(), method, std::forward<Args>(args)...);
+                java_env().env()->CallStaticVoidMethod(jc.get(), method, std::forward<Args>(args)...);
                 return java_method_result<void>();
             }
         
             template < typename ...Args >
             static java_method_result<void> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                java_env().env()->CallNonvirtualVoidMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
+                java_env().env()->CallNonvirtualVoidMethod(obj.get(), jc.get(), method, std::forward<Args>(args)...);
                 return java_method_result<void>();
             }
         
             template < typename ...Args >
             static java_method_result<void> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                java_env().env()->CallVoidMethod(obj.data(), method, std::forward<Args>(args)...);
+                java_env().env()->CallVoidMethod(obj.get(), method, std::forward<Args>(args)...);
                 return java_method_result<void>();
             }
         };
     
-        template <>
-        struct java_method_caller<jobject> {
-            template < typename ...Args >
-            static java_method_result<jobject> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticObjectMethod(jc.data(), method, std::forward<Args>(args)...);
+        #define JAVA_METHOD_CALLER(type_name, suffix) \
+            template <> \
+            struct java_method_caller<type_name> { \
+                template < typename ...Args > \
+                static java_method_result<type_name> call_static(const java_class& jc, jmethodID method, Args&&... args) { \
+                    return java_env().env()->CallStatic ## suffix ## Method(jc.get(), method, std::forward<Args>(args)...); \
+                } \
+                \
+                template < typename ...Args > \
+                static java_method_result<type_name> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) { \
+                    return java_env().env()->CallNonvirtual ## suffix ## Method(obj.get(), jc.get(), method, std::forward<Args>(args)...); \
+                } \
+                \
+                template < typename ...Args > \
+                static java_method_result<type_name> call(const java_obj& obj, jmethodID method, Args&&... args) { \
+                    return java_env().env()->Call ## suffix ## Method(obj.get(), method, std::forward<Args>(args)...); \
+                } \
             }
-        
-            template < typename ...Args >
-            static java_method_result<jobject> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualObjectMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jobject> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallObjectMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
+        JAVA_METHOD_CALLER(jobject, Object);
+        JAVA_METHOD_CALLER(jboolean, Boolean);
+        JAVA_METHOD_CALLER(jbyte, Byte);
+        JAVA_METHOD_CALLER(jchar, Char);
+        JAVA_METHOD_CALLER(jshort, Short);
+        JAVA_METHOD_CALLER(jint, Int);
+        JAVA_METHOD_CALLER(jlong, Long);
+        JAVA_METHOD_CALLER(jfloat, Float);
+        JAVA_METHOD_CALLER(jdouble, Double);
+        #undef JAVA_METHOD_CALLER
     
-        template <>
-        struct java_method_caller<jboolean> {
-            template < typename ...Args >
-            static java_method_result<jboolean> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticBooleanMethod(jc.data(), method, std::forward<Args>(args)...);
+        #define CPPTYPE_TO_JAVATYPE(javatype, cpptype) \
+            [[nodiscard]] inline javatype CppTypeToJava(const cpptype& x) { \
+                return javatype(x); \
             }
-        
-            template < typename ...Args >
-            static java_method_result<jboolean> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualBooleanMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jboolean> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallBooleanMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
-    
-        template <>
-        struct java_method_caller<jbyte> {
-            template < typename ...Args >
-            static java_method_result<jbyte> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticByteMethod(jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jbyte> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualByteMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jbyte> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallByteMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
-    
-        template <>
-        struct java_method_caller<jchar> {
-            template < typename ...Args >
-            static java_method_result<jchar> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticShortMethod(jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jchar> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualShortMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jchar> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallShortMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
-    
-        template <>
-        struct java_method_caller<jint> {
-            template < typename ...Args >
-            static java_method_result<jint> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticIntMethod(jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jint> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualIntMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jint> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallIntMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
-    
-        template <>
-        struct java_method_caller<jlong> {
-            template < typename ...Args >
-            static java_method_result<jlong> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticLongMethod(jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jlong> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualLongMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jlong> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallLongMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
-    
-        template <>
-        struct java_method_caller<jfloat> {
-            template < typename ...Args >
-            static java_method_result<jfloat> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticFloatMethod(jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jfloat> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualFloatMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jfloat> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallFloatMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
-    
-        template <>
-        struct java_method_caller<jdouble> {
-            template < typename ...Args >
-            static java_method_result<jdouble> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallStaticDoubleMethod(jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jdouble> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-                return java_env().env()->CallNonvirtualDoubleMethod(obj.data(), jc.data(), method, std::forward<Args>(args)...);
-            }
-        
-            template < typename ...Args >
-            static java_method_result<jdouble> call(const java_obj& obj, jmethodID method, Args&&... args) {
-                return java_env().env()->CallDoubleMethod(obj.data(), method, std::forward<Args>(args)...);
-            }
-        };
+        CPPTYPE_TO_JAVATYPE(jobject, jobject);
+        CPPTYPE_TO_JAVATYPE(jstring, jstring);
+        CPPTYPE_TO_JAVATYPE(jboolean, jboolean);
+        CPPTYPE_TO_JAVATYPE(jbyte, jbyte);
+        CPPTYPE_TO_JAVATYPE(jchar, jchar);
+        CPPTYPE_TO_JAVATYPE(jshort, jshort);
+        CPPTYPE_TO_JAVATYPE(jint, jint);
+        CPPTYPE_TO_JAVATYPE(jlong, jlong);
+        CPPTYPE_TO_JAVATYPE(jfloat, jfloat);
+        CPPTYPE_TO_JAVATYPE(jdouble, jdouble);
+        CPPTYPE_TO_JAVATYPE(jboolean, bool);
+        CPPTYPE_TO_JAVATYPE(jint, u32);
+        CPPTYPE_TO_JAVATYPE(jlong, u64);
+        #undef CPPTYPE_TO_JAVATYPE
+
+        [[nodiscard]] inline jobject CppTypeToJava(const java_obj& obj) {
+            return obj.get();
+        }
+
+        [[nodiscard]] inline jstring CppTypeToJava(const java_string& jstr) {
+            return jstr.get();
+        }
+
+        template < typename T >
+        [[nodiscard]] inline auto CppTypeToJava(const java_array<T>& arr) {
+            return arr.get();
+        }
     }
 
     //
@@ -607,8 +477,9 @@ namespace e2d
         : class_(jc)
         , method_(method) {}
 
-        detail::java_method_result<Ret> operator () (const Args&... args) const {
-            return detail::java_method_caller<Ret>::call_static(class_, method_, args...);
+        template < typename ...ArgTypes >
+        detail::java_method_result<Ret> operator () (const ArgTypes&... args) const {
+            return detail::java_method_caller<Ret>::call_static(class_, method_, detail::CppTypeToJava(args)...);
         }
     private:
         java_class class_;
@@ -627,9 +498,10 @@ namespace e2d
         java_method(const java_obj& obj, jmethodID method)
         : obj_(obj)
         , method_(method) {}
-
-        detail::java_method_result<Ret> operator () (const Args&... args) const {
-            return detail::java_method_caller<Ret>::call(obj_, method_, args...);
+        
+        template < typename ...ArgTypes >
+        detail::java_method_result<Ret> operator () (const ArgTypes&... args) const {
+            return detail::java_method_caller<Ret>::call(obj_, method_, detail::CppTypeToJava(args)...);
         }
     private:
         java_obj obj_;
@@ -638,7 +510,7 @@ namespace e2d
     
 
     template < typename FN >
-    inline java_static_method<FN> java_class::static_method_id(str_view name) const {
+    inline java_static_method<FN> java_class::static_method(str_view name) const {
         if ( !class_ ) {
             throw std::runtime_error("invalid java class");
         }
@@ -648,18 +520,18 @@ namespace e2d
     }
 
     template < typename FN >
-    inline java_static_method<FN> java_obj::static_method_id(str_view name) const {
-        return java_class(*this).static_method_id<FN>(name);
+    inline java_static_method<FN> java_obj::static_method(str_view name) const {
+        return java_class(*this).static_method<FN>(name);
     }
     
     template < typename FN >
-    inline java_method<FN> java_obj::method_id(str_view name) const {
+    inline java_method<FN> java_obj::method(str_view name) const {
         if ( !obj_ ) {
             throw std::runtime_error("invalid java object");
         }
         java_env je;
         detail::java_method_sig<FN> sig;
-        return java_method<FN>(*this, je.env()->GetMethodID(java_class(*this).data(), name.data(), sig.signature().data()));
+        return java_method<FN>(*this, je.env()->GetMethodID(java_class(*this).get(), name.data(), sig.signature().data()));
     }
 
     template < typename ...Args >
@@ -669,11 +541,11 @@ namespace e2d
         }
         java_env je;
         detail::java_method_sig<void (Args...)> sig;
-        jmethodID ctor_id = je.env()->GetMethodID(jc.data(), "<init>", sig.signature().data());
+        jmethodID ctor_id = je.env()->GetMethodID(jc.get(), "<init>", sig.signature().data());
         if ( !ctor_id ) {
             throw std::runtime_error("constructor doesn't exists");
         }
-        jobject jo = je.env()->NewObjectV(jc.data(), std::forward<Args>(args)...);
+        jobject jo = je.env()->NewObjectV(jc.get(), std::forward<Args>(args)...);
         if ( !jo ) {
             throw std::runtime_error("failed to create java object");
         }

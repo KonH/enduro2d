@@ -48,8 +48,11 @@ namespace
         void set_orientation();
         void show_toast(str);
         void set_title(str);
+        void close();
     public:
         java_obj main_activity_;
+        java_method<void ()> finish_activity_;
+        java_method<void (jstring)> set_activity_title_;
         message_queue messages_;
         std::thread::id thread_id_ = std::this_thread::get_id();
     };
@@ -198,6 +201,10 @@ namespace
     void android_activity::set_activity(jobject obj) {
         E2D_ASSERT(is_current_thread());
         main_activity_ = java_obj(obj);
+        if ( main_activity_ ) {
+            finish_activity_ = main_activity_.method<void ()>("finish");
+            //set_activity_title_ = main_activity_.method<void (jstring)>("set_title");
+        }
     }
 
     void android_activity::process_messages() {
@@ -217,7 +224,13 @@ namespace
 
     void android_activity::set_title(str value) {
         messages_.push([this, title = std::move(value)] () {
-            // TODO
+            set_activity_title_(java_string(title));
+        });
+    }
+
+    void android_activity::close() {
+        messages_.push([this] () {
+            finish_activity_();
         });
     }
     
@@ -659,14 +672,12 @@ namespace
                 }
                 surface_.create_surface(wnd);
                 framebuffer_size = surface_.framebuffer_size();
-                real_size = surface_.framebuffer_size(); // TODO
-                the<debug>().error("on_surface_changed_, real(%0, %1), framebuffer(%2, %3)", real_size.x, real_size.y, framebuffer_size.x, framebuffer_size.y);
+                real_size = surface_.framebuffer_size();
             } else {
                 surface_.destroy_surface();
                 framebuffer_size = v2u(0,0);
                 real_size = v2u(0,0);
                 surface_destoyed_ = true;
-                the<debug>().error("on_surface_destroyed");
             }
             enabled = surface_.has_surface();
         });
@@ -676,7 +687,8 @@ namespace
             for (; !surface_destoyed_; ) {
                 millis dt = std::chrono::duration_cast<millis>(time_point::clock::now() - start);
                 if ( dt > timeout ) {
-                    the<debug>().error("on_surface_destroyed - timeout");
+                    the<debug>().error("ANDROID: time is out when waiting render thread");
+                    return;
                 }
             }
         }
@@ -917,8 +929,10 @@ namespace e2d
     }
 
     void window::set_should_close(bool yesno) noexcept {
-        std::lock_guard<std::recursive_mutex> guard(state_->rmutex());
-        // TODO
+        java_interface::instance().activity.close();
+        auto& wnd = state_->native_window();
+        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+        wnd.should_close = true;
     }
 
     void window::bind_context() noexcept {
