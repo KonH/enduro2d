@@ -4,7 +4,7 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#define CATCH_CONFIG_MAIN
+#define CATCH_CONFIG_RUNNER
 #include "_utils.hpp"
 using namespace e2d;
 
@@ -66,4 +66,8 @@ TEST_CASE("utils") {
         REQUIRE(id1 == utils::type_family<str16>::id());
         REQUIRE(id2 == utils::type_family<str32>::id());
     }
+}
+
+int e2d_main (int argc, char * argv[]) {
+    return Catch::Session().run( argc, argv );
 }
