@@ -213,8 +213,8 @@ namespace
                         auto dir = math::normalized(data.translation - target);
                         auto unit_x = v3f::unit_x();
                         f32 dz = dir.x * unit_x.y - dir.y * unit_x.x;
-                        f32 move_angle = -std::atan2f( std::fabsf(dz) + 1.0e-37f, math::dot(dir, unit_x));
-                        data.velocity_angle = rad<f32>(move_angle + M_PI_2);
+                        rad<f32> move_angle = -math::atan2(math::abs(dz) + 1.0e-37f, math::dot(dir, unit_x));
+                        data.velocity_angle = move_angle + math::half_pi<f32>();
 
                         std::uniform_real_distribution<f32> vel(80.f, 200.f);
                         data.velocity_value = vel(gen);
