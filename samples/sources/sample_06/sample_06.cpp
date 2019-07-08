@@ -71,14 +71,13 @@ namespace
         };
 
         void addObject (const object_generator::object_data& d) {
-            E2D_ASSERT(count < max_size);
+            E2D_ASSERT(count < objects.size());
             objects[count] = d;
             count++;
         }
 
-        object_data objects[5];
+        std::array<object_data, 5> objects;
         i32 count{0};
-        i32 max_size{5};
     };
 
     class game_system final : public ecs::system {
