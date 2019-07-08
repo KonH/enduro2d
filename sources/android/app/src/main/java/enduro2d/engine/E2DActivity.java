@@ -17,15 +17,21 @@
 package enduro2d.engine;
 
 import android.app.Activity;
+import android.content.Context;
+import android.content.res.AssetManager;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Display;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import java.io.File;
 
@@ -42,12 +48,14 @@ public class E2DActivity
 
     @Override protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-        Log.e(TAG, "onCreate");
+        Log.i(TAG, "onCreate");
 
         opengl_view_ = new SurfaceView(this);
         setContentView(opengl_view_);
 
         E2DNativeLib.create(this);
+        sendVersionInfo();
+        sendDisplayInfo();
 
         SurfaceHolder holder = opengl_view_.getHolder();
         holder.addCallback(this);
@@ -61,35 +69,40 @@ public class E2DActivity
 
     @Override protected void onDestroy() {
         super.onDestroy();
-        Log.e(TAG, "onDestroy");
+        Log.i(TAG, "onDestroy");
         E2DNativeLib.destroy();
     }
 
     @Override protected void onPause() {
         super.onPause();
-        Log.e(TAG, "onPause");
+        Log.i(TAG, "onPause");
         E2DNativeLib.pause();
     }
 
     @Override protected void onResume() {
         super.onResume();
-        Log.e(TAG, "onResume");
+        Log.i(TAG, "onResume");
         E2DNativeLib.resume();
     }
 
     @Override protected void onStart() {
         super.onStart();
-        Log.e(TAG, "onStart");
+        Log.i(TAG, "onStart");
         E2DNativeLib.start();
         native_tick_.run();
     }
 
     @Override protected void onStop() {
         super.onStop();
-        Log.e(TAG, "onStop");
+        Log.i(TAG, "onStop");
         E2DNativeLib.stop();
         native_tick_.run();
         handler_.removeCallbacks(native_tick_);
+    }
+
+    @Override public void onConfigurationChanged(Configuration newConfig) {
+        Display display = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
+        E2DNativeLib.orientationChanged(display.getRotation());
     }
 
     // SurfaceHolder.Callback
@@ -141,17 +154,55 @@ public class E2DActivity
         return true;
     }
 
+    // called from native code
+    @SuppressWarnings("unused") public AssetManager getAssetManager() {
+        return getResources().getAssets();
+    }
+
+    @SuppressWarnings("unused") public void setActivityTitle(String value) {
+        this.setTitle(value);
+    }
+
+    @SuppressWarnings("unused") public void showToast(String msg, boolean long_time) {
+        int duration = long_time ? Toast.LENGTH_LONG : Toast.LENGTH_SHORT;
+        Toast toast = Toast.makeText(this, msg, duration);
+        toast.show();
+    }
+
+    @SuppressWarnings("unused") public void SetScreenOrientation(int value) {
+        setRequestedOrientation(value);
+    }
+
+    private void sendVersionInfo() {
+        E2DNativeLib.setApiVersion(android.os.Build.VERSION.SDK_INT);
+    }
+
+    private void sendDisplayInfo() {
+        WindowManager wm = (WindowManager)getSystemService(Context.WINDOW_SERVICE);
+        DisplayMetrics metrics = new DisplayMetrics();
+        Display display = wm.getDefaultDisplay();
+        display.getMetrics(metrics);
+        E2DNativeLib.orientationChanged(display.getRotation());
+        E2DNativeLib.setDisplayInfo(metrics.widthPixels, metrics.heightPixels, metrics.densityDpi);
+    }
+
     private Runnable native_tick_ = new Runnable() {
         @Override
         public void run() {
-            E2DNativeLib.tick();
+            try {
+                E2DNativeLib.tick();
+            } catch(Exception e) {
+                String s = "Catched exception: ";
+                s += e.toString();
+                s += android.util.Log.getStackTraceString(e);
+                Log.e(TAG, "exception: " + s);
+            }
             handler_.postDelayed(native_tick_, 1000/30);
         }
     };
 
     private static final int max_touches_ = 8;
-    private float touch_data_[] = new float[max_touches_ * 4]; // packed: {id, x, y, pressure}
-
+    private float[] touch_data_ = new float[max_touches_ * 4]; // packed: {id, x, y, pressure}
     private Handler handler_ = new Handler();
     private SurfaceView opengl_view_;
 }

@@ -127,7 +127,7 @@ namespace e2d
         public:
             java_method_sig() {
                 signature_ += '(';
-                if constexpr ( sizeof...(Args) ) {
+                if constexpr ( sizeof...(Args) > 0 ) {
                     append_args<Args...>();
                 }
                 signature_ += ')';
@@ -140,7 +140,7 @@ namespace e2d
             template < typename Arg0, typename ...ArgsN >
             void append_args() {
                 jni_type_name<Arg0>::append(signature_);
-                if constexpr ( sizeof...(ArgsN) ) {
+                if constexpr ( sizeof...(ArgsN) > 0 ) {
                     append_args<ArgsN...>();
                 }
             }
@@ -469,9 +469,9 @@ namespace e2d
     template < typename Ret, typename ...Args >
     class java_static_method<Ret (Args...)> {
     public:
+        using signature_t = Ret (Args...);
+    public:
         java_static_method() noexcept = default;
-        java_static_method(java_static_method&&) noexcept = default;
-        java_static_method(const java_static_method&) noexcept = default;
 
         java_static_method(const java_class& jc, jmethodID method)
         : class_(jc)
@@ -483,7 +483,7 @@ namespace e2d
         }
     private:
         java_class class_;
-        jmethodID method_ {nullptr};
+        jmethodID method_ = nullptr;
     };
 
     //
@@ -492,6 +492,8 @@ namespace e2d
 
     template < typename Ret, typename ...Args >
     class java_method<Ret (Args...)> {
+    public:
+        using signature_t = Ret (Args...);
     public:
         java_method() noexcept = default;
 
@@ -505,7 +507,7 @@ namespace e2d
         }
     private:
         java_obj obj_;
-        jmethodID method_ {nullptr};
+        jmethodID method_ = nullptr;
     };
     
 
