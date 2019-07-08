@@ -11,8 +11,10 @@ using namespace e2d;
 
 namespace
 {
-    sound_source_ptr sound_laser;
-    sound_source_ptr sound_meteor_boom;
+    struct sounds {
+        sound_source_ptr laser;
+        sound_source_ptr meteor_boom;
+    };
 
     struct player {
         f32 speed{120.f};
@@ -231,7 +233,7 @@ namespace
     public:
         void process(ecs::registry& owner) override {
             owner.for_joined_components<scene, object_generator>(
-                [](const ecs::const_entity& e, const scene& s, object_generator& og){
+                [&owner](const ecs::const_entity& e, const scene& s, object_generator& og){
                     for ( int i = 0; i < og.count; i++ ) {
                         auto& o = og.objects[i];
                         switch (o.type) {
@@ -286,7 +288,11 @@ namespace
                                 node_iptr laser_n = laser_i->get_component<actor>().get().node();
                                 laser_n->translation(o.translation);
                                 laser_n->rotation(o.rotation);
-                                sound_laser->play();
+                                owner.for_joined_components<scene, sounds>(
+                                    [](const ecs::const_entity&, scene&, sounds& s){
+                                       s.laser->play();
+                                    }
+                                );
                             } break;
 
                             case object_generator::object_data::object_type::none: {
@@ -442,10 +448,14 @@ namespace
     public:
         void process(ecs::registry& owner) override {
             owner.for_joined_components<collision_detected, actor>(
-                  [](const ecs::entity& e, collision_detected& c, actor& act){
+                  [&owner](const ecs::entity& e, collision_detected& c, actor& act){
                       if ( !e.exists_component<player>() ) {
                           if ( c.mask_group & collision::flag_group::laser ) {
-                              sound_meteor_boom->play();
+                              owner.for_joined_components<scene, sounds>(
+                                    [](const ecs::const_entity&, scene&, sounds& s){
+                                        s.meteor_boom->play();
+                                    }
+                              );
                           }
 
                           const node_iptr node = act.node();
@@ -467,22 +477,25 @@ namespace
     private:
         bool create_scene() {
 
-            auto sstream_laser_sound = the<audio>().create_stream(the<vfs>().read(url("resources://bin/library/sfx_laser1.ogg")));
-            auto sstream_meteor_boom_sound = the<audio>().create_stream(the<vfs>().read(url("resources://bin/library/sfx_zap.ogg")));
+            auto stream_laser_sound = the<audio>().create_stream(the<vfs>().read(url("resources://bin/library/sfx_laser1.ogg")));
+            auto stream_meteor_boom_sound = the<audio>().create_stream(the<vfs>().read(url("resources://bin/library/sfx_zap.ogg")));
             auto spaceship_prefab_ref = the<library>().load_asset<prefab_asset>("player_spaceship_prefab.json");
             auto asteroids_bg_prefab_ref = the<library>().load_asset<prefab_asset>("asteroids_bg_prefab.json");
 
-            if ( !spaceship_prefab_ref || !asteroids_bg_prefab_ref || !sstream_laser_sound || !sstream_meteor_boom_sound ) {
+            if ( !spaceship_prefab_ref
+                || !asteroids_bg_prefab_ref
+                || !stream_laser_sound
+                || !stream_meteor_boom_sound ) {
                 return false;
             }
 
-            sound_laser = the<audio>().create_source(sstream_laser_sound);
-            sound_meteor_boom = the<audio>().create_source(sstream_meteor_boom_sound);
-
             auto scene_i = the<world>().instantiate();
-
             scene_i->entity_filler()
                 .component<scene>()
+                .component<sounds>(sounds{
+                    the<audio>().create_source(stream_laser_sound),
+                    the<audio>().create_source(stream_meteor_boom_sound)
+                })
                 .component<meteor_generator_timer>()
                 .component<object_generator>()
                 .component<actor>(node::create(scene_i));
