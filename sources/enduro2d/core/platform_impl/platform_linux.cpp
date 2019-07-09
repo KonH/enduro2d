@@ -12,18 +12,19 @@ namespace
 {
     using namespace e2d;
 
-    class platform_internal_state_impl_linux final : public platform_internal_state_impl {
+    class platform_internal_state_linux final : public platform::internal_state {
     public:
-        platform_internal_state_impl_linux() = default;
-        ~platform_internal_state_impl_linux() noexcept final = default;
+        platform_internal_state_linux(int argc, char *argv[])
+            : internal_state(argc, argv) {}
+
+        ~platform_internal_state_linux() noexcept = default;
     };
 }
 
 namespace e2d
 {
-    platform_internal_state_impl_uptr platform_internal_state_impl::create() {
-        return std::make_unique<platform_internal_state_impl_linux>();
-    }
+    platform::platform(int argc, char *argv[])
+    : state_(new platform_internal_state_linux(argc, argv)) {}
 }
 
 int main(int argc, char *argv[]) {
