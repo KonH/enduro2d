@@ -29,4 +29,9 @@ android {
             path '../../../CMakeLists.txt'
         }
     }
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets', '../../../samples/bin']
+        }
+    }
 }

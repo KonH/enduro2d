@@ -35,14 +35,17 @@
 
 namespace e2d
 {
-    class platform_internal_state_impl;
-    using platform_internal_state_impl_uptr = std::unique_ptr<platform_internal_state_impl>;
+    //
+    // platform::internal_state
+    //
 
-    class platform_internal_state_impl : private e2d::noncopyable {
+    class platform::internal_state : private e2d::noncopyable {
     public:
-        static platform_internal_state_impl_uptr create();
+        internal_state(int argc, char *argv[]);
+        ~internal_state() noexcept = default;
     public:
-        platform_internal_state_impl() = default;
-        virtual ~platform_internal_state_impl() noexcept = default;
+        const vector<str>& command_line_arguments() const noexcept;
+    private:
+        vector<str> command_line_arguments_;
     };
 }

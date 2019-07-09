@@ -23,10 +23,8 @@ function(add_e2d_sample NAME)
     # resources
     #
 
-    add_custom_command(TARGET ${SAMPLE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/bin
-        $<TARGET_FILE_DIR:${SAMPLE_NAME}>/bin)
+    e2d_copy_resource_dir(${SAMPLE_NAME}
+        ${CMAKE_CURRENT_SOURCE_DIR}/bin)
     add_e2d_shared_libraries_to_target(${SAMPLE_NAME})
 endfunction(add_e2d_sample)
 

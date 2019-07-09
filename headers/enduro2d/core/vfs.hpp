@@ -92,6 +92,20 @@ namespace e2d
         output_stream_uptr write(str_view path, bool append) const final;
         bool trace(str_view path, filesystem::trace_func func) const final;
     };
+    
+    class asset_file_source final : public vfs::file_source {
+    public:
+        asset_file_source();
+        ~asset_file_source() noexcept final;
+        bool valid() const noexcept final;
+        bool exists(str_view path) const final;
+        input_stream_uptr read(str_view path) const final;
+        output_stream_uptr write(str_view path, bool append) const final;
+        bool trace(str_view path, filesystem::trace_func func) const final;
+    private:
+        class state;
+        std::unique_ptr<state> state_;
+    };
 }
 
 namespace e2d

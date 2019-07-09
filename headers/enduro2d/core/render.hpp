@@ -873,8 +873,18 @@ namespace e2d
             std::array<command_value, N> commands_;
             std::size_t command_count_ = 0;
         };
+        
+        enum class api_profile {
+            unknown,
+            opengl_compat,
+            opengl4_core,
+            opengles2,
+            opengles3,
+        };
 
         struct device_caps {
+            api_profile profile = api_profile::unknown;
+
             u32 max_texture_size = 0;
             u32 max_renderbuffer_size = 0;
             u32 max_cube_map_texture_size = 0;
@@ -902,6 +912,8 @@ namespace e2d
             bool dxt5_compression_supported = false;
             bool pvrtc_compression_supported = false;
             bool pvrtc2_compression_supported = false;
+
+            bool fragment_shader_highp_float_supported = false;
         };
     public:
         render(debug& d, window& w);

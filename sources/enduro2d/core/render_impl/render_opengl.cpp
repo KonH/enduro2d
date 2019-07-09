@@ -465,14 +465,49 @@ namespace e2d
     {
         E2D_ASSERT(is_in_main_thread());
 
+        const char* vs_header = "";
+        const char* fs_header = "";
+        switch ( device_capabilities().profile ) {
+            case api_profile::opengl_compat :
+                vs_header = fs_header = "#version 120\n"
+                    "#define highp\n"
+                    "#define mediump\n"
+                    "#define lowp\n";
+                break;
+            case api_profile::opengl4_core :
+                vs_header = "#version 420 core\n"
+                    "#define varying out\n"
+                    "#define attribute in\n";
+                fs_header = "#version 420 core\n"
+                    "#define varying in\n"
+                    "out vec4 gl_FragColor;\n";
+                break;
+            case api_profile::opengles2 :
+                vs_header =
+                    "precision highp float;\n"
+                    "precision highp int;\n";
+                fs_header =
+                    "precision mediump float;\n" // TODO: test GL_FRAGMENT_PRECISION_HIGH macro in shader
+                    "precision highp int;\n";
+                break;
+            case api_profile::opengles3 :
+                vs_header = "#version 300 es"
+                    "precision highp float;\n"
+                    "precision highp int;\n";
+                fs_header = "#version 300 es"
+                    "precision mediump float;\n"
+                    "precision highp int;\n";
+                break;
+        }
+
         gl_shader_id vs = gl_compile_shader(
-            state_->dbg(), vertex_source, GL_VERTEX_SHADER);
+            state_->dbg(), vs_header, vertex_source.data(), GL_VERTEX_SHADER);
         if ( vs.empty() ) {
             return nullptr;
         }
 
         gl_shader_id fs = gl_compile_shader(
-            state_->dbg(), fragment_source, GL_FRAGMENT_SHADER);
+            state_->dbg(), fs_header, fragment_source.data(), GL_FRAGMENT_SHADER);
         if ( fs.empty() ) {
             return nullptr;
         }

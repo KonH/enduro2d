@@ -6,6 +6,10 @@
 
 #include "window.hpp"
 
+#ifdef __INTELLISENSE__
+#  define E2D_WINDOW_MODE E2D_WINDOW_MODE_NATIVE_ANDROID
+#endif
+
 #if defined(E2D_WINDOW_MODE) && E2D_WINDOW_MODE == E2D_WINDOW_MODE_NATIVE_ANDROID
 
 #include <enduro2d/utils/java.hpp>
@@ -72,7 +76,6 @@ namespace
         void close();
     public:
         java_obj main_activity_;
-        java_obj asset_manager_;
         java_method<void ()> finish_activity_;
         java_method<void (jstring)> set_activity_title_;
         java_method<void (jstring, jboolean)> show_toast_;
@@ -250,14 +253,10 @@ namespace
             set_activity_title_ = main_activity_.method<void (jstring)>("setActivityTitle");
             show_toast_ = main_activity_.method<void (jstring, jboolean)>("showToast");
             set_orientation_ = main_activity_.method<void (jint)>("SetScreenOrientation");
-
-            auto get_asset_mngr = main_activity_.method<jobject ()>("getAssetManager");
-            asset_manager_ = java_obj(get_asset_mngr());
         } else {
             // release all java objects
             finish_activity_ = {};
             set_activity_title_ = {};
-            asset_manager_ = {};
         }
     }
     
@@ -709,6 +708,7 @@ namespace
             if ( !main_was_called && surface_.has_surface() ) {
                 main_was_called = true;
                 e2d_main(0, nullptr);
+                exit_loop_.store(true); // temp ?
             }
         }
     }
@@ -1061,7 +1061,7 @@ namespace
         __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_create(JNIEnv* env, jobject, jobject activity) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_create(JNIEnv*, jclass, jobject activity) noexcept {
         try {
             if ( !modules::is_initialized<debug>() ) {
                 modules::initialize<debug>();
@@ -1075,7 +1075,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_destroy(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_destroy(JNIEnv*, jclass) noexcept {
         try {
             auto& inst = java_interface::instance();
             inst.activity.set_activity(nullptr);
@@ -1086,35 +1086,35 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_start(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_start(JNIEnv*, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
             check_exceptions(e);
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_stop(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_stop(JNIEnv*, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
             check_exceptions(e);
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_pause(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_pause(JNIEnv*, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
             check_exceptions(e);
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_resume(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_resume(JNIEnv*, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
             check_exceptions(e);
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceChanged(JNIEnv* env, jobject obj, jobject surface, jint w, jint h) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceChanged(JNIEnv* env, jclass, jobject surface, jint w, jint h) noexcept {
         try {
             java_interface::instance().window.on_surface_changed(ANativeWindow_fromSurface(env, surface));
         } catch(const std::exception& e) {
@@ -1122,7 +1122,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceDestroyed(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_surfaceDestroyed(JNIEnv*, jclass) noexcept {
         try {
             java_interface::instance().window.on_surface_changed(nullptr);
         } catch(const std::exception& e) {
@@ -1130,7 +1130,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_visibilityChanged(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_visibilityChanged(JNIEnv*, jclass) noexcept {
         try {
 
         } catch(const std::exception& e) {
@@ -1138,7 +1138,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_orientationChanged(JNIEnv* env, jobject obj, jint value) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_orientationChanged(JNIEnv*, jclass, jint value) noexcept {
         try {
             java_interface::instance().window.set_orientation(value);
         } catch(const std::exception& e) {
@@ -1146,7 +1146,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onLowMemory(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onLowMemory(JNIEnv*, jclass) noexcept {
         try {
 
         } catch(const std::exception& e) {
@@ -1154,7 +1154,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTrimMemory(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTrimMemory(JNIEnv*, jclass) noexcept {
         try {
 
         } catch(const std::exception& e) {
@@ -1162,7 +1162,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_tick(JNIEnv* env, jobject obj) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_tick(JNIEnv*, jclass) noexcept {
         try {
             java_interface::instance().activity.process_messages();
         } catch(const std::exception& e) {
@@ -1170,7 +1170,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onKey(JNIEnv* env, jobject obj, jint keycode, jint action) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onKey(JNIEnv*, jclass, jint keycode, jint action) noexcept {
         try {
             java_interface::instance().window.on_key(keycode, action);
         } catch(const std::exception& e) {
@@ -1178,7 +1178,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTouch(JNIEnv* env, jobject obj, jint action, jint num_pointers, jfloatArray touch_data_array) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_onTouch(JNIEnv*, jclass, jint action, jint num_pointers, jfloatArray touch_data_array) noexcept {
         try {
             android_window::touch touch;
             touch.action = action;
@@ -1196,7 +1196,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_setApiVersion(JNIEnv* env, jobject obj,jint version) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_setApiVersion(JNIEnv*, jclass, jint version) noexcept {
         try {
             java_interface::instance().activity.set_android_version(version);
         } catch(const std::exception& e) {
@@ -1204,7 +1204,7 @@ namespace
         }
     }
 
-    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_setDisplayInfo(JNIEnv* env, jobject obj,jint w, jint h, jint ppi) noexcept {
+    extern "C" JNIEXPORT void JNICALL Java_enduro2d_engine_E2DNativeLib_setDisplayInfo(JNIEnv*, jclass, jint w, jint h, jint ppi) noexcept {
         try {
             java_interface::instance().window.set_display_info(w, h, ppi);
         } catch(const std::exception& e) {

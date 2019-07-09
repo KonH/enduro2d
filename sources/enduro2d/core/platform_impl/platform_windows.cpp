@@ -14,9 +14,10 @@ namespace
 {
     using namespace e2d;
 
-    class platform_internal_state_impl_windows final : public platform_internal_state_impl {
+    class platform_internal_state_windows final : public platform::internal_state {
     public:
-        platform_internal_state_impl_windows() {
+        platform_internal_state_windows(int argc, char *argv[])
+        : internal_state(argc, argv) {
             TIMECAPS tc;
             if ( MMSYSERR_NOERROR == ::timeGetDevCaps(&tc, sizeof(tc)) ) {
                 if ( TIMERR_NOERROR == ::timeBeginPeriod(tc.wPeriodMin) ) {
@@ -25,7 +26,7 @@ namespace
             }
         }
 
-        ~platform_internal_state_impl_windows() noexcept final {
+        ~platform_internal_state_windows() noexcept {
             if ( timers_resolution_ > 0 ) {
                 ::timeEndPeriod(timers_resolution_);
             }
@@ -37,9 +38,8 @@ namespace
 
 namespace e2d
 {
-    platform_internal_state_impl_uptr platform_internal_state_impl::create() {
-        return std::make_unique<platform_internal_state_impl_windows>();
-    }
+    platform::platform(int argc, char *argv[])
+    : state_(new platform_internal_state_windows(argc, argv)) {}
 }
 
 int main(int argc, char *argv[]) {

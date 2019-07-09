@@ -175,9 +175,6 @@ namespace e2d
         window& wnd() const noexcept;
         const device_caps& device_capabilities() const noexcept;
         const render_target_ptr& render_target() const noexcept;
-        bool is_available() const noexcept;
-        void pause();
-        void resume();
     public:
         internal_state& set_states(const state_block& sb) noexcept;
         internal_state& set_depth_state(const depth_state& ds) noexcept;
@@ -197,7 +194,6 @@ namespace e2d
         render_target_ptr render_target_;
         opengl::gl_program_id default_sp_;
         opengl::gl_framebuffer_id default_fb_;
-        bool is_available_;
     };
 }
 

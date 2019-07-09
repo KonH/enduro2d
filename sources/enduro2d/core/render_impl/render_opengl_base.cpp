@@ -1428,15 +1428,30 @@ namespace e2d::opengl
 
         caps.pvrtc2_compression_supported =
             gl_has_any_extension(debug, "GL_IMG_texture_compression_pvrtc2");
+
+        caps.profile =
+            version >= gl_version::gles_300 ? render::api_profile::opengles3 :
+            version >= gl_version::gles_200 ? render::api_profile::opengles2 :
+            render::api_profile::opengl_compat;
+
+        if ( caps.profile == render::api_profile::opengles2 ||
+             caps.profile == render::api_profile::opengles3 ) {
+            GLint range[2] = {};
+            GLint precision = 0;
+            GL_CHECK_CODE(debug, glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, range, &precision));
+            caps.fragment_shader_highp_float_supported = (precision == 0 && range[0] == 0 && range[1] == 0);
+        } else {
+            caps.fragment_shader_highp_float_supported = true;
+        }
     }
 
-    gl_shader_id gl_compile_shader(debug& debug, const str& source, GLenum type) noexcept {
+    gl_shader_id gl_compile_shader(debug& debug, const char* header, const char* source, GLenum type) noexcept {
         gl_shader_id id = gl_shader_id::create(debug, type);
         if ( id.empty() ) {
             return id;
         }
-        const char* source_cstr = source.c_str();
-        GL_CHECK_CODE(debug, glShaderSource(*id, 1, &source_cstr, nullptr));
+        const char* sources[2] = {header, source};
+        GL_CHECK_CODE(debug, glShaderSource(*id, std::size(sources), sources, nullptr));
         GL_CHECK_CODE(debug, glCompileShader(*id));
         return process_shader_compilation_result(debug, *id)
             ? std::move(id)

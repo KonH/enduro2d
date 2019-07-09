@@ -176,6 +176,21 @@ else()
     message(FATAL_ERROR "unsupported platform ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION}")
 endif()
 
+function(e2d_copy_resource_dir TARG FROM)
+    get_filename_component(dir_name ${FROM} NAME)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+        #[[add_custom_command(TARGET ${TARG} PRE_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${FROM}
+            ${E2D_ANDROID_RESOURCE_PATH}/${dir_name})]]
+    else()
+        add_custom_command(TARGET ${TARG} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${FROM}
+            $<TARGET_FILE_DIR:${TARG}>/${dir_name})
+    endif()
+endfunction()
+
 #
 # e2d sources
 #
