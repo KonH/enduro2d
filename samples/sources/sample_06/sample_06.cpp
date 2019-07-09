@@ -202,7 +202,7 @@ namespace
 
                         std::random_device rd;
                         std::mt19937 gen(rd());
-                        std::uniform_real_distribution<f32> dis(-M_PI, M_PI);
+                        std::uniform_real_distribution<f32> dis(-math::pi<f32>().value, math::pi<f32>().value);
                         auto outer_angle = make_rad(dis(gen));
                         auto inner_angle = make_rad(dis(gen));
 
@@ -348,7 +348,7 @@ namespace
                       const node_iptr node1 = act1.node();
                       if ( node1 ) {
                           owner.for_joined_components<collision, physical_body, actor>(
-                              [this,&e1,&c1,&b1,&act1,&node1](ecs::entity e2, collision& c2, physical_body& b2, actor& act2){
+                              [this,&e1,&c1,&b1,&node1](ecs::entity e2, collision& c2, physical_body& b2, actor& act2){
                                   if ( e1 != e2 ) {
                                       if ( c1.mask_group & c2.mask_collision || c2.mask_group & c1.mask_collision ) {
                                           const node_iptr node2 = act2.node();
@@ -413,13 +413,13 @@ namespace
             f32 dy = y2 - y1;
 
             f32 a = dx*dx + dy*dy;
-            f32 b = 2.*(x1*dx + y1*dy);
+            f32 b = 2.f*(x1*dx + y1*dy);
             f32 c = x1*x1 + y1*y1 - r*r;
             
             if (-b < 0)
                 return (c < 0);
-            if (-b < (2.*a))
-                return ((4.*a*c - b*b) < 0);
+            if (-b < (2.f*a))
+                return ((4.f*a*c - b*b) < 0);
             
             return (a+b+c < 0);
         }
