@@ -7,7 +7,7 @@
 #include "render_opengl_base.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
 
 namespace
 {
@@ -1179,24 +1179,6 @@ namespace e2d::opengl
 
     template < typename ...EXT >
     bool gl_has_any_extension(debug& debug, EXT... required) noexcept {
-    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
-        // OpenGL 3.x style
-        GLint num_extensions = 0;
-        GL_CHECK_CODE(debug, glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions));
-        for ( GLint i = 0; i < num_extensions; ++i ) {
-            const GLubyte* ext;
-            GL_CHECK_CODE(debug, ext = glGetStringi(GL_EXTENSIONS, i));
-            if ( !ext ) {
-                return false;
-            }
-            str_view current(reinterpret_cast<const char*>(ext));
-            for ( auto req : {required...} ) {
-                if ( current == req )
-                    return true;
-            }
-        }
-        return false;
-    #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
         const GLubyte* all_extensions;
         GL_CHECK_CODE(debug, all_extensions = glGetString(GL_EXTENSIONS));
         if ( !all_extensions )
@@ -1212,9 +1194,6 @@ namespace e2d::opengl
             }
         }
         return false;
-    #else
-    #   error unknown render mode!
-    #endif
     }
 
     enum class gl_version : u32 {
@@ -1223,7 +1202,7 @@ namespace e2d::opengl
         webgl_bit_ = 4 << 28,
 
         gl_150 = 150 | gl_bit_,
-        gl_200 = 200 | gl_bit_,
+        gl_210 = 210 | gl_bit_,
         gl_300 = 300 | gl_bit_,
         gles_200 = 200 | gles_bit_,
         gles_300 = 300 | gles_bit_,
@@ -1239,18 +1218,19 @@ namespace e2d::opengl
     }
 
     gl_version gl_get_version(debug& debug) noexcept {
-    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
-        GLint major = 0, minor = 0;
-        GL_CHECK_CODE(debug, glGetIntegerv(GL_MAJOR_VERSION, &major));
-        GL_CHECK_CODE(debug, glGetIntegerv(GL_MINOR_VERSION, &minor));
-        return gl_version(u32(gl_version::gl_bit_) | (major*100 + minor*10));
-    #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
-        // TODO: check glGetString(GL_VERSION)
-        E2D_UNUSED(debug);
-        return gl_version::gles_200;
-    #else
-    #   error unknown render mode!
-    #endif
+        const GLubyte* ver;
+        GL_CHECK_CODE(debug, ver = glGetString(GL_VERSION));
+        GLint major = 2, minor = 1;
+        if ( ver ) {
+            str_view ver_str = str_view(reinterpret_cast<const char*>(ver));
+            std::size_t dot = ver_str.find('.');
+            if ( dot > 0 && dot+1 < ver_str.length() ) {
+                major = ver[dot-1]-'0';
+                minor = ver[dot+1]-'0';
+            }
+        }
+        return gl_version(u32(E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+                ? gl_version::gl_bit_ : gl_version::gles_bit_) | (major*100 + minor*10));
     }
 }
 
@@ -1343,7 +1323,7 @@ namespace e2d::opengl
         GLint max_vertex_uniform_vectors = 0;
         GLint max_fragment_uniform_vectors = 0;
 
-    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
+    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
         GL_CHECK_CODE(debug, glGetIntegerv(GL_MAX_VARYING_VECTORS, &max_varying_vectors));
         GL_CHECK_CODE(debug, glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &max_vertex_uniform_vectors));
         GL_CHECK_CODE(debug, glGetIntegerv(GL_MAX_FRAGMENT_UNIFORM_VECTORS, &max_fragment_uniform_vectors));
@@ -1380,37 +1360,37 @@ namespace e2d::opengl
             gl_has_any_extension(debug, "GL_OES_texture_npot", "GL_ARB_texture_non_power_of_two");
 
         caps.depth_texture_supported =
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug, "GL_OES_depth_texture", "GL_ARB_depth_texture", "GL_ANGLE_depth_texture", "GL_SGIX_depth_texture");
 
         caps.render_target_supported =
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_200 ||
             gl_has_any_extension(debug, "GL_OES_framebuffer_object", "GL_ARB_framebuffer_object", "GL_EXT_framebuffer_object");
 
         caps.element_index_uint = 
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug, "GL_OES_element_index_uint");
             
         caps.depth16_supported = 
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug, "GL_OES_depth24", "GL_ARB_depth_texture", "GL_ANGLE_depth_texture");
 
         caps.depth24_supported = 
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug, "GL_OES_depth24", "GL_ARB_depth_texture", "GL_ANGLE_depth_texture");
 
         caps.depth32_supported =
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug, "GL_OES_depth32", "GL_ARB_depth_buffer_float");
 
         caps.depth24_stencil8_supported =
-            version >= gl_version::gl_200 ||
+            version >= gl_version::gl_210 ||
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug, "GL_OES_packed_depth_stencil", "GL_EXT_packed_depth_stencil", "GL_ANGLE_depth_texture");
         

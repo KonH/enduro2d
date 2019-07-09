@@ -12,18 +12,19 @@ namespace
 {
     using namespace e2d;
 
-    class platform_internal_state_impl_macosx final : public platform_internal_state_impl {
+    class platform_internal_state_macosx final : public platform::internal_state {
     public:
-        platform_internal_state_impl_macosx() = default;
-        ~platform_internal_state_impl_macosx() noexcept final = default;
+        platform_internal_state_macosx(int argc, char** argv)
+        : internal_state(argc, argv) {}
+
+        ~platform_internal_state_macosx() noexcept = default;
     };
 }
 
 namespace e2d
 {
-    platform_internal_state_impl_uptr platform_internal_state_impl::create() {
-        return std::make_unique<platform_internal_state_impl_macosx>();
-    }
+    platform::platform(int argc, char *argv[])
+    : state_(new platform_internal_state_macosx(argc, argv)) {}
 }
 
 int main(int argc, char *argv[]) {

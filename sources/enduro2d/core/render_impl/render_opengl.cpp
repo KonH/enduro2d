@@ -9,7 +9,7 @@
 #include "render_opengl_impl.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
 
 namespace
 {
@@ -130,24 +130,31 @@ namespace
                         texture_id.target(), *texture_id));
                     GL_CHECK_CODE(debug, glTexParameteri(
                         texture_id.target(),
-                        GL_TEXTURE_WRAP_S,
-                        convert_sampler_wrap(sampler.s_wrap())));
-                    GL_CHECK_CODE(debug, glTexParameteri(
-                        texture_id.target(),
-                        GL_TEXTURE_WRAP_T,
-                        convert_sampler_wrap(sampler.t_wrap())));
-                    //GL_CHECK_CODE(debug, glTexParameteri(
-                    //    texture_id.target(),
-                    //    GL_TEXTURE_WRAP_R,
-                    //    convert_sampler_wrap(sampler.r_wrap())));
-                    GL_CHECK_CODE(debug, glTexParameteri(
-                        texture_id.target(),
                         GL_TEXTURE_MIN_FILTER,
                         convert_sampler_filter(sampler.min_filter())));
                     GL_CHECK_CODE(debug, glTexParameteri(
                         texture_id.target(),
                         GL_TEXTURE_MAG_FILTER,
                         convert_sampler_filter(sampler.mag_filter())));
+                    GL_CHECK_CODE(debug, glTexParameteri(
+                        texture_id.target(),
+                        GL_TEXTURE_WRAP_S,
+                        convert_sampler_wrap(sampler.s_wrap())));
+                    GL_CHECK_CODE(debug, glTexParameteri(
+                        texture_id.target(),
+                        GL_TEXTURE_WRAP_T,
+                        convert_sampler_wrap(sampler.t_wrap())));
+                #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+                    GL_CHECK_CODE(debug, glTexParameteri(
+                        texture_id.target(),
+                        GL_TEXTURE_WRAP_R,
+                        convert_sampler_wrap(sampler.r_wrap())));
+                #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
+                    // not supported
+                #else
+                #   error unknown render mode
+                #endif
+
                 } else {
                     GL_CHECK_CODE(debug, glBindTexture(GL_TEXTURE_2D, 0));
                     GL_CHECK_CODE(debug, glBindTexture(GL_TEXTURE_CUBE_MAP, 0));
@@ -988,9 +995,9 @@ namespace e2d
             #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
                 GL_CHECK_CODE(state_->dbg(), glClearDepth(
                     math::numeric_cast<GLclampd>(math::saturate(command.depth_value()))));
-            #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES2
+            #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
                 GL_CHECK_CODE(state_->dbg(), glClearDepthf(
-                    math::numeric_cast<GLclampf>(math::saturate(command.depth_value()))));
+                    math::saturate(command.depth_value())));
             #else
             #   error unknown render mode
             #endif
