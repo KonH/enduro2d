@@ -74,11 +74,6 @@ namespace e2d
     public:
         bool on_message(debug::level lvl, str_view text) noexcept final;
     };
-
-    class debug_native_log_sink final : public debug::sink {
-    public:
-        bool on_message(debug::level lvl, str_view text) noexcept final;
-    };
 }
 
 namespace e2d

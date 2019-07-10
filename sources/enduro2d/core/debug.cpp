@@ -4,7 +4,7 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#include <enduro2d/core/debug.hpp>
+#include <enduro2d/core/debug_impl/debug.hpp>
 
 namespace
 {
@@ -23,16 +23,16 @@ namespace
         }
         #undef DEFINE_CASE
     }
+}
 
+namespace e2d
+{
     str log_text_format(debug::level lvl, str_view text) {
         return strings::rformat(
             "[%0](%1) -> %2\n",
             level_to_cstr(lvl), time::now_ms(), text);
     }
-}
 
-namespace e2d
-{
     debug::sink& debug::register_sink(sink_uptr sink) {
         return register_sink_ex(level::trace, std::move(sink));
     }
@@ -86,18 +86,4 @@ namespace e2d
         }
     }
 
-    //
-    // debug_console_sink
-    //
-
-    bool debug_console_sink::on_message(debug::level lvl, str_view text) noexcept {
-        try {
-            const str log_text = log_text_format(lvl, text);
-            const std::ptrdiff_t rprintf = std::printf("%s", log_text.c_str());
-            return rprintf >= 0
-                && math::numeric_cast<std::size_t>(rprintf) == log_text.length();
-        } catch (...) {
-            return false;
-        }
-    }
 }

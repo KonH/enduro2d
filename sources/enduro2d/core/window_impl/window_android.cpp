@@ -1065,7 +1065,7 @@ namespace
         try {
             if ( !modules::is_initialized<debug>() ) {
                 modules::initialize<debug>();
-                the<debug>().register_sink<debug_native_log_sink>();
+                the<debug>().register_sink<debug_console_sink>();
             }
             auto& inst = java_interface::instance();
             inst.activity.set_activity(activity);
