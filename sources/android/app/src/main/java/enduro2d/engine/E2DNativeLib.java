@@ -6,7 +6,7 @@
 
 package enduro2d.engine;
 
-public class E2DNativeLib {
+public final class E2DNativeLib {
      // application
      public static native void createPlatform(Object ctx, Object asset_mngr);
      public static native void destroyPlatform();
@@ -38,4 +38,9 @@ public class E2DNativeLib {
      // display, device ... info
      public static native void setApiVersion(int version);
      public static native void setDisplayInfo(int w, int h, int ppi);
+
+     // called from native code
+     @SuppressWarnings("unused") private static int nativeMethodCount() {
+          return E2DNativeLib.class.getDeclaredMethods().length-1;
+     }
 }

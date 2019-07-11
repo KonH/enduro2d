@@ -44,26 +44,39 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
 
     try {
         java_class jc("enduro2d/engine/E2DNativeLib");
-        jc.register_static_method("createPlatform", &e2d_native_lib::create_platform);
-        jc.register_static_method("destroyPlatform", &e2d_native_lib::destroy_platform);
-        jc.register_static_method("createWindow", &e2d_native_lib::create_window);
-        jc.register_static_method("destroyWindow", &e2d_native_lib::destroy_window);
-        jc.register_static_method("start", &e2d_native_lib::start);
-        jc.register_static_method("stop", &e2d_native_lib::stop);
-        jc.register_static_method("pause", &e2d_native_lib::pause);
-        jc.register_static_method("resume", &e2d_native_lib::resume);
-        jc.register_static_method("surfaceChanged", &e2d_native_lib::surface_changed);
-        jc.register_static_method("surfaceDestroyed", &e2d_native_lib::surface_destroyed);
-        jc.register_static_method("visibilityChanged", &e2d_native_lib::visibility_changed);
-        jc.register_static_method("orientationChanged", &e2d_native_lib::orientation_changed);
-        jc.register_static_method("onLowMemory", &e2d_native_lib::on_low_memory);
-        jc.register_static_method("onTrimMemory", &e2d_native_lib::on_trim_memory);
-        jc.register_static_method("tick", &e2d_native_lib::tick);
-        jc.register_static_method("onKey", &e2d_native_lib::on_key);
-        jc.register_static_method("onTouch", &e2d_native_lib::on_touch);
-        jc.register_static_method("setApiVersion", &e2d_native_lib::set_api_version);
-        jc.register_static_method("setDisplayInfo", &e2d_native_lib::set_display_info);
-    } catch(...) {
+        auto method_count = jc.static_method<jint()>("nativeMethodCount");
+        const int expected = method_count();
+        int count = 0;
+        auto register_method = [&jc, &count](str_view name, auto* fn) {
+            jc.register_static_method(name, fn);
+            ++count;
+        };
+        register_method("createPlatform", &e2d_native_lib::create_platform);
+        register_method("destroyPlatform", &e2d_native_lib::destroy_platform);
+        register_method("createWindow", &e2d_native_lib::create_window);
+        register_method("destroyWindow", &e2d_native_lib::destroy_window);
+        register_method("start", &e2d_native_lib::start);
+        register_method("stop", &e2d_native_lib::stop);
+        register_method("pause", &e2d_native_lib::pause);
+        register_method("resume", &e2d_native_lib::resume);
+        register_method("surfaceChanged", &e2d_native_lib::surface_changed);
+        register_method("surfaceDestroyed", &e2d_native_lib::surface_destroyed);
+        register_method("visibilityChanged", &e2d_native_lib::visibility_changed);
+        register_method("orientationChanged", &e2d_native_lib::orientation_changed);
+        register_method("onLowMemory", &e2d_native_lib::on_low_memory);
+        register_method("onTrimMemory", &e2d_native_lib::on_trim_memory);
+        register_method("tick", &e2d_native_lib::tick);
+        register_method("onKey", &e2d_native_lib::on_key);
+        register_method("onTouch", &e2d_native_lib::on_touch);
+        register_method("setApiVersion", &e2d_native_lib::set_api_version);
+        register_method("setDisplayInfo", &e2d_native_lib::set_display_info);
+
+        if ( count != expected ) {
+            __android_log_print(ANDROID_LOG_FATAL, "enduro2d", "%i native methods wasn't registered\n", expected - count);
+            return -1;
+        }
+    } catch(const std::exception& e) {
+        __android_log_print(ANDROID_LOG_FATAL, "enduro2d", "JNI_OnLoad failed: %s\n", e.what());
         return -1;
     }
 
