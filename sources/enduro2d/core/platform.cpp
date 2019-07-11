@@ -44,4 +44,8 @@ namespace e2d
     const platform::internal_state& platform::state() const noexcept {
         return *state_;
     }
+
+    void platform::override_predef_paths(vfs& the_vfs) {
+        return state_->override_predef_paths(the_vfs);
+    }
 }

@@ -270,7 +270,7 @@ namespace e2d
 
     class java_string {
     public:
-        java_string() noexcept;
+        java_string() noexcept = default;
         explicit java_string(jstring) noexcept;
         explicit java_string(str_view) noexcept;
         java_string(java_string&&) noexcept;
@@ -315,6 +315,10 @@ namespace e2d
         template < typename FN >
         [[nodiscard]] java_static_method<FN> static_method(str_view name) const;
         [[nodiscard]] explicit operator bool() const noexcept;
+        template < typename Ret, typename ...Args >
+        void register_method(str_view name, Ret (JNICALL *fn)(JNIEnv*, jobject, Args...)) const;
+        template < typename Ret, typename ...Args >
+        void register_static_method(str_view name, Ret (JNICALL *fn)(JNIEnv*, jclass, Args...)) const;
     private:
         void set_(const java_env&, jclass) noexcept;
         void dec_ref_() noexcept;
@@ -340,6 +344,40 @@ namespace e2d
             throw std::runtime_error("java class is not found");
         }
         set_(je, jc);
+    }
+
+    template < typename Ret, typename ...Args >
+    void java_class::register_static_method(str_view name, Ret (JNICALL *fn)(JNIEnv*, jclass, Args...)) const {
+        if ( !class_ ) {
+            throw std::runtime_error("invalid java class");
+        }
+        java_env je;
+        detail::java_method_sig<Ret (Args...)> sig;
+        JNINativeMethod info = {
+            name.data(),
+            sig.signature().data(),
+            reinterpret_cast<void*>(fn)
+        };
+        if ( je.env()->RegisterNatives(class_, &info, 1) != 0 ) {
+            throw std::runtime_error("can't register native method");
+        }
+    }
+
+    template < typename Ret, typename ...Args >
+    void java_class::register_method(str_view name, Ret (JNICALL *fn)(JNIEnv*, jobject, Args...)) const {
+        if ( !class_ ) {
+            throw std::runtime_error("invalid java class");
+        }
+        java_env je;
+        detail::java_method_sig<Ret (Args...)> sig;
+        JNINativeMethod info = {
+            name.data(),
+            sig.signature().data(),
+            reinterpret_cast<void*>(fn)
+        };
+        if ( je.env()->RegisterNatives(class_, &info, 1) != 0 ) {
+            throw std::runtime_error("can't register native method");
+        }
     }
 
     //
@@ -430,7 +468,7 @@ namespace e2d
         #undef JAVA_METHOD_CALLER
     
         #define CPPTYPE_TO_JAVATYPE(javatype, cpptype) \
-            [[nodiscard]] inline javatype CppTypeToJava(const cpptype& x) { \
+            [[nodiscard]] inline javatype cpptype_to_java(const cpptype& x) { \
                 return javatype(x); \
             }
         CPPTYPE_TO_JAVATYPE(jobject, jobject);
@@ -448,16 +486,16 @@ namespace e2d
         CPPTYPE_TO_JAVATYPE(jlong, u64);
         #undef CPPTYPE_TO_JAVATYPE
 
-        [[nodiscard]] inline jobject CppTypeToJava(const java_obj& obj) {
+        [[nodiscard]] inline jobject cpptype_to_java(const java_obj& obj) {
             return obj.get();
         }
 
-        [[nodiscard]] inline jstring CppTypeToJava(const java_string& jstr) {
+        [[nodiscard]] inline jstring cpptype_to_java(const java_string& jstr) {
             return jstr.get();
         }
 
         template < typename T >
-        [[nodiscard]] inline auto CppTypeToJava(const java_array<T>& arr) {
+        [[nodiscard]] inline auto cpptype_to_java(const java_array<T>& arr) {
             return arr.get();
         }
     }
@@ -479,7 +517,7 @@ namespace e2d
 
         template < typename ...ArgTypes >
         detail::java_method_result<Ret> operator () (const ArgTypes&... args) const {
-            return detail::java_method_caller<Ret>::call_static(class_, method_, detail::CppTypeToJava(args)...);
+            return detail::java_method_caller<Ret>::call_static(class_, method_, detail::cpptype_to_java(args)...);
         }
     private:
         java_class class_;
@@ -503,7 +541,7 @@ namespace e2d
         
         template < typename ...ArgTypes >
         detail::java_method_result<Ret> operator () (const ArgTypes&... args) const {
-            return detail::java_method_caller<Ret>::call(obj_, method_, detail::CppTypeToJava(args)...);
+            return detail::java_method_caller<Ret>::call(obj_, method_, detail::cpptype_to_java(args)...);
         }
     private:
         java_obj obj_;
@@ -553,6 +591,7 @@ namespace e2d
         }
         set_(je, jo);
     }
+  
 }
 
 #endif

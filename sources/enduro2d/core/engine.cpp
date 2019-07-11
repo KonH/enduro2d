@@ -369,6 +369,7 @@ namespace e2d
         safe_module_initialize<vfs>();
 
         the<vfs>().register_scheme<filesystem_file_source>("file");
+        the<platform>().override_predef_paths(the<vfs>());
         safe_register_predef_path(the<vfs>(), "home", filesystem::predef_path::home);
         safe_register_predef_path(the<vfs>(), "appdata", filesystem::predef_path::appdata);
         safe_register_predef_path(the<vfs>(), "desktop", filesystem::predef_path::desktop);

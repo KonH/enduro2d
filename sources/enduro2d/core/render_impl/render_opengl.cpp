@@ -490,6 +490,7 @@ namespace e2d
                     "out vec4 gl_FragColor;\n";
                 break;
             case api_profile::opengles2 :
+            case api_profile::opengles3 :
                 vs_header =
                     "precision highp float;\n"
                     "precision highp int;\n";
@@ -497,14 +498,14 @@ namespace e2d
                     "precision mediump float;\n" // TODO: test GL_FRAGMENT_PRECISION_HIGH macro in shader
                     "precision highp int;\n";
                 break;
-            case api_profile::opengles3 :
-                vs_header = "#version 300 es"
+            /*case api_profile::opengles3 :
+                vs_header = "#version 300 es\n"
                     "precision highp float;\n"
                     "precision highp int;\n";
                 fs_header = "#version 300 es"
                     "precision mediump float;\n"
                     "precision highp int;\n";
-                break;
+                break;*/
         }
 
         gl_shader_id vs = gl_compile_shader(

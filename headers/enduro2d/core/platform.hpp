@@ -21,6 +21,8 @@ namespace e2d
 
         std::size_t command_line_argument_count() const noexcept;
         const str& command_line_argument(std::size_t index) const noexcept;
+
+        void override_predef_paths(vfs&);
     private:
         internal_state_uptr state_;
     };

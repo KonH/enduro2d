@@ -8,6 +8,7 @@ package enduro2d.engine;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
 import android.os.Bundle;
@@ -35,12 +36,23 @@ public class E2DActivity
 
     @Override protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
-        Log.i(TAG, "onCreate");
+
+        try {
+            Intent params = getIntent();
+            String libname = params.getStringExtra(E2DApplication.NATIVE_LIB);
+            Log.i(TAG, "onCreate: " + libname);
+            System.loadLibrary(libname);
+        } catch (Exception e) {
+            Log.e(TAG, "failed to initialize native application");
+            finish();
+            return;
+        }
 
         opengl_view_ = new SurfaceView(this);
         setContentView(opengl_view_);
 
-        E2DNativeLib.create(this);
+        E2DNativeLib.createPlatform(getApplicationContext(), getResources().getAssets());
+        E2DNativeLib.createWindow(this);
         sendVersionInfo();
         sendDisplayInfo();
 
@@ -57,7 +69,11 @@ public class E2DActivity
     @Override protected void onDestroy() {
         super.onDestroy();
         Log.i(TAG, "onDestroy");
-        E2DNativeLib.destroy();
+        if ( opengl_view_ != null ) {
+            E2DNativeLib.destroyWindow();
+            E2DNativeLib.destroyPlatform();
+            E2DApplication.onDestroyActivity(getApplicationContext());
+        }
     }
 
     @Override protected void onPause() {
@@ -88,6 +104,7 @@ public class E2DActivity
     }
 
     @Override public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
         Display display = ((WindowManager)getSystemService(WINDOW_SERVICE)).getDefaultDisplay();
         E2DNativeLib.orientationChanged(display.getRotation());
     }

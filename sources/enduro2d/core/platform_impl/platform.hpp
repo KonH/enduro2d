@@ -42,9 +42,10 @@ namespace e2d
     class platform::internal_state : private e2d::noncopyable {
     public:
         internal_state(int argc, char *argv[]);
-        ~internal_state() noexcept = default;
+        virtual ~internal_state() noexcept = default;
     public:
         const vector<str>& command_line_arguments() const noexcept;
+        virtual void override_predef_paths(vfs&) {}
     private:
         vector<str> command_line_arguments_;
     };

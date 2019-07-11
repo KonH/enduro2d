@@ -63,7 +63,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
                              -Werror=return-stack-address
                              -Werror=return-type
                              -Werror=multichar
-                             -Werror=odr)
+                             -Werror=odr
+                             -Werror=delete-non-virtual-dtor
+                             -Werror=undefined-internal)
     string(REPLACE ";" " " E2D_SHARED_CXX_FLAGS "${E2D_SHARED_CXX_FLAGS}")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -179,10 +181,18 @@ endif()
 function(e2d_copy_resource_dir TARG FROM)
     get_filename_component(dir_name ${FROM} NAME)
     if(CMAKE_SYSTEM_NAME STREQUAL "Android")
-        #[[add_custom_command(TARGET ${TARG} PRE_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${FROM}
-            ${E2D_ANDROID_RESOURCE_PATH}/${dir_name})]]
+        if(DEFINED E2D_ANDROID_ASSETS_PATH)
+            set(ASSET_PATH "${CMAKE_SOURCE_DIR}/${E2D_ANDROID_ASSETS_PATH}")
+            if(NOT EXISTS ${ASSET_PATH})
+                message(FATAL_ERROR "ASSET_PATH: '${ASSET_PATH}' is not exists")
+            endif()
+            add_custom_command(TARGET ${TARG} PRE_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${FROM}
+                ${ASSET_PATH}/${dir_name})
+        else()
+            message(FATAL_ERROR "E2D_ANDROID_ASSETS_PATH not defined")
+        endif()
     else()
         add_custom_command(TARGET ${TARG} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_directory

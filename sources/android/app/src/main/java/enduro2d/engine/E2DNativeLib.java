@@ -8,11 +8,12 @@ package enduro2d.engine;
 
 public class E2DNativeLib {
      // application
-     public static native void initialize(Object ctx, Object asset_mngr);
+     public static native void createPlatform(Object ctx, Object asset_mngr);
+     public static native void destroyPlatform();
 
      // activity life-cycle
-     public static native void create(Object activity);
-     public static native void destroy();
+     public static native void createWindow(Object activity);
+     public static native void destroyWindow();
      public static native void start();
      public static native void stop();
      public static native void pause();
