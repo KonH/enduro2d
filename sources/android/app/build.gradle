@@ -8,12 +8,13 @@ android {
         minSdkVersion 24
         targetSdkVersion 28
         ndk {
-            abiFilters "x86" //, "armeabi-v7a"
+            abiFilters "x86", "armeabi-v7a"
         }
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static',
-                          '-DE2D_ANDROID_ASSETS_PATH=sources/android/app/src/main/assets'
+                          '-DE2D_ANDROID_ASSETS_PATH=sources/android/app/src/main/assets',
+                          '-DE2D_ANDROID_JNILIBS_PATH=sources/android/app/src/main/jniLibs'
             }
         }
     }
@@ -28,12 +29,6 @@ android {
         cmake {
             version '3.10.2'
             path '../../../CMakeLists.txt'
-        }
-    }
-    sourceSets {
-        main {
-            //assets.srcDirs = ['src/main/assets', '../../../samples/bin']
-            jniLibs.srcDirs = ['src/main/jniLibs', '../../../modules/enduro2d-external/bass/bin/android']
         }
     }
 }
