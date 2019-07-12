@@ -56,10 +56,11 @@ namespace e2d
             renderer_uptr renderer_;
         };
     private:
-        static void check_exceptions_(const std::exception& e) noexcept;
+        static void check_exceptions_(JNIEnv* env, const std::exception& e) noexcept;
     public:
         [[nodiscard]] static internal_state& state() noexcept;
 
+		// application
         static void JNICALL create_platform(JNIEnv*, jclass, jobject ctx, jobject asset_mngr) noexcept;
         static void JNICALL destroy_platform(JNIEnv*, jclass) noexcept;
         static void JNICALL on_low_memory(JNIEnv*, jclass) noexcept;

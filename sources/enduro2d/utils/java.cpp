@@ -31,18 +31,13 @@ namespace e2d
     // java_env
     //
     
-    java_env::java_env() noexcept
-    : jni_env_(nullptr)
-    , must_be_detached_(false) {
+    java_env::java_env() noexcept {
         attach();
     }
 
     java_env::java_env(JNIEnv *env) noexcept
-    : jni_env_(env)
-    , must_be_detached_(false) {
-        if ( !env ) {
-            attach();
-        }
+    : jni_env_(env) {
+		attach();
     }
 
     java_env::~java_env() noexcept {
@@ -50,6 +45,9 @@ namespace e2d
     }
 
     void java_env::attach() {
+		if ( jni_env_ ) {
+			return;
+		}
         JavaVM* jvm = detail::java_vm::get();
         if ( !jvm ) {
             throw std::runtime_error("JavaVM is null");
@@ -84,9 +82,20 @@ namespace e2d
         }
     }
     
+	void java_env::throw_exception(str_view msg) const {
+        E2D_ASSERT(jni_env_);
+		java_class jc("java/lang/Error");
+		jni_env_->ThrowNew(jc.get(), msg.data());
+	}
+
+	void java_env::exception_clear() const noexcept {
+        E2D_ASSERT(jni_env_);
+		jni_env_->ExceptionClear();
+	}
+
     bool java_env::has_exception() const noexcept {
         E2D_ASSERT(jni_env_);
-        return jni_env_->ExceptionCheck();
+        return jni_env_->ExceptionCheck() == JNI_TRUE;
     }
 
     JNIEnv* java_env::env() const noexcept {

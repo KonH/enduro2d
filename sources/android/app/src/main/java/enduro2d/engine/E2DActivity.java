@@ -42,7 +42,7 @@ public class E2DActivity
             String libname = params.getStringExtra(E2DApplication.NATIVE_LIB);
             Log.i(TAG, "onCreate: " + libname);
             System.loadLibrary(libname);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             Log.e(TAG, "failed to initialize native application");
             finish();
             return;
@@ -195,7 +195,7 @@ public class E2DActivity
         public void run() {
             try {
                 E2DNativeLib.tick();
-            } catch(Exception e) {
+            } catch(Throwable e) {
                 String s = "Catched exception: ";
                 s += e.toString();
                 s += android.util.Log.getStackTraceString(e);

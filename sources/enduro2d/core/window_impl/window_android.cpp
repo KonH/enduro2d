@@ -6,7 +6,6 @@
 
 #include "window.hpp"
 
-
 #if defined(E2D_WINDOW_MODE) && E2D_WINDOW_MODE == E2D_WINDOW_MODE_NATIVE_ANDROID
 
 #include <enduro2d/core/platform_impl/platform_android.hpp>
@@ -1045,16 +1044,16 @@ namespace e2d
     // e2d_native_lib
     //
 
-    void JNICALL e2d_native_lib::create_window(JNIEnv*, jclass, jobject activity) noexcept {
+    void JNICALL e2d_native_lib::create_window(JNIEnv* env, jclass, jobject activity) noexcept {
         try {
             state().activity_.reset(new activity_interface(activity));
             state().renderer_.reset(new renderer_interface());
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::destroy_window(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::destroy_window(JNIEnv* env, jclass) noexcept {
         try {
             state().activity().release();
             state().renderer().on_destroy();
@@ -1063,35 +1062,36 @@ namespace e2d
             state().renderer_.reset();
             state().activity_.reset();
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::start(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::start(JNIEnv* env, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::stop(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::stop(JNIEnv* env, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::pause(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::pause(JNIEnv* env, jclass) noexcept {
         try {
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::resume(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::resume(JNIEnv* env, jclass) noexcept {
         try {
+            state().activity().set_activity_title_(java_string("exception test"));
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
@@ -1099,51 +1099,51 @@ namespace e2d
         try {
             state().renderer().on_surface_changed(ANativeWindow_fromSurface(env, surface));
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::surface_destroyed(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::surface_destroyed(JNIEnv* env, jclass) noexcept {
         try {
             state().renderer().on_surface_changed(nullptr);
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::visibility_changed(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::visibility_changed(JNIEnv* env, jclass) noexcept {
         try {
 
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::orientation_changed(JNIEnv*, jclass, jint value) noexcept {
+    void JNICALL e2d_native_lib::orientation_changed(JNIEnv* env, jclass, jint value) noexcept {
         try {
             state().renderer().set_orientation(value);
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::tick(JNIEnv*, jclass) noexcept {
+    void JNICALL e2d_native_lib::tick(JNIEnv* env, jclass) noexcept {
         try {
             state().activity().process_messages();
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::on_key(JNIEnv*, jclass, jint keycode, jint action) noexcept {
+    void JNICALL e2d_native_lib::on_key(JNIEnv* env, jclass, jint keycode, jint action) noexcept {
         try {
             state().renderer().on_key(keycode, action);
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::on_touch(JNIEnv*, jclass, jint action, jint num_pointers, jfloatArray touch_data_array) noexcept {
+    void JNICALL e2d_native_lib::on_touch(JNIEnv* env, jclass, jint action, jint num_pointers, jfloatArray touch_data_array) noexcept {
         try {
             renderer_interface::touch touch;
             touch.action = action;
@@ -1157,15 +1157,15 @@ namespace e2d
             }
             state().renderer().on_touch(touch);
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void JNICALL e2d_native_lib::set_display_info(JNIEnv*, jclass, jint w, jint h, jint ppi) noexcept {
+    void JNICALL e2d_native_lib::set_display_info(JNIEnv* env, jclass, jint w, jint h, jint ppi) noexcept {
         try {
             state().renderer().set_display_info(w, h, ppi);
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 }

@@ -176,15 +176,16 @@ namespace e2d
     void JNICALL e2d_native_lib::on_trim_memory(JNIEnv*, jclass) noexcept {
     }
 
-    void JNICALL e2d_native_lib::set_api_version(JNIEnv*, jclass, jint version) noexcept {
+    void JNICALL e2d_native_lib::set_api_version(JNIEnv* env, jclass, jint version) noexcept {
         try {
         } catch(const std::exception& e) {
-            check_exceptions_(e);
+            check_exceptions_(env, e);
         }
     }
 
-    void e2d_native_lib::check_exceptions_(const std::exception& e) noexcept {
+    void e2d_native_lib::check_exceptions_(JNIEnv* env, const std::exception& e) noexcept {
         __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
+		env->ExceptionClear();
     }
 
     //
