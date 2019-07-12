@@ -6,6 +6,9 @@
 
 package enduro2d.engine;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+
 public final class E2DNativeLib {
      // application
      public static native void createPlatform(Object ctx, Object asset_mngr);
@@ -41,6 +44,11 @@ public final class E2DNativeLib {
 
      // called from native code
      @SuppressWarnings("unused") private static int nativeMethodCount() {
-          return E2DNativeLib.class.getDeclaredMethods().length-1;
+          Method[] m = E2DNativeLib.class.getDeclaredMethods();
+          int count = 0;
+          for (int i = 0; i < m.length; ++i) {
+               count += ((m[i].getModifiers() & Modifier.NATIVE) == Modifier.NATIVE ? 1 : 0);
+          }
+          return count;
      }
 }
