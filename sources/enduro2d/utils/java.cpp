@@ -37,7 +37,7 @@ namespace e2d
 
     java_env::java_env(JNIEnv *env) noexcept
     : jni_env_(env) {
-		attach();
+        attach();
     }
 
     java_env::~java_env() noexcept {
@@ -45,9 +45,9 @@ namespace e2d
     }
 
     void java_env::attach() {
-		if ( jni_env_ ) {
-			return;
-		}
+        if ( jni_env_ ) {
+            return;
+        }
         JavaVM* jvm = detail::java_vm::get();
         if ( !jvm ) {
             throw std::runtime_error("JavaVM is null");
@@ -82,16 +82,16 @@ namespace e2d
         }
     }
     
-	void java_env::throw_exception(str_view msg) const {
+    void java_env::throw_exception(str_view msg) const {
         E2D_ASSERT(jni_env_);
-		java_class jc("java/lang/Error");
-		jni_env_->ThrowNew(jc.get(), msg.data());
-	}
+        java_class jc("java/lang/Error");
+        jni_env_->ThrowNew(jc.get(), msg.data());
+    }
 
-	void java_env::exception_clear() const noexcept {
+    void java_env::exception_clear() const noexcept {
         E2D_ASSERT(jni_env_);
-		jni_env_->ExceptionClear();
-	}
+        jni_env_->ExceptionClear();
+    }
 
     bool java_env::has_exception() const noexcept {
         E2D_ASSERT(jni_env_);

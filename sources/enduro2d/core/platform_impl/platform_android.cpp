@@ -185,7 +185,7 @@ namespace e2d
 
     void e2d_native_lib::check_exceptions_(JNIEnv* env, const std::exception& e) noexcept {
         __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
-		env->ExceptionClear();
+        env->ExceptionClear();
     }
 
     //

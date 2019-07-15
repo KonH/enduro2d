@@ -30,8 +30,8 @@ namespace e2d
         ~java_env() noexcept;
         void attach();
         void detach();
-		void throw_exception(str_view msg) const;
-		void exception_clear() const noexcept;
+        void throw_exception(str_view msg) const;
+        void exception_clear() const noexcept;
         [[nodiscard]] bool has_exception() const noexcept;
         [[nodiscard]] JNIEnv* env() const noexcept;
     private:
@@ -410,19 +410,19 @@ namespace e2d
         jobject obj_ = nullptr;
     };
     
-	//
-	// java_call_exception
-	//
+    //
+    // java_call_exception
+    //
 
-	class java_call_exception final : public std::exception {
+    class java_call_exception final : public std::exception {
     public:
-		// use java_env::exception_clear() to continue or
-		// return from native code to java code to process exceptions
+        // use java_env::exception_clear() to continue or
+        // return from native code to java code to process exceptions
 
         const char* what() const noexcept final {
             return "exception has occured when calling java method";
         }
-	};
+    };
 
     namespace detail
     {
@@ -437,34 +437,34 @@ namespace e2d
         struct java_method_caller<void> {
             template < typename ...Args >
             static java_method_result<void> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-				java_env je;
-				E2D_ASSERT(! je.has_exception());
+                java_env je;
+                E2D_ASSERT(! je.has_exception());
                 je.env()->CallStaticVoidMethod(jc.get(), method, std::forward<Args>(args)...);
-				if ( je.has_exception() ) {
-					throw java_call_exception();
-				}
+                if ( je.has_exception() ) {
+                    throw java_call_exception();
+                }
                 return java_method_result<void>();
             }
         
             template < typename ...Args >
             static java_method_result<void> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-				java_env je;
-				E2D_ASSERT(! je.has_exception());
+                java_env je;
+                E2D_ASSERT(! je.has_exception());
                 je.env()->CallNonvirtualVoidMethod(obj.get(), jc.get(), method, std::forward<Args>(args)...);
-				if ( je.has_exception() ) {
-					throw java_call_exception();
-				}
+                if ( je.has_exception() ) {
+                    throw java_call_exception();
+                }
                 return java_method_result<void>();
             }
         
             template < typename ...Args >
             static java_method_result<void> call(const java_obj& obj, jmethodID method, Args&&... args) {
-				java_env je;
-				E2D_ASSERT(! je.has_exception());
+                java_env je;
+                E2D_ASSERT(! je.has_exception());
                 je.env()->CallVoidMethod(obj.get(), method, std::forward<Args>(args)...);
-				if ( je.has_exception() ) {
-					throw java_call_exception();
-				}
+                if ( je.has_exception() ) {
+                    throw java_call_exception();
+                }
                 return java_method_result<void>();
             }
         };
@@ -473,35 +473,35 @@ namespace e2d
         struct java_method_caller<jstring> {
             template < typename ...Args >
             static java_method_result<jstring> call_static(const java_class& jc, jmethodID method, Args&&... args) {
-				java_env je;
-				E2D_ASSERT(! je.has_exception());
+                java_env je;
+                E2D_ASSERT(! je.has_exception());
                 auto result = static_cast<jstring>(java_env().env()->CallStaticObjectMethod(jc.get(), method, std::forward<Args>(args)...));
-				if ( je.has_exception() ) {
-					throw java_call_exception();
-				}
-				return result;
+                if ( je.has_exception() ) {
+                    throw java_call_exception();
+                }
+                return result;
             }
         
             template < typename ...Args >
             static java_method_result<jstring> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) {
-				java_env je;
-				E2D_ASSERT(! je.has_exception());
+                java_env je;
+                E2D_ASSERT(! je.has_exception());
                 auto result = static_cast<jstring>(java_env().env()->CallNonvirtualObjectMethod(obj.get(), jc.get(), method, std::forward<Args>(args)...));
-				if ( je.has_exception() ) {
-					throw java_call_exception();
-				}
-				return result;
+                if ( je.has_exception() ) {
+                    throw java_call_exception();
+                }
+                return result;
             }
         
             template < typename ...Args >
             static java_method_result<jstring> call(const java_obj& obj, jmethodID method, Args&&... args) {
-				java_env je;
-				E2D_ASSERT(! je.has_exception());
+                java_env je;
+                E2D_ASSERT(! je.has_exception());
                 auto result = static_cast<jstring>(java_env().env()->CallObjectMethod(obj.get(), method, std::forward<Args>(args)...));
-				if ( je.has_exception() ) {
-					throw java_call_exception();
-				}
-				return result;
+                if ( je.has_exception() ) {
+                    throw java_call_exception();
+                }
+                return result;
             }
         };
     
@@ -510,35 +510,35 @@ namespace e2d
             struct java_method_caller<type_name> { \
                 template < typename ...Args > \
                 static java_method_result<type_name> call_static(const java_class& jc, jmethodID method, Args&&... args) { \
-					java_env je; \
-					E2D_ASSERT(! je.has_exception()); \
+                    java_env je; \
+                    E2D_ASSERT(! je.has_exception()); \
                     auto result = java_env().env()->CallStatic ## suffix ## Method(jc.get(), method, std::forward<Args>(args)...); \
-					if ( je.has_exception() ) { \
-						throw java_call_exception(); \
-					} \
-					return result; \
+                    if ( je.has_exception() ) { \
+                        throw java_call_exception(); \
+                    } \
+                    return result; \
                 } \
                 \
                 template < typename ...Args > \
                 static java_method_result<type_name> call_nonvirtual(const java_obj& obj, const java_class& jc, jmethodID method, Args&&... args) { \
-					java_env je; \
-					E2D_ASSERT(! je.has_exception()); \
+                    java_env je; \
+                    E2D_ASSERT(! je.has_exception()); \
                     auto result = java_env().env()->CallNonvirtual ## suffix ## Method(obj.get(), jc.get(), method, std::forward<Args>(args)...); \
-					if ( je.has_exception() ) { \
-						throw java_call_exception(); \
-					} \
-					return result; \
+                    if ( je.has_exception() ) { \
+                        throw java_call_exception(); \
+                    } \
+                    return result; \
                 } \
                 \
                 template < typename ...Args > \
                 static java_method_result<type_name> call(const java_obj& obj, jmethodID method, Args&&... args) { \
-					java_env je; \
-					E2D_ASSERT(! je.has_exception()); \
+                    java_env je; \
+                    E2D_ASSERT(! je.has_exception()); \
                     auto result = java_env().env()->Call ## suffix ## Method(obj.get(), method, std::forward<Args>(args)...); \
-					if ( je.has_exception() ) { \
-						throw java_call_exception(); \
-					} \
-					return result; \
+                    if ( je.has_exception() ) { \
+                        throw java_call_exception(); \
+                    } \
+                    return result; \
                 } \
             }
         JAVA_METHOD_CALLER(jobject, Object);

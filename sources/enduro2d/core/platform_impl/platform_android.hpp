@@ -60,7 +60,7 @@ namespace e2d
     public:
         [[nodiscard]] static internal_state& state() noexcept;
 
-		// application
+        // application
         static void JNICALL create_platform(JNIEnv*, jclass, jobject ctx, jobject asset_mngr) noexcept;
         static void JNICALL destroy_platform(JNIEnv*, jclass) noexcept;
         static void JNICALL on_low_memory(JNIEnv*, jclass) noexcept;

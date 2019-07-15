@@ -14,12 +14,12 @@ namespace e2d
 {
     bool debug_console_sink::on_message(debug::level lvl, str_view text) noexcept {
         try {
-			// TODO: should be <file>(<line>): <message> <newline>
-			// write to IDE console
-			OutputDebugStringA(text.data());
-			OutputDebugStringA("\n");
+            // TODO: should be <file>(<line>): <message> <newline>
+            // write to IDE console
+            OutputDebugStringA(text.data());
+            OutputDebugStringA("\n");
 
-			// write to console window
+            // write to console window
             const str log_text = log_text_format(lvl, text);
             const std::ptrdiff_t rprintf = std::printf("%s", log_text.c_str());
             return rprintf >= 0
