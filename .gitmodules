@@ -31,6 +31,9 @@
 [submodule "modules/variant"]
 	path = modules/variant
 	url = https://github.com/mpark/variant
+[submodule "modules/curly.hpp"]
+	path = modules/curly.hpp
+	url = https://github.com/BlackMATov/curly.hpp
 [submodule "modules/enduro2d-external"]
 	path = modules/enduro2d-external
 	url = https://github.com/enduro2d/enduro2d-external.git
