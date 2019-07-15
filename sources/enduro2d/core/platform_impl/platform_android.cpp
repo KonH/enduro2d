@@ -245,15 +245,21 @@ namespace
     }
 
     std::size_t android_input_stream::read(void* dst, std::size_t size) {
-        return math::numeric_cast<size_t>(AAsset_read(asset_, dst, size));
+        off_t rread = AAsset_read(asset_, dst, size);
+        return rread >= 0
+            ? math::numeric_cast<size_t>(rread)
+            : throw bad_stream_operation();
     }
     
     std::size_t android_input_stream::seek(std::ptrdiff_t offset, bool relative) {
-        return math::numeric_cast<size_t>(AAsset_seek(asset_, offset, relative ? SEEK_CUR : SEEK_SET));
+        off_t rseek = AAsset_seek(asset_, offset, relative ? SEEK_CUR : SEEK_SET);
+        return rseek >= 0
+            ? math::numeric_cast<size_t>(rseek)
+            : throw bad_stream_operation();
     }
 
     std::size_t android_input_stream::tell() const {
-        return length_ - AAsset_getRemainingLength(asset_);
+        return length_ - math::numeric_cast<size_t>(AAsset_getRemainingLength(asset_));
     }
 
     std::size_t android_input_stream::length() const noexcept {
