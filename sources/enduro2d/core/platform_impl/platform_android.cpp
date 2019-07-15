@@ -220,22 +220,22 @@ namespace
     class android_input_stream final : public input_stream {
     public:
         android_input_stream(AAsset*);
-        ~android_input_stream() noexcept;
-        std::size_t read(void* dst, std::size_t size);
-        std::size_t seek(std::ptrdiff_t offset, bool relative);
-        std::size_t tell() const;
-        std::size_t length() const noexcept;
+        ~android_input_stream() noexcept override;
+        std::size_t read(void* dst, std::size_t size) override;
+        std::size_t seek(std::ptrdiff_t offset, bool relative) override;
+        std::size_t tell() const  override;
+        std::size_t length() const noexcept override;
     private:
         AAsset* asset_ = nullptr;
         std::size_t length_ = 0;
     };
 
     android_input_stream::android_input_stream(AAsset* asset)
-    : asset_(asset)
-    , length_(AAsset_getLength(asset_)) {
+    : asset_(asset) {
         if ( !asset ) {
             throw bad_stream_operation();
         }
+        length_ = math::numeric_cast<size_t>(AAsset_getLength(asset_));
     }
 
     android_input_stream::~android_input_stream() noexcept {
@@ -245,11 +245,11 @@ namespace
     }
 
     std::size_t android_input_stream::read(void* dst, std::size_t size) {
-        return AAsset_read(asset_, dst, size);
+        return math::numeric_cast<size_t>(AAsset_read(asset_, dst, size));
     }
     
     std::size_t android_input_stream::seek(std::ptrdiff_t offset, bool relative) {
-        return AAsset_seek(asset_, offset, relative ? SEEK_CUR : SEEK_SET);
+        return math::numeric_cast<size_t>(AAsset_seek(asset_, offset, relative ? SEEK_CUR : SEEK_SET));
     }
 
     std::size_t android_input_stream::tell() const {

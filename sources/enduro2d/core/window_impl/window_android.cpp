@@ -689,7 +689,8 @@ namespace e2d
             if ( !main_was_called && surface_.has_surface() ) {
                 main_was_called = true;
                 char* argv[] = {""};
-                e2d_main(std::size(argv), argv);
+                int res = e2d_main(std::size(argv), argv);
+                __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "e2d_main result %i\n", res);
                 exit_loop_.store(true); // temp ?
             }
         }
