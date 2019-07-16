@@ -238,7 +238,7 @@ if(${E2D_ENABLE_CURL})
     set(USE_SYSTEM_CURL OFF CACHE INTERNAL "" FORCE)
     set(USE_EMBEDDED_CURL OFF CACHE INTERNAL "" FORCE)
     add_subdirectory(modules/curly.hpp)
-    set_target_properties(curly.hpp PROPERTIES FOLDER modules)
+    set_target_properties(curly.hpp curl PROPERTIES FOLDER modules)
 
     cmake_policy(PUSH)
     cmake_policy(SET CMP0079 NEW)
