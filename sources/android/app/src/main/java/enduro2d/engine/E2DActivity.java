@@ -11,6 +11,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Configuration;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.DisplayMetrics;
@@ -175,6 +177,21 @@ public class E2DActivity
 
     @SuppressWarnings("unused") public void SetScreenOrientation(int value) {
         setRequestedOrientation(value);
+    }
+
+    @SuppressWarnings("unused") public boolean isNetworkConnected () {
+        try {
+            ConnectivityManager cm = (ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo ni = cm.getActiveNetworkInfo();
+            if ( ni != null ) {
+                NetworkInfo.DetailedState state = ni.getDetailedState();
+                if ( state == NetworkInfo.DetailedState.CONNECTED )
+                    return true;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "exception: " + e.toString());
+        }
+        return false;
     }
 
     private void sendVersionInfo() {

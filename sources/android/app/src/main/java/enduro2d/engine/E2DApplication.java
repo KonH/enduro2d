@@ -16,11 +16,11 @@ public final class E2DApplication
     public final static String NATIVE_LIB = "NativeLib";
 
     private final static String[] native_app_list_ = {
-            /*"untests_base",
+            "untests_base",
             "untests_core",
             "untests_math",
-            "untests_utils",*/
-            //"untests_high",
+            "untests_utils",
+            "untests_high",
             "sample_00",
             "sample_01",
             "sample_02",

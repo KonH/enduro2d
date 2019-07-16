@@ -519,6 +519,7 @@ namespace e2d
         java_method<void (jstring)> set_activity_title_;
         java_method<void (jstring, jboolean)> show_toast_;
         java_method<void (jint)> set_orientation_;
+        java_method<jboolean ()> has_network_;
         message_queue messages_;
         std::thread::id thread_id_ = std::this_thread::get_id();
     };
@@ -602,7 +603,8 @@ namespace e2d
         finish_activity_ = main_activity_.method<void ()>("finish");
         set_activity_title_ = main_activity_.method<void (jstring)>("setActivityTitle");
         show_toast_ = main_activity_.method<void (jstring, jboolean)>("showToast");
-        set_orientation_ = main_activity_.method<void (jint)>("SetScreenOrientation");
+        set_orientation_ = main_activity_.method<void (jint)>("setScreenOrientation");
+        has_network_ = main_activity_.method<jboolean ()>("isNetworkConnected");
     }
     
     void e2d_native_lib::activity_interface::release() {
@@ -611,6 +613,7 @@ namespace e2d
         set_activity_title_ = {};
         show_toast_ = {};
         set_orientation_ = {};
+        has_network_ = {};
     }
 
     bool e2d_native_lib::activity_interface::process_messages() {
