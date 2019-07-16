@@ -233,21 +233,18 @@ file(GLOB_RECURSE E2D_3RDPARTY
 # e2d external 3rd party
 #
 
+add_subdirectory(modules/enduro2d-external)
+include(modules/enduro2d-external/engine-integration.cmake)
+
 if(${E2D_ENABLE_CURL})
     set(USE_STATIC_CRT ${E2D_BUILD_WITH_STATIC_CRT} CACHE INTERNAL "" FORCE)
     set(USE_SYSTEM_CURL OFF CACHE INTERNAL "" FORCE)
     set(USE_EMBEDDED_CURL OFF CACHE INTERNAL "" FORCE)
+    include_directories(${E2D_CURL_INCLUDE_DIR})
+    add_definitions(-DCURL_STATICLIB)
     add_subdirectory(modules/curly.hpp)
-    set_target_properties(curly.hpp curl PROPERTIES FOLDER modules)
-
-    cmake_policy(PUSH)
-    cmake_policy(SET CMP0079 NEW)
-    target_link_libraries(curly.hpp PRIVATE curl)
-    cmake_policy(POP)
+    set_target_properties(curly.hpp PROPERTIES FOLDER modules)
 endif()
-
-add_subdirectory(modules/enduro2d-external)
-include(modules/enduro2d-external/engine-integration.cmake)
 
 function(e2d_add_executable target_name source_list)
     if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
@@ -282,7 +279,7 @@ if(${E2D_ENABLE_BASS})
 endif()
 
 if(${E2D_ENABLE_CURL})
-    target_link_libraries(${PROJECT_NAME} PUBLIC curly.hpp)
+    target_link_libraries(${PROJECT_NAME} PUBLIC curly.hpp curl)
 endif()
 
 target_include_directories(${PROJECT_NAME}
