@@ -6,6 +6,7 @@
 
 #pragma once
 
+#define CATCH_CONFIG_EXTERNAL_INTERFACES
 #include "../catch/catch.hpp"
 #include <enduro2d/enduro2d.hpp>
 
@@ -36,4 +37,16 @@ namespace e2d_untests
     };
     using verbose_profiler_us = verbose_profiler<microseconds_tag>;
     using verbose_profiler_ms = verbose_profiler<milliseconds_tag>;
+
+    //
+    // catch2_test_listener
+    //
+
+    struct catch2_test_listener : Catch::TestEventListenerBase {
+        using TestEventListenerBase::TestEventListenerBase; // inherit constructor
+        void assertionStarting(const Catch::AssertionInfo&) override;
+        bool assertionEnded(const Catch::AssertionStats&) override;
+    private:
+        std::size_t prev_failed_ = 0;
+    };
 }

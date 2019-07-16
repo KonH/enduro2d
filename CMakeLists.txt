@@ -233,6 +233,19 @@ file(GLOB_RECURSE E2D_3RDPARTY
 # e2d external 3rd party
 #
 
+if(${E2D_ENABLE_CURL})
+    set(USE_STATIC_CRT ${E2D_BUILD_WITH_STATIC_CRT} CACHE INTERNAL "" FORCE)
+    set(USE_SYSTEM_CURL OFF CACHE INTERNAL "" FORCE)
+    set(USE_EMBEDDED_CURL OFF CACHE INTERNAL "" FORCE)
+    add_subdirectory(modules/curly.hpp)
+    set_target_properties(curly.hpp PROPERTIES FOLDER modules)
+
+    cmake_policy(PUSH)
+    cmake_policy(SET CMP0079 NEW)
+    target_link_libraries(curly.hpp PRIVATE curl)
+    cmake_policy(POP)
+endif()
+
 add_subdirectory(modules/enduro2d-external)
 include(modules/enduro2d-external/engine-integration.cmake)
 
@@ -269,12 +282,13 @@ if(${E2D_ENABLE_BASS})
 endif()
 
 if(${E2D_ENABLE_CURL})
-    target_link_libraries(${PROJECT_NAME} PRIVATE curl)
+    target_link_libraries(${PROJECT_NAME} PUBLIC curly.hpp)
 endif()
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC headers
-    PRIVATE sources)
+    PRIVATE sources
+    PRIVATE modules)
 
 target_compile_options(${PROJECT_NAME}
     PRIVATE ${E2D_COMPILER_FLAGS})

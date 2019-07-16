@@ -47,7 +47,10 @@ TEST_CASE("debug"){
         REQUIRE(test_sink::s_on_message_acc == "hello");
     }
     {
-        modules::initialize<debug>();
+        const bool initialized = modules::is_initialized<debug>();
+        if ( !initialized ) {
+            modules::initialize<debug>();
+        }
         test_sink& s1 = the<debug>().register_sink_ex<test_sink>(debug::level::warning);
         test_sink& s2 = the<debug>().register_sink_ex<test_sink>(debug::level::error);
         REQUIRE(s1.on_message_acc.empty());
@@ -71,6 +74,8 @@ TEST_CASE("debug"){
         the<debug>().fatal("r");
         REQUIRE(s1.on_message_acc == "wqer");
         REQUIRE(s2.on_message_acc == "qer");
-        modules::shutdown<debug>();
+        if ( initialized ) {
+            modules::shutdown<debug>();
+        }
     }
 }
