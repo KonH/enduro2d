@@ -153,16 +153,9 @@ TEST_CASE("images") {
             {"bin/images/ship_rgb8.pvr", true, image_data_format::rgb8}
         };
 
-        str resources;
-        REQUIRE(filesystem::extract_predef_path(
-            resources,
-            filesystem::predef_path::resources));
-
         for ( const auto& info : test_images ) {
-            input_stream_uptr stream = make_read_file(path::combine(resources, info.name));
-            REQUIRE(stream);
             image img;
-            REQUIRE(images::try_load_image(img, stream) == info.can_load);
+            REQUIRE(images::try_load_image(img, the<vfs>().read(url("resources", info.name))) == info.can_load);
             if ( info.can_load ) {
                 REQUIRE(img.format() == info.format);
                 REQUIRE(img.size().x == 64);

@@ -14,6 +14,7 @@ import android.content.res.Configuration;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -54,6 +55,17 @@ public class E2DActivity
         setContentView(opengl_view_);
 
         E2DNativeLib.createPlatform(getApplicationContext(), getResources().getAssets());
+        File internal_path = getFilesDir();
+        File internal_cache = getCacheDir();
+        File external_path = getExternalFilesDir(null);
+        File external_cache = getExternalCacheDir();
+        File external_storage = Environment.getExternalStorageDirectory();
+        E2DNativeLib.setPredefPath(
+                internal_path == null ? "" : internal_path.getAbsolutePath(),
+                internal_cache == null ? "" : internal_cache.getAbsolutePath(),
+                external_path == null ? "" : external_path.getAbsolutePath(),
+                external_cache == null ? "" : external_cache.getAbsolutePath(),
+                external_storage == null ? "" : external_storage.getAbsolutePath());
         E2DNativeLib.createWindow(this);
         sendVersionInfo();
         sendDisplayInfo();
@@ -113,7 +125,7 @@ public class E2DActivity
 
     // SurfaceHolder.Callback
     @Override public final void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {
-        E2DNativeLib.surfaceChanged(holder.getSurface(), w, h);
+        E2DNativeLib.surfaceChanged(holder.getSurface());
     }
 
     @Override public final void surfaceCreated(SurfaceHolder holder) {

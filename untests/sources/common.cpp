@@ -4,6 +4,7 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
+#define CATCH_CONFIG_RUNNER
 #include "common.hpp"
     
 #if E2D_PLATFORM == E2D_PLATFORM_ANDROID
@@ -29,4 +30,21 @@ namespace e2d_untests
     
     CATCH_REGISTER_LISTENER(catch2_test_listener)
 #endif
+}
+
+int e2d_main (int argc, char * argv[]) {
+    using namespace e2d;
+
+    // without platform android can not start tests
+    if ( !modules::is_initialized<platform>() ) {
+        modules::initialize<platform>(argc, argv);
+    }
+
+    // without vfs android can not read assets
+    if ( !modules::is_initialized<vfs>() ) {
+        modules::initialize<vfs>();
+    }
+    the<platform>().register_scheme_aliases(the<vfs>());
+
+    return Catch::Session().run( argc, argv );
 }

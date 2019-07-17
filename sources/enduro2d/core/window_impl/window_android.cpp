@@ -143,6 +143,7 @@ namespace
     }
 
     android_surface::~android_surface() noexcept {
+        // context & window should be destroyed
         E2D_ASSERT(context_ == EGL_NO_CONTEXT);
         E2D_ASSERT(!window_);
     }
@@ -653,9 +654,6 @@ namespace e2d
             if ( !main_activity_ ) {
                 return;
             }
-            
-            __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "activity_interface::close()\n");
-
             finish_activity_();
             release();
         });
@@ -691,7 +689,8 @@ namespace e2d
             }
             if ( !main_was_called && surface_.has_surface() ) {
                 main_was_called = true;
-                char* argv[] = {""};
+                char arg[1] = {};
+                char* argv[] = {arg};
                 int res = e2d_main(std::size(argv), argv);
                 __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "e2d_main result %i\n", res);
                 exit_loop_.store(true); // temp ?
@@ -1099,7 +1098,7 @@ namespace e2d
         }
     }
 
-    void JNICALL e2d_native_lib::surface_changed(JNIEnv* env, jclass, jobject surface, jint w, jint h) noexcept {
+    void JNICALL e2d_native_lib::surface_changed(JNIEnv* env, jclass, jobject surface) noexcept {
         try {
             state().renderer().on_surface_changed(ANativeWindow_fromSurface(env, surface));
         } catch(const std::exception& e) {

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <enduro2d/core/platform.hpp>
+#include <enduro2d/core/vfs.hpp>
 
 #define E2D_PLATFORM_MODE_NONE 1
 #define E2D_PLATFORM_MODE_IOS 2
@@ -45,7 +46,7 @@ namespace e2d
         virtual ~internal_state() noexcept = default;
     public:
         const vector<str>& command_line_arguments() const noexcept;
-        virtual void override_predef_paths(vfs&) {}
+        virtual void register_scheme_aliases(vfs&) = 0;
     private:
         vector<str> command_line_arguments_;
     };

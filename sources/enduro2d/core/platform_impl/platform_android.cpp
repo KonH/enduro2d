@@ -12,6 +12,7 @@
 #include <enduro2d/core/vfs.hpp>
 #include <enduro2d/utils/java.hpp>
 #include <android/asset_manager_jni.h>
+#include <unistd.h>
 
 namespace
 {
@@ -70,6 +71,7 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
         register_method("onTouch", &e2d_native_lib::on_touch);
         register_method("setApiVersion", &e2d_native_lib::set_api_version);
         register_method("setDisplayInfo", &e2d_native_lib::set_display_info);
+        register_method("setPredefPath", &e2d_native_lib::set_predef_path);
 
         if ( count != expected ) {
             __android_log_print(ANDROID_LOG_FATAL, "enduro2d", "%i native methods wasn't registered\n", expected - count);
@@ -97,6 +99,12 @@ namespace e2d
         java_obj context;
         java_obj asset_mngr;
         AAssetManager* jni_asset_mngr = nullptr;
+
+        str internal_appdata_path;
+        str internal_cache_path;
+        str external_appdata_path;
+        str external_cache_path;
+        str external_storage_path;
     private:
         int android_version_ = 0;
         std::thread::id thread_id_ = std::this_thread::get_id();
@@ -182,24 +190,62 @@ namespace e2d
             check_exceptions_(env, e);
         }
     }
+    
+    void JNICALL e2d_native_lib::set_predef_path(JNIEnv* env, jclass,
+                                                 jstring internal_appdata,
+                                                 jstring internal_cache,
+                                                 jstring external_appdata,
+                                                 jstring external_cache,
+                                                 jstring external_storage) noexcept {
+        try {
+            auto& inst = state().platform();
+            inst.internal_appdata_path = java_string(internal_appdata);
+            inst.internal_cache_path = java_string(internal_cache);
+            inst.external_appdata_path = java_string(external_appdata);
+            inst.external_cache_path = java_string(external_cache);
+            inst.external_storage_path = java_string(external_storage);
+
+            // set default directory
+            if ( chdir(inst.internal_appdata_path.data()) == -1 ) {
+                the<debug>().error("can't set current directory to '%0'", inst.internal_appdata_path);
+            }
+        } catch(const std::exception& e) {
+            check_exceptions_(env, e);
+        }
+    }
 
     void e2d_native_lib::check_exceptions_(JNIEnv* env, const std::exception& e) noexcept {
         __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "exception: %s\n", e.what());
         env->ExceptionClear();
     }
-
+    
     //
     // platform_internal_state_android
     //
 
+    class platform_internal_state_android final : public platform::internal_state {
+    public:
+        platform_internal_state_android(int argc, char *argv[]);
+        ~platform_internal_state_android() noexcept = default;
+        
+        void register_scheme_aliases(vfs&) override;
+    };
+
     platform_internal_state_android::platform_internal_state_android(int argc, char *argv[])
     : internal_state(argc, argv) {}
-    
-    platform_internal_state_android::~platform_internal_state_android() noexcept {}
         
-    void platform_internal_state_android::override_predef_paths(vfs& the_vfs) {
+    void platform_internal_state_android::register_scheme_aliases(vfs& the_vfs) {
+        auto& inst = e2d_native_lib::state().platform();  
         the_vfs.register_scheme<asset_file_source>("assets");
         the_vfs.register_scheme_alias("resources", url{"assets", ""});
+
+        the_vfs.register_scheme<filesystem_file_source>("file");
+        the_vfs.register_scheme_alias("home", url("file", inst.external_storage_path));
+        the_vfs.register_scheme_alias("appdata", url("file", inst.external_appdata_path));
+        the_vfs.register_scheme_alias("desktop", url("file", inst.external_storage_path));
+        the_vfs.register_scheme_alias("working", url("file", inst.internal_appdata_path));
+        the_vfs.register_scheme_alias("documents", url("file", inst.external_storage_path));
+        the_vfs.register_scheme_alias("executable", url("file", inst.internal_appdata_path));
     }
 
 
@@ -289,10 +335,15 @@ namespace
 
     input_stream_uptr asset_file_source::read(str_view path) const {
         AAsset* asset = AAssetManager_open(asset_manager(), path.data(), AASSET_MODE_UNKNOWN);
-        return input_stream_uptr(new android_input_stream(asset));
+        try {
+            return input_stream_uptr(new android_input_stream(asset));
+        } catch(...) {
+            return nullptr;
+        }
     }
 
     output_stream_uptr asset_file_source::write(str_view path, bool append) const {
+        E2D_UNUSED(path, append);
         throw std::runtime_error("can't write to assets");
         return nullptr;
     }

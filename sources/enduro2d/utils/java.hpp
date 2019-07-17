@@ -280,7 +280,7 @@ namespace e2d
         [[nodiscard]] const char* data() const noexcept;
         [[nodiscard]] size_t length() const noexcept;
         [[nodiscard]] jstring get() const noexcept;
-        explicit operator str_view() const noexcept;
+        operator str_view() const noexcept;
     private:
         void release_() noexcept;
     private:

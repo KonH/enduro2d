@@ -15,18 +15,6 @@
 namespace e2d
 {
     //
-    // platform_internal_state_android
-    //
-
-    class platform_internal_state_android final : public platform::internal_state {
-    public:
-        platform_internal_state_android(int argc, char *argv[]);
-        ~platform_internal_state_android() noexcept;
-        
-        void override_predef_paths(vfs&) override;
-    };
-
-    //
     // e2d_native_lib
     //
 
@@ -66,6 +54,12 @@ namespace e2d
         static void JNICALL on_low_memory(JNIEnv*, jclass) noexcept;
         static void JNICALL on_trim_memory(JNIEnv*, jclass) noexcept;
         static void JNICALL set_api_version(JNIEnv*, jclass, jint version) noexcept;
+        static void JNICALL set_predef_path(JNIEnv*, jclass,
+                                            jstring internal_appdata,
+                                            jstring internal_cache,
+                                            jstring external_appdata,
+                                            jstring external_cache,
+                                            jstring external_storage) noexcept;
 
         // window
         static void JNICALL create_window(JNIEnv*, jclass, jobject activity) noexcept;
@@ -74,7 +68,7 @@ namespace e2d
         static void JNICALL stop(JNIEnv*, jclass) noexcept;
         static void JNICALL pause(JNIEnv*, jclass) noexcept;
         static void JNICALL resume(JNIEnv*, jclass) noexcept;
-        static void JNICALL surface_changed(JNIEnv* env, jclass, jobject surface, jint w, jint h) noexcept;
+        static void JNICALL surface_changed(JNIEnv* env, jclass, jobject surface) noexcept;
         static void JNICALL surface_destroyed(JNIEnv*, jclass) noexcept;
         static void JNICALL visibility_changed(JNIEnv*, jclass) noexcept;
         static void JNICALL orientation_changed(JNIEnv*, jclass, jint value) noexcept;

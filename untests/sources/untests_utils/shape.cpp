@@ -8,15 +8,11 @@
 using namespace e2d;
 
 TEST_CASE("shape") {
-    str resources;
-    REQUIRE(filesystem::extract_predef_path(
-        resources,
-        filesystem::predef_path::resources));
     {
         shape s;
         REQUIRE(shapes::try_load_shape(
             s,
-            make_read_file(path::combine(resources, "bin/gnome/gnome.obj.gnome.e2d_shape"))));
+            the<vfs>().read(url("resources", "bin/gnome/gnome.obj.gnome.e2d_shape"))));
 
         REQUIRE(s.vertices().size() == 397);
 
@@ -32,7 +28,7 @@ TEST_CASE("shape") {
         shape s;
         REQUIRE(shapes::try_load_shape(
             s,
-            make_read_file(path::combine(resources, "bin/gnome/gnome.obj.yad.e2d_shape"))));
+            the<vfs>().read(url("resources", "bin/gnome/gnome.obj.yad.e2d_shape"))));
 
         REQUIRE(s.vertices().size() == 46);
 

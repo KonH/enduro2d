@@ -65,7 +65,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
                              -Werror=multichar
                              -Werror=odr
                              -Werror=delete-non-virtual-dtor
-                             -Werror=undefined-internal)
+                             -Werror=undefined-internal
+                             -Werror=writable-strings)
     string(REPLACE ";" " " E2D_SHARED_CXX_FLAGS "${E2D_SHARED_CXX_FLAGS}")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")

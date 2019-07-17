@@ -20,76 +20,6 @@ namespace
             ::FindClose(handle);
         }
     }
-
-    bool extract_home_directory(str& dst) {
-        WCHAR buf[MAX_PATH + 1] = {0};
-        if ( SUCCEEDED(::SHGetFolderPathW(0, CSIDL_PROFILE | CSIDL_FLAG_CREATE, 0, 0, buf)) ) {
-            dst = make_utf8(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_appdata_directory(str& dst) {
-        WCHAR buf[MAX_PATH + 1] = {0};
-        if ( SUCCEEDED(::SHGetFolderPathW(0, CSIDL_APPDATA | CSIDL_FLAG_CREATE, 0, 0, buf)) ) {
-            dst = make_utf8(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_desktop_directory(str& dst) {
-        WCHAR buf[MAX_PATH + 1] = {0};
-        if ( SUCCEEDED(::SHGetFolderPathW(0, CSIDL_DESKTOP | CSIDL_FLAG_CREATE, 0, 0, buf)) ) {
-            dst = make_utf8(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_working_directory(str& dst) {
-        WCHAR buf[MAX_PATH + 1] = {0};
-        const DWORD len = ::GetCurrentDirectoryW(
-            math::numeric_cast<DWORD>(std::size(buf) - 1),
-            buf);
-        if ( len > 0 && len <= MAX_PATH ) {
-            dst = make_utf8(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_documents_directory(str& dst) {
-        WCHAR buf[MAX_PATH + 1] = {0};
-        if ( SUCCEEDED(::SHGetFolderPathW(0, CSIDL_MYDOCUMENTS | CSIDL_FLAG_CREATE, 0, 0, buf)) ) {
-            dst = make_utf8(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_executable_path(str& dst) {
-        WCHAR buf[MAX_PATH + 1] = {0};
-        const DWORD len = ::GetModuleFileNameW(
-            0,
-            buf,
-            math::numeric_cast<DWORD>(std::size(buf) - 1));
-        if ( len > 0 && len <= MAX_PATH ) {
-            dst = make_utf8(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_resources_directory(str& dst) {
-        str executable_path;
-        if ( extract_executable_path(executable_path) ) {
-            dst = path::parent_path(executable_path);
-            return true;
-        }
-        return false;
-    }
 }
 
 namespace e2d::filesystem::impl
@@ -146,28 +76,6 @@ namespace e2d::filesystem::impl
             }
         } while ( ::FindNextFileW(dir.get(), &entw) != 0 );
         return true;
-    }
-
-    bool extract_predef_path(str& dst, predef_path path_type) {
-        switch ( path_type ) {
-            case predef_path::home:
-                return extract_home_directory(dst);
-            case predef_path::appdata:
-                return extract_appdata_directory(dst);
-            case predef_path::desktop:
-                return extract_desktop_directory(dst);
-            case predef_path::working:
-                return extract_working_directory(dst);
-            case predef_path::documents:
-                return extract_documents_directory(dst);
-            case predef_path::resources:
-                return extract_resources_directory(dst);
-            case predef_path::executable:
-                return extract_executable_path(dst);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected predef path");
-                return false;
-        }
     }
 }
 

@@ -4,7 +4,6 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#define CATCH_CONFIG_RUNNER
 #include "_math.hpp"
 using namespace e2d;
 
@@ -661,8 +660,4 @@ TEST_CASE("math") {
         REQUIRE_FALSE(math::approximately<u32>(umin,umax,1));
         REQUIRE_FALSE(math::approximately<u32>(umax,umin,1));
     }
-}
-
-int e2d_main (int argc, char * argv[]) {
-    return Catch::Session().run( argc, argv );
 }

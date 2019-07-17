@@ -114,8 +114,4 @@ namespace e2d::filesystem
         return streams::try_write_tail(
             src, make_write_file(path, append));
     }
-
-    bool extract_predef_path(str& dst, predef_path path_type) {
-        return impl::extract_predef_path(dst, path_type);
-    }
 }

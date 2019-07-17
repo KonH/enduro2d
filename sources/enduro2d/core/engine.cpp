@@ -27,17 +27,6 @@ namespace
             modules::initialize<Module>(std::forward<Args>(args)...);
         }
     }
-
-    void safe_register_predef_path(
-        vfs& the_vfs,
-        str_view scheme,
-        filesystem::predef_path predef_path)
-    {
-        str path;
-        if ( filesystem::extract_predef_path(path, predef_path) ) {
-            the_vfs.register_scheme_alias(scheme, url{"file", path});
-        }
-    }
 }
 
 namespace e2d
@@ -382,15 +371,7 @@ namespace e2d
 
         safe_module_initialize<vfs>();
 
-        the<vfs>().register_scheme<filesystem_file_source>("file");
-        the<platform>().override_predef_paths(the<vfs>());
-        safe_register_predef_path(the<vfs>(), "home", filesystem::predef_path::home);
-        safe_register_predef_path(the<vfs>(), "appdata", filesystem::predef_path::appdata);
-        safe_register_predef_path(the<vfs>(), "desktop", filesystem::predef_path::desktop);
-        safe_register_predef_path(the<vfs>(), "working", filesystem::predef_path::working);
-        safe_register_predef_path(the<vfs>(), "documents", filesystem::predef_path::documents);
-        safe_register_predef_path(the<vfs>(), "resources", filesystem::predef_path::resources);
-        safe_register_predef_path(the<vfs>(), "executable", filesystem::predef_path::executable);
+        the<platform>().register_scheme_aliases(the<vfs>());
 
         if ( params.debug_params().file_logging() ) {
             url log_url = url("appdata://")

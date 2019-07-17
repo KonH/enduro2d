@@ -76,18 +76,6 @@ namespace e2d::filesystem
 
     bool try_write_all(const str& src, str_view path, bool append) noexcept;
     bool try_write_all(const buffer& src, str_view path, bool append) noexcept;
-
-    enum class predef_path {
-        home,
-        appdata,
-        desktop,
-        working,
-        documents,
-        resources,
-        executable
-    };
-
-    bool extract_predef_path(str& dst, predef_path path_type);
 }
 
 #include "filesystem.inl"

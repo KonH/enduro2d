@@ -17,34 +17,34 @@ TEST_CASE("vfs"){
     }
     {
         vfs v;
-        REQUIRE(v.register_scheme<filesystem_file_source>("file"));
+        REQUIRE(v.register_scheme<filesystem_file_source>("fs"));
         {
-            REQUIRE(v.exists({"file", file_path}));
+            REQUIRE(v.exists({"fs", file_path}));
             REQUIRE_FALSE(v.exists({"file2", file_path}));
-            REQUIRE_FALSE(v.exists({"file", nofile_path}));
+            REQUIRE_FALSE(v.exists({"fs", nofile_path}));
         }
         {
             buffer b;
-            auto r = v.read({"file", file_path});
+            auto r = v.read({"fs", file_path});
             REQUIRE(r);
             REQUIRE(streams::try_read_tail(b, r));
             REQUIRE(b == buffer{"hello", 5});
             REQUIRE(v.read({"file2", file_path}) == input_stream_uptr());
-            REQUIRE(v.read({"file", nofile_path}) == input_stream_uptr());
+            REQUIRE(v.read({"fs", nofile_path}) == input_stream_uptr());
         }
         {
             buffer b0;
-            REQUIRE(v.load({"file", file_path}, b0));
+            REQUIRE(v.load({"fs", file_path}, b0));
             REQUIRE(b0 == buffer{"hello", 5});
 
-            auto b1 = v.load_async({"file", file_path}).get();
+            auto b1 = v.load_async({"fs", file_path}).get();
             REQUIRE(b1 == buffer{"hello", 5});
 
             str b2;
-            REQUIRE(v.load_as_string({"file", file_path}, b2));
+            REQUIRE(v.load_as_string({"fs", file_path}, b2));
             REQUIRE(b2 == "hello");
 
-            auto b3 = v.load_as_string_async({"file", file_path}).get();
+            auto b3 = v.load_as_string_async({"fs", file_path}).get();
             REQUIRE(b3 == "hello");
         }
     }
@@ -56,17 +56,13 @@ TEST_CASE("vfs"){
         REQUIRE(v.resolve_scheme_aliases({"save", "save.txt"}) == url("file://~/game/saves/save.txt"));
     }
     SECTION("archive"){
-        vfs v;
+        vfs& v = the<vfs>();
         {
-            str resources;
-            REQUIRE(filesystem::extract_predef_path(resources, filesystem::predef_path::resources));
-            REQUIRE(v.register_scheme_alias("resources", {"file", resources}));
-
             REQUIRE_FALSE(v.register_scheme<archive_file_source>(
                 "archive",
                 v.read(url("resources://bin/noresources.zip"))));
 
-            REQUIRE(v.register_scheme<filesystem_file_source>("file"));
+            REQUIRE(v.register_scheme<filesystem_file_source>("fs"));
 
             REQUIRE_FALSE(v.register_scheme<archive_file_source>(
                 "archive",

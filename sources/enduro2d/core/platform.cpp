@@ -45,7 +45,7 @@ namespace e2d
         return *state_;
     }
 
-    void platform::override_predef_paths(vfs& the_vfs) {
-        return state_->override_predef_paths(the_vfs);
+    void platform::register_scheme_aliases(vfs& the_vfs) {
+        return state_->register_scheme_aliases(the_vfs);
     }
 }

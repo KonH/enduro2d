@@ -13,69 +13,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-namespace
-{
-    using namespace e2d;
-
+namespace {
     const mode_t default_directory_mode = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
-
-    bool extract_home_directory(str& dst) {
-        const char* const home_path = std::getenv("HOME");
-        if ( home_path ) {
-            dst.assign(home_path);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_appdata_directory(str& dst) {
-        return extract_home_directory(dst);
-    }
-
-    bool extract_desktop_directory(str& dst) {
-        str home_directory;
-        if ( extract_home_directory(home_directory) ) {
-            dst = path::combine(home_directory, "Desktop");
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_documents_directory(str& dst) {
-        str home_directory;
-        if ( extract_home_directory(home_directory) ) {
-            dst = path::combine(home_directory, "Documents");
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_working_directory(str& dst) {
-        char buf[PATH_MAX + 1] = {0};
-        if ( ::getcwd(buf, std::size(buf) - 1) ) {
-            dst.assign(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_executable_path(str& dst) {
-        char buf[PATH_MAX + 1] = {0};
-        if ( ::readlink("/proc/self/exe", buf, std::size(buf) - 1) != -1 ) {
-            dst.assign(buf);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_resources_directory(str& dst) {
-        str executable_path;
-        if ( extract_executable_path(executable_path) ) {
-            dst = path::parent_path(executable_path);
-            return true;
-        }
-        return false;
-    }
 }
 
 namespace e2d::filesystem::impl
@@ -122,28 +61,6 @@ namespace e2d::filesystem::impl
             }
         }
         return true;
-    }
-
-    bool extract_predef_path(str& dst, predef_path path_type) {
-        switch ( path_type ) {
-            case predef_path::home:
-                return extract_home_directory(dst);
-            case predef_path::appdata:
-                return extract_appdata_directory(dst);
-            case predef_path::desktop:
-                return extract_desktop_directory(dst);
-            case predef_path::working:
-                return extract_working_directory(dst);
-            case predef_path::documents:
-                return extract_documents_directory(dst);
-            case predef_path::resources:
-                return extract_resources_directory(dst);
-            case predef_path::executable:
-                return extract_executable_path(dst);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected predef path");
-                return false;
-        }
     }
 }
 

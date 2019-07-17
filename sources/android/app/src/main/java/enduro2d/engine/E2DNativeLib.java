@@ -13,6 +13,11 @@ public final class E2DNativeLib {
      // application
      public static native void createPlatform(Object ctx, Object asset_mngr);
      public static native void destroyPlatform();
+     public static native void setPredefPath(String internal_appdata,
+                                           String internal_cache,
+                                           String external_appdata,
+                                           String external_cache,
+                                           String external_storage);
 
      // activity life-cycle
      public static native void createWindow(Object activity);
@@ -25,7 +30,7 @@ public final class E2DNativeLib {
      public static native void tick();
 
      // surface
-     public static native void surfaceChanged(Object surface, int width, int height);
+     public static native void surfaceChanged(Object surface);
      public static native void surfaceDestroyed();
 
      public static native void visibilityChanged();

@@ -8,15 +8,11 @@
 using namespace e2d;
 
 TEST_CASE("mesh") {
-    str resources;
-    REQUIRE(filesystem::extract_predef_path(
-        resources,
-        filesystem::predef_path::resources));
     {
         mesh m;
         REQUIRE(meshes::try_load_mesh(
             m,
-            make_read_file(path::combine(resources, "bin/gnome/gnome.obj.gnome.e2d_mesh"))));
+            the<vfs>().read(url("resources", "bin/gnome/gnome.obj.gnome.e2d_mesh"))));
 
         REQUIRE(m.vertices().size() == 397);
 
@@ -35,7 +31,7 @@ TEST_CASE("mesh") {
         mesh m;
         REQUIRE(meshes::try_load_mesh(
             m,
-            make_read_file(path::combine(resources, "bin/gnome/gnome.obj.yad.e2d_mesh"))));
+            the<vfs>().read(url("resources", "bin/gnome/gnome.obj.yad.e2d_mesh"))));
 
         REQUIRE(m.vertices().size() == 46);
 
