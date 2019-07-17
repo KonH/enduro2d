@@ -8,6 +8,11 @@
 
 #if defined(E2D_PLATFORM_MODE) && E2D_PLATFORM_MODE == E2D_PLATFORM_MODE_LINUX
 
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+
 namespace
 {
     using namespace e2d;
@@ -17,7 +22,7 @@ namespace
         platform_internal_state_linux(int argc, char *argv[])
             : internal_state(argc, argv) {}
 
-        ~platform_internal_state_linux() noexcept = default;
+        ~platform_internal_state_linux() noexcept override = default;
         
         void register_scheme_aliases(vfs&) override;
     };
