@@ -50,7 +50,7 @@ namespace e2d
         }
         JavaVM* jvm = detail::java_vm::get();
         if ( !jvm ) {
-            throw std::runtime_error("JavaVM is null");
+            throw java_exception("JavaVM is null");
         }
         detach();
         void* env = nullptr;
@@ -62,19 +62,19 @@ namespace e2d
         }
         if ( status == JNI_EDETACHED ) {
             if ( jvm->AttachCurrentThread(&jni_env_, nullptr) < 0 ) {
-                throw std::runtime_error("can't attach to current java thread");
+                throw java_exception("can't attach to current java thread");
             }
             must_be_detached_ = true;
             return;
         }
-        throw std::runtime_error("can't get java enviroment");
+        throw java_exception("can't get java enviroment");
     }
 
     void java_env::detach() {
         if ( must_be_detached_ ) {
             JavaVM* jvm = detail::java_vm::get();
             if ( !jvm ) {
-                throw std::runtime_error("JavaVM is null");
+                throw java_exception("JavaVM is null");
             }
             jvm->DetachCurrentThread();
             jni_env_ = nullptr;
@@ -170,7 +170,7 @@ namespace e2d
         java_env je;
         jclass jc = je.env()->FindClass(class_name.data());
         if ( !jc ) {
-            throw std::runtime_error("java class is not found");
+            throw java_exception("java class is not found");
         }
         set_(je, jc);
     }
@@ -181,12 +181,12 @@ namespace e2d
     
     java_class::java_class(const java_obj& obj) {
         if ( !obj ) {
-            throw std::runtime_error("java object is null");
+            throw java_exception("java object is null");
         }
         java_env je;
         jclass jc = je.env()->GetObjectClass(obj.get());
         if ( !jc ) {
-            throw std::runtime_error("failed to get object class");
+            throw java_exception("failed to get object class");
         }
         set_(je, jc);
     }

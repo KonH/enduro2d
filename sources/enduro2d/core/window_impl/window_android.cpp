@@ -152,13 +152,13 @@ namespace
         E2D_ASSERT(context_ == EGL_NO_CONTEXT);
         EGL_CHECK_CODE(debug_, display_ = eglGetDisplay(EGL_DEFAULT_DISPLAY));
         if ( display_ == EGL_NO_DISPLAY ) {
-            throw std::runtime_error("failed to get EGL display");
+            throw android_exception("failed to get EGL display");
         }
         EGLint maj_ver, min_ver;
         EGLBoolean ok;
         EGL_CHECK_CODE(debug_, ok = eglInitialize(display_, &maj_ver, &min_ver));
         if ( ok != EGL_TRUE ) {
-            throw std::runtime_error("failed to initialize EGL");
+            throw android_exception("failed to initialize EGL");
         }
         egl_version_ = maj_ver * 100 + min_ver * 10;
         EGL_CHECK_CODE(debug_, eglBindAPI(EGL_OPENGL_ES_API));
@@ -172,11 +172,11 @@ namespace
         EGLint num_configs = 0;
         EGL_CHECK_CODE(debug_, ok = eglGetConfigs(display_, configs, std::size(configs), &num_configs));
         if ( ok != EGL_TRUE )
-            throw std::runtime_error("failed to get EGL display configs");
+            throw android_exception("failed to get EGL display configs");
 
         EGL_CHECK_CODE(debug_, ok = eglChooseConfig(display_, required_config, configs, std::size(configs), &num_configs));
         if ( ok != EGL_TRUE || num_configs == 0 ) {
-            throw std::runtime_error("failed to choose EGL display config");
+            throw android_exception("failed to choose EGL display config");
         }
         const auto get_attrib = [this] (EGLConfig cfg, EGLint attrib) {
             EGLint result = 0;
@@ -239,7 +239,7 @@ namespace
         };
         EGL_CHECK_CODE(debug_, context_ = eglCreateContext(display_, config_, EGL_NO_CONTEXT, context_attribs));
         if ( context_ == EGL_NO_CONTEXT ) {
-            throw std::runtime_error("failed to create EGL context");
+            throw android_exception("failed to create EGL context");
         }
         debug_.trace("ANDROID: selected EGL surface config:\n"
             "--> EGL_DEPTH_SIZE: %0\n"
@@ -272,7 +272,7 @@ namespace
 
     void android_surface::create_surface(ANativeWindow* window) {
         if ( context_ == EGL_NO_CONTEXT ) {
-            throw std::runtime_error("can't create surface without EGL context");
+            throw android_exception("can't create surface without EGL context");
         }
         destroy_surface();
         window_ = window;
@@ -281,7 +281,7 @@ namespace
         EGL_CHECK_CODE(debug_, eglGetConfigAttrib(display_, config_, EGL_NATIVE_VISUAL_ID, &format));
 
         if ( ANativeWindow_setBuffersGeometry(window_, 0, 0, format) ) {
-            throw std::runtime_error("failed to set pixel format to native window");
+            throw android_exception("failed to set pixel format to native window");
         }
         const EGLint surface_attribs[] = {
             EGL_RENDER_BUFFER, EGL_BACK_BUFFER,
@@ -289,12 +289,12 @@ namespace
         };
         EGL_CHECK_CODE(debug_,  surface_ = eglCreateWindowSurface(display_, config_, window_, surface_attribs));
         if ( surface_ == EGL_NO_SURFACE ) {
-            throw std::runtime_error("failed to create window surface");
+            throw android_exception("failed to create window surface");
         }
         EGLBoolean ok;
         EGL_CHECK_CODE(debug_, ok = eglMakeCurrent(display_, surface_, surface_, context_));
         if ( ok != EGL_TRUE ) {
-            throw std::runtime_error("failed to make EGL context current");
+            throw android_exception("failed to make EGL context current");
         }
     }
 

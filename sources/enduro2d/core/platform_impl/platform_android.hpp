@@ -15,6 +15,23 @@
 namespace e2d
 {
     //
+    // android_exception
+    //
+
+    class android_exception final : public std::exception {
+    public:
+        explicit android_exception(const char* msg) noexcept
+        : msg_(msg) {}
+
+        const char* what() const noexcept {
+            return msg_;
+        }
+
+    private:
+        const char* const msg_;
+    };
+
+    //
     // e2d_native_lib
     //
 

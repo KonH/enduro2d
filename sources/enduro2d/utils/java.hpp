@@ -18,6 +18,23 @@
 
 namespace e2d
 {
+    
+    //
+    // java_exception
+    //
+
+    class java_exception final : public std::exception {
+    public:
+        explicit java_exception(const char* msg) noexcept
+        : msg_(msg) {}
+
+        const char* what() const noexcept {
+            return msg_;
+        }
+
+    private:
+        const char* const msg_;
+    };
 
     //
     // java_env
@@ -343,7 +360,7 @@ namespace e2d
         }
         jclass jc = je.env()->FindClass(class_name.data());
         if ( !jc ) {
-            throw std::runtime_error("java class is not found");
+            throw java_exception("java class is not found");
         }
         set_(je, jc);
     }
@@ -351,7 +368,7 @@ namespace e2d
     template < typename Ret, typename ...Args >
     void java_class::register_static_method(str_view name, Ret (JNICALL *fn)(JNIEnv*, jclass, Args...)) const {
         if ( !class_ ) {
-            throw std::runtime_error("invalid java class");
+            throw java_exception("invalid java class");
         }
         java_env je;
         detail::java_method_sig<Ret (Args...)> sig;
@@ -361,14 +378,14 @@ namespace e2d
             reinterpret_cast<void*>(fn)
         };
         if ( je.env()->RegisterNatives(class_, &info, 1) != 0 ) {
-            throw std::runtime_error("can't register native method");
+            throw java_exception("can't register native method");
         }
     }
 
     template < typename Ret, typename ...Args >
     void java_class::register_method(str_view name, Ret (JNICALL *fn)(JNIEnv*, jobject, Args...)) const {
         if ( !class_ ) {
-            throw std::runtime_error("invalid java class");
+            throw java_exception("invalid java class");
         }
         java_env je;
         detail::java_method_sig<Ret (Args...)> sig;
@@ -378,7 +395,7 @@ namespace e2d
             reinterpret_cast<void*>(fn)
         };
         if ( je.env()->RegisterNatives(class_, &info, 1) != 0 ) {
-            throw std::runtime_error("can't register native method");
+            throw java_exception("can't register native method");
         }
     }
 
@@ -637,7 +654,7 @@ namespace e2d
     template < typename FN >
     inline java_static_method<FN> java_class::static_method(str_view name) const {
         if ( !class_ ) {
-            throw std::runtime_error("invalid java class");
+            throw java_exception("invalid java class");
         }
         java_env je;
         detail::java_method_sig<FN> sig;
@@ -652,7 +669,7 @@ namespace e2d
     template < typename FN >
     inline java_method<FN> java_obj::method(str_view name) const {
         if ( !obj_ ) {
-            throw std::runtime_error("invalid java object");
+            throw java_exception("invalid java object");
         }
         java_env je;
         detail::java_method_sig<FN> sig;
@@ -662,17 +679,17 @@ namespace e2d
     template < typename ...Args >
     inline java_obj::java_obj(const java_class& jc, const Args&... args) {
         if ( !jc ) {
-            throw std::runtime_error("invalid java class");
+            throw java_exception("invalid java class");
         }
         java_env je;
         detail::java_method_sig<void (Args...)> sig;
         jmethodID ctor_id = je.env()->GetMethodID(jc.get(), "<init>", sig.signature().data());
         if ( !ctor_id ) {
-            throw std::runtime_error("constructor doesn't exists");
+            throw java_exception("constructor doesn't exists");
         }
         jobject jo = je.env()->NewObjectV(jc.get(), std::forward<Args>(args)...);
         if ( !jo ) {
-            throw std::runtime_error("failed to create java object");
+            throw java_exception("failed to create java object");
         }
         set_(je, jo);
     }

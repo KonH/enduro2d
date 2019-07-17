@@ -344,28 +344,27 @@ namespace
 
     output_stream_uptr asset_file_source::write(str_view path, bool append) const {
         E2D_UNUSED(path, append);
-        throw std::runtime_error("can't write to assets");
+        throw bad_stream_operation();
         return nullptr;
     }
 
     bool asset_file_source::trace(str_view path, filesystem::trace_func func) const {
-        /*if ( !func ) {
+        if ( !func ) {
             return false;
         }
-        str parent_path = "";
 
-        const auto for_each_file_in_dir = [this] () {
-            AAssetDir* dir = AAssetManager_openDir(asset_manager(), path.data());
-            for (;;) {
-                const char* asset_name = AAssetDir_getNextFileName(dir);
-                if ( !asset_name ) {
-                    break;
-                }
-                const str filename = path::combine(parent_path, asset_name);
-                func(filename, false);
+        AAssetDir* dir = AAssetManager_openDir(asset_manager(), path.data());
+        for (;;) {
+            const char* asset_name = AAssetDir_getNextFileName(dir);
+            if ( !asset_name ) {
+                break;
             }
-        };*/
-        return false;
+            const str filename = path::combine(path, asset_name);
+            if ( !func(filename, false) ) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
