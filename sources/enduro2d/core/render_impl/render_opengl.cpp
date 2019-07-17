@@ -495,7 +495,7 @@ namespace e2d
                     "precision highp float;\n"
                     "precision highp int;\n";
                 fs_header =
-                    "precision mediump float;\n" // TODO: test GL_FRAGMENT_PRECISION_HIGH macro in shader
+                    "precision mediump float;\n"
                     "precision highp int;\n";
                 break;
             /*case api_profile::opengles3 :

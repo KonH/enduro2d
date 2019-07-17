@@ -70,7 +70,6 @@ namespace e2d
         static void JNICALL destroy_platform(JNIEnv*, jclass) noexcept;
         static void JNICALL on_low_memory(JNIEnv*, jclass) noexcept;
         static void JNICALL on_trim_memory(JNIEnv*, jclass) noexcept;
-        static void JNICALL set_api_version(JNIEnv*, jclass, jint version) noexcept;
         static void JNICALL set_predef_path(JNIEnv*, jclass,
                                             jstring internal_appdata,
                                             jstring internal_cache,

@@ -8,13 +8,14 @@ android {
         minSdkVersion 24
         targetSdkVersion 28
         ndk {
-            abiFilters "x86", "armeabi-v7a"
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static',
                           '-DE2D_ANDROID_ASSETS_PATH=sources/android/app/src/main/assets',
-                          '-DE2D_ANDROID_JNILIBS_PATH=sources/android/app/src/main/jniLibs'
+                          '-DE2D_ANDROID_JNILIBS_PATH=sources/android/app/src/main/jniLibs',
+                          '-DE2D_ENABLE_BASS=OFF'
             }
         }
     }

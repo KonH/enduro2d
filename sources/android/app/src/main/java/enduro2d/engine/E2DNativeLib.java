@@ -44,7 +44,6 @@ public final class E2DNativeLib {
      public static native void onTrimMemory();
 
      // display, device ... info
-     public static native void setApiVersion(int version);
      public static native void setDisplayInfo(int w, int h, int ppi);
 
      // called from native code

@@ -69,7 +69,6 @@ extern "C" JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void*) {
         register_method("tick", &e2d_native_lib::tick);
         register_method("onKey", &e2d_native_lib::on_key);
         register_method("onTouch", &e2d_native_lib::on_touch);
-        register_method("setApiVersion", &e2d_native_lib::set_api_version);
         register_method("setDisplayInfo", &e2d_native_lib::set_display_info);
         register_method("setPredefPath", &e2d_native_lib::set_predef_path);
 
@@ -106,7 +105,6 @@ namespace e2d
         str external_cache_path;
         str external_storage_path;
     private:
-        int android_version_ = 0;
         std::thread::id thread_id_ = std::this_thread::get_id();
     };
 
@@ -118,11 +116,6 @@ namespace e2d
     bool e2d_native_lib::platform_interface::is_current_thread() const noexcept {
         return std::this_thread::get_id() == thread_id_;
     }
-    
-    /*void e2d_native_lib::platform_interface::set_android_version(int version) {
-        E2D_ASSERT(is_current_thread());
-        android_version_ = version;
-    }*/
 
     //
     // e2d_native_lib::internal_state
@@ -182,13 +175,6 @@ namespace e2d
     }
 
     void JNICALL e2d_native_lib::on_trim_memory(JNIEnv*, jclass) noexcept {
-    }
-
-    void JNICALL e2d_native_lib::set_api_version(JNIEnv* env, jclass, jint version) noexcept {
-        try {
-        } catch(const std::exception& e) {
-            check_exceptions_(env, e);
-        }
     }
     
     void JNICALL e2d_native_lib::set_predef_path(JNIEnv* env, jclass,

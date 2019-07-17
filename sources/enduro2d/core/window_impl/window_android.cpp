@@ -673,7 +673,6 @@ namespace e2d
     }
     
     void e2d_native_lib::renderer_interface::release() {
-        exit_loop_.store(true);
         thread_.join();
     }
 
@@ -692,8 +691,8 @@ namespace e2d
                 char arg[1] = {};
                 char* argv[] = {arg};
                 int res = e2d_main(std::size(argv), argv);
-                __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "e2d_main result %i\n", res);
-                exit_loop_.store(true); // temp ?
+                __android_log_print(ANDROID_LOG_ERROR, "enduro2d", "'e2d_main' returns %i\n", res);
+                e2d_native_lib::state().activity().close();
             }
         }
         
@@ -885,19 +884,15 @@ namespace e2d
     window::~window() noexcept = default;
 
     void window::hide() noexcept {
-        // TODO
     }
 
     void window::show() noexcept {
-        // TODO
     }
 
     void window::restore() noexcept {
-        // TODO
     }
 
     void window::minimize() noexcept {
-        // TODO
     }
 
     bool window::enabled() const noexcept {
@@ -919,30 +914,24 @@ namespace e2d
     }
 
     bool window::minimized() const noexcept {
-        // TODO
         return false;
     }
 
     bool window::fullscreen() const noexcept {
-        // TODO
         return true;
     }
 
     bool window::toggle_fullscreen(bool yesno) noexcept {
-        // TODO
-        return true;
+        return fullscreen() == yesno;
     }
 
     void window::hide_cursor() noexcept {
-        // TODO
     }
 
     void window::show_cursor() noexcept {
-        // TODO
     }
 
     bool window::is_cursor_hidden() const noexcept {
-        // TODO
         return true;
     }
 
@@ -967,7 +956,7 @@ namespace e2d
     const str& window::title() const noexcept {
         auto& wnd = state_->native_window();
         std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
-        return wnd.title; // TODO: this is not a thread safe code
+        return wnd.title;
     }
 
     void window::set_title(str_view title) {
@@ -984,10 +973,12 @@ namespace e2d
     }
 
     void window::set_should_close(bool yesno) noexcept {
-        e2d_native_lib::state().activity().close();
-        auto& wnd = state_->native_window();
-        std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
-        wnd.should_close = true;
+        if ( yesno ) {
+            e2d_native_lib::state().activity().close();
+            auto& wnd = state_->native_window();
+            std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
+            wnd.should_close = true;
+        }
     }
 
     void window::bind_context() noexcept {
@@ -1011,7 +1002,7 @@ namespace e2d
         auto& wnd = state_->native_window();
         std::lock_guard<std::recursive_mutex> guard(wnd.rmutex);
         wnd.listeners.push_back(std::move(listener));
-        return *wnd.listeners.back(); // TODO: this is not a thread safe code
+        return *wnd.listeners.back();
     }
 
     void window::unregister_event_listener(const event_listener& listener) noexcept {

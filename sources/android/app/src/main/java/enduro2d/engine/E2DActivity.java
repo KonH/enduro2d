@@ -67,7 +67,6 @@ public class E2DActivity
                 external_cache == null ? "" : external_cache.getAbsolutePath(),
                 external_storage == null ? "" : external_storage.getAbsolutePath());
         E2DNativeLib.createWindow(this);
-        sendVersionInfo();
         sendDisplayInfo();
 
         SurfaceHolder holder = opengl_view_.getHolder();
@@ -187,7 +186,7 @@ public class E2DActivity
         toast.show();
     }
 
-    @SuppressWarnings("unused") public void SetScreenOrientation(int value) {
+    @SuppressWarnings("unused") public void setScreenOrientation(int value) {
         setRequestedOrientation(value);
     }
 
@@ -204,10 +203,6 @@ public class E2DActivity
             Log.e(TAG, "exception: " + e.toString());
         }
         return false;
-    }
-
-    private void sendVersionInfo() {
-        E2DNativeLib.setApiVersion(android.os.Build.VERSION.SDK_INT);
     }
 
     private void sendDisplayInfo() {
