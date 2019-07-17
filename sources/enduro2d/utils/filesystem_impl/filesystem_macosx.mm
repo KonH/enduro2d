@@ -13,79 +13,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#import <Foundation/Foundation.h>
-
 namespace
 {
     using namespace e2d;
 
     const mode_t default_directory_mode = S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH;
-
-    bool extract_home_directory(str& dst) {
-        NSString* path = NSHomeDirectory();
-        if ( path ) {
-            dst.assign([path UTF8String]);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_appdata_directory(str& dst) {
-        NSArray<NSString*>* paths = NSSearchPathForDirectoriesInDomains(
-            NSApplicationSupportDirectory, NSUserDomainMask, YES);
-        if ( paths && paths.count > 0 ) {
-            dst.assign([[paths objectAtIndex:0] UTF8String]);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_desktop_directory(str& dst) {
-        NSArray<NSString*>* paths = NSSearchPathForDirectoriesInDomains(
-            NSDesktopDirectory, NSUserDomainMask, YES);
-        if ( paths && paths.count > 0 ) {
-            dst.assign([[paths objectAtIndex:0] UTF8String]);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_working_directory(str& dst) {
-        NSString* filename = [[NSFileManager defaultManager] currentDirectoryPath];
-        if ( filename ) {
-            dst.assign([filename UTF8String]);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_documents_directory(str& dst) {
-        NSArray<NSString*>* paths = NSSearchPathForDirectoriesInDomains(
-            NSDocumentDirectory, NSUserDomainMask, YES);
-        if ( paths && paths.count > 0 ) {
-            dst.assign([[paths objectAtIndex:0] UTF8String]);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_resources_directory(str& dst) {
-        NSString* filename = [[NSBundle mainBundle] resourcePath];
-        if ( filename ) {
-            dst.assign([filename UTF8String]);
-            return true;
-        }
-        return false;
-    }
-
-    bool extract_executable_path(str& dst) {
-        NSString* filename = [[NSBundle mainBundle] executablePath];
-        if ( filename ) {
-            dst.assign([filename UTF8String]);
-            return true;
-        }
-        return false;
-    }
 }
 
 namespace e2d::filesystem::impl
@@ -132,28 +64,6 @@ namespace e2d::filesystem::impl
             }
         }
         return true;
-    }
-
-    bool extract_predef_path(str& dst, predef_path path_type) {
-        switch ( path_type ) {
-            case predef_path::home:
-                return extract_home_directory(dst);
-            case predef_path::appdata:
-                return extract_appdata_directory(dst);
-            case predef_path::desktop:
-                return extract_desktop_directory(dst);
-            case predef_path::working:
-                return extract_working_directory(dst);
-            case predef_path::documents:
-                return extract_documents_directory(dst);
-            case predef_path::resources:
-                return extract_resources_directory(dst);
-            case predef_path::executable:
-                return extract_executable_path(dst);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected predef path");
-                return false;
-        }
     }
 }
 
