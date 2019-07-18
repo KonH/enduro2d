@@ -8,22 +8,33 @@ android {
         minSdkVersion 24
         targetSdkVersion 28
         ndk {
+            // TODO: for fast building keep only one target
             abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
         }
         externalNativeBuild {
             cmake {
                 arguments '-DANDROID_STL=c++_static',
                           '-DE2D_ANDROID_ASSETS_PATH=sources/android/app/src/main/assets',
-                          '-DE2D_ANDROID_JNILIBS_PATH=sources/android/app/src/main/jniLibs',
-                          '-DE2D_ENABLE_BASS=OFF'
+                          '-DE2D_ANDROID_JNILIBS_PATH=sources/android/app/src/main/jniLibs'
             }
+        }
+    }
+    signingConfigs {
+        // TODO: replace with you keystore
+        release {
+            storeFile file('../keystore/testbuild.jks')
+            storePassword 'enduro2d'
+            keyAlias = 'testbuild'
+            keyPassword 'enduro2d'
         }
     }
     buildTypes {
         release {
+            //debuggable true // to enable logcat
             minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android.txt'),
                           'proguard-rules.pro'
+            signingConfig signingConfigs.release
         }
     }
     externalNativeBuild {

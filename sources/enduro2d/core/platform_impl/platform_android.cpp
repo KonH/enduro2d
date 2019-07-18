@@ -12,6 +12,7 @@
 #include <enduro2d/core/vfs.hpp>
 #include <enduro2d/utils/java.hpp>
 #include <android/asset_manager_jni.h>
+#include <android/log.h>
 #include <unistd.h>
 
 namespace
