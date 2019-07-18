@@ -65,18 +65,21 @@ namespace e2d
             debug& debug,
             opengl::gl_texture_id id,
             const v2u& size,
-            const pixel_declaration& decl);
+            const pixel_declaration& decl,
+            bool has_all_mipmaps);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
         const opengl::gl_texture_id& id() const noexcept;
         const v2u& size() const noexcept;
         const pixel_declaration& decl() const noexcept;
+        bool has_all_mipmaps() const noexcept;
     private:
         debug& debug_;
         opengl::gl_texture_id id_;
         v2u size_;
         pixel_declaration decl_;
+        bool has_all_mipmaps_;
     };
 
     //

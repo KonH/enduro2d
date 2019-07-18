@@ -897,8 +897,9 @@ namespace e2d::opengl
         }
         #undef DEFINE_CASE
     }
-
-    GLint convert_sampler_filter(render::sampler_min_filter f) noexcept {
+    
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+    GLint convert_sampler_filter(render::sampler_min_filter f, bool) noexcept {
         #define DEFINE_CASE(x,y) case render::sampler_min_filter::x: return y;
         switch ( f ) {
             DEFINE_CASE(nearest, GL_NEAREST);
@@ -913,6 +914,39 @@ namespace e2d::opengl
         }
         #undef DEFINE_CASE
     }
+#elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
+    GLint convert_sampler_filter(render::sampler_min_filter f, bool has_mipmaps) noexcept {
+        #define DEFINE_CASE(x,y) case render::sampler_min_filter::x: return y;
+        if (has_mipmaps) {
+            switch ( f ) {
+                DEFINE_CASE(nearest, GL_NEAREST);
+                DEFINE_CASE(linear, GL_LINEAR);
+                DEFINE_CASE(nearest_mipmap_nearest, GL_NEAREST_MIPMAP_NEAREST);
+                DEFINE_CASE(linear_mipmap_nearest, GL_LINEAR_MIPMAP_NEAREST);
+                DEFINE_CASE(nearest_mipmap_linear, GL_NEAREST_MIPMAP_LINEAR);
+                DEFINE_CASE(linear_mipmap_linear, GL_LINEAR_MIPMAP_LINEAR);
+                default:
+                    E2D_ASSERT_MSG(false, "unexpected sampler min filter");
+                    return 0;
+            }
+        } else {
+            switch ( f ) {
+                DEFINE_CASE(nearest, GL_NEAREST);
+                DEFINE_CASE(linear, GL_LINEAR);
+                DEFINE_CASE(nearest_mipmap_nearest, GL_NEAREST);
+                DEFINE_CASE(linear_mipmap_nearest, GL_LINEAR);
+                DEFINE_CASE(nearest_mipmap_linear, GL_NEAREST);
+                DEFINE_CASE(linear_mipmap_linear, GL_LINEAR);
+                default:
+                    E2D_ASSERT_MSG(false, "unexpected sampler min filter");
+                    return 0;
+            }
+        }
+        #undef DEFINE_CASE
+    }
+#else
+#   error unknown render mode
+#endif
 
     GLint convert_sampler_filter(render::sampler_mag_filter f) noexcept {
         #define DEFINE_CASE(x,y) case render::sampler_mag_filter::x: return y;

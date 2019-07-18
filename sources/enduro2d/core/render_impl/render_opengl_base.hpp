@@ -270,7 +270,7 @@ namespace e2d::opengl
     GLint convert_attribute_type(attribute_type at) noexcept;
 
     GLint convert_sampler_wrap(render::sampler_wrap w) noexcept;
-    GLint convert_sampler_filter(render::sampler_min_filter f) noexcept;
+    GLint convert_sampler_filter(render::sampler_min_filter f, bool m) noexcept;
     GLint convert_sampler_filter(render::sampler_mag_filter f) noexcept;
 
     GLenum convert_buffer_usage(index_buffer::usage u) noexcept;

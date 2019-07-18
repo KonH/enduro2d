@@ -59,11 +59,13 @@ namespace e2d
         debug& debug,
         gl_texture_id id,
         const v2u& size,
-        const pixel_declaration& decl)
+        const pixel_declaration& decl,
+        bool has_all_mipmaps)
     : debug_(debug)
     , id_(std::move(id))
     , size_(size)
-    , decl_(decl){
+    , decl_(decl)
+    , has_all_mipmaps_(has_all_mipmaps){
         E2D_ASSERT(!id_.empty());
     }
 
@@ -81,6 +83,10 @@ namespace e2d
 
     const pixel_declaration& texture::internal_state::decl() const noexcept {
         return decl_;
+    }
+      
+    bool texture::internal_state::has_all_mipmaps() const noexcept {
+        return has_all_mipmaps_;
     }
 
     //

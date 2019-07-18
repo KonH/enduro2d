@@ -126,12 +126,13 @@ namespace
                     ui.location, math::numeric_cast<GLint>(unit)));
                 if ( sampler.texture() ) {
                     const gl_texture_id& texture_id = sampler.texture()->state().id();
+                    const bool mipmaps = sampler.texture()->state().has_all_mipmaps();
                     GL_CHECK_CODE(debug, glBindTexture(
                         texture_id.target(), *texture_id));
                     GL_CHECK_CODE(debug, glTexParameteri(
                         texture_id.target(),
                         GL_TEXTURE_MIN_FILTER,
-                        convert_sampler_filter(sampler.min_filter())));
+                        convert_sampler_filter(sampler.min_filter(), mipmaps)));
                     GL_CHECK_CODE(debug, glTexParameteri(
                         texture_id.target(),
                         GL_TEXTURE_MAG_FILTER,
@@ -629,7 +630,7 @@ namespace e2d
 
         return std::make_shared<texture>(
             std::make_unique<texture::internal_state>(
-                state_->dbg(), std::move(id), image.size(), decl));
+                state_->dbg(), std::move(id), image.size(), decl, false));
     }
 
     texture_ptr render::create_texture(
