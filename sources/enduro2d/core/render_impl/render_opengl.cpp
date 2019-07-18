@@ -729,7 +729,7 @@ namespace e2d
 
         return std::make_shared<texture>(
             std::make_unique<texture::internal_state>(
-                state_->dbg(), std::move(id), size, decl));
+                state_->dbg(), std::move(id), size, decl, false));
     }
 
     index_buffer_ptr render::create_index_buffer(
