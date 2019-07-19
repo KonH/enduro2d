@@ -45,7 +45,7 @@ android {
     }
     sourceSets {
         main {
-            java.srcDirs = ['src/main/java', '../engine']
+            java.srcDirs = ['src/main/java', '../../enduro2d/core/platform_impl']
         }
     }
 }
