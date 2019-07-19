@@ -4,13 +4,13 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-package enduro2d.engine;
+package enduro2d.engine.test;
 
 import android.app.Application;
 import android.content.Context;
 import android.content.Intent;
 
-public final class E2DApplication
+public final class E2DTestApplication
     extends Application
 {
     public final static String NATIVE_LIB = "NativeLib";
@@ -37,12 +37,12 @@ public final class E2DApplication
 
     public static void onDestroyActivity(Context ctx) {
         if ( native_app_index_ < native_app_list_.length ) {
-            ((E2DApplication) ctx).startApp(native_app_list_[native_app_index_++]);
+            ((E2DTestApplication) ctx).startApp(native_app_list_[native_app_index_++]);
         }
     }
 
     private void startApp(String libname) {
-        Intent intent = new Intent(this, E2DActivity.class);
+        Intent intent = new Intent(this, E2DTestActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         intent.putExtra(NATIVE_LIB, libname);
         startActivity(intent);

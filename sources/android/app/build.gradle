@@ -4,7 +4,7 @@ android {
     compileSdkVersion 28
 
     defaultConfig {
-        applicationId 'enduro2d.engine'
+        applicationId 'enduro2d.engine.test'
         minSdkVersion 24
         targetSdkVersion 28
         ndk {
@@ -41,6 +41,11 @@ android {
         cmake {
             version '3.10.2'
             path '../../../CMakeLists.txt'
+        }
+    }
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java', '../engine']
         }
     }
 }

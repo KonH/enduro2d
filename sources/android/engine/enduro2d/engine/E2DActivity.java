@@ -35,22 +35,9 @@ public class E2DActivity
                     View.OnKeyListener,
                     View.OnTouchListener
 {
-    private	static final String TAG = "Enduro2D";
+    protected static final String TAG = "Enduro2D";
 
-    @Override protected void onCreate(Bundle icicle) {
-        super.onCreate(icicle);
-
-        try {
-            Intent params = getIntent();
-            String libname = params.getStringExtra(E2DApplication.NATIVE_LIB);
-            Log.i(TAG, "onCreate: " + libname);
-            System.loadLibrary(libname);
-        } catch (Throwable e) {
-            Log.e(TAG, "failed to initialize native application");
-            finish();
-            return;
-        }
-
+    protected final void create() {
         opengl_view_ = new SurfaceView(this);
         setContentView(opengl_view_);
 
@@ -79,38 +66,36 @@ public class E2DActivity
         opengl_view_.setOnTouchListener(this);
     }
 
+    protected final boolean isCreated() {
+        return opengl_view_ != null;
+    }
+
     @Override protected void onDestroy() {
         super.onDestroy();
-        Log.i(TAG, "onDestroy");
         if ( opengl_view_ != null ) {
             E2DNativeLib.destroyWindow();
             E2DNativeLib.destroyPlatform();
-            E2DApplication.onDestroyActivity(getApplicationContext());
         }
     }
 
     @Override protected void onPause() {
         super.onPause();
-        Log.i(TAG, "onPause");
         E2DNativeLib.pause();
     }
 
     @Override protected void onResume() {
         super.onResume();
-        Log.i(TAG, "onResume");
         E2DNativeLib.resume();
     }
 
     @Override protected void onStart() {
         super.onStart();
-        Log.i(TAG, "onStart");
         E2DNativeLib.start();
         native_tick_.run();
     }
 
     @Override protected void onStop() {
         super.onStop();
-        Log.i(TAG, "onStop");
         E2DNativeLib.stop();
         native_tick_.run();
         handler_.removeCallbacks(native_tick_);
@@ -214,7 +199,7 @@ public class E2DActivity
         E2DNativeLib.setDisplayInfo(metrics.widthPixels, metrics.heightPixels, metrics.densityDpi);
     }
 
-    private Runnable native_tick_ = new Runnable() {
+    private final Runnable native_tick_ = new Runnable() {
         @Override
         public void run() {
             try {
