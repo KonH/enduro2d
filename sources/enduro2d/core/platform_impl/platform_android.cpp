@@ -95,27 +95,32 @@ namespace e2d
     public:
         platform_interface(java_obj&& context, java_obj&& asset_mngr, AAssetManager* jni_asset_mngr);
         [[nodiscard]] bool is_current_thread() const noexcept;
+        [[nodiscard]] AAssetManager* asset_manager() const noexcept;
     public:
-        java_obj context;
-        java_obj asset_mngr;
-        AAssetManager* jni_asset_mngr = nullptr;
-
+        std::mutex path_mutex;
         str internal_appdata_path;
         str internal_cache_path;
         str external_appdata_path;
         str external_cache_path;
         str external_storage_path;
     private:
+        java_obj context_;
+        java_obj asset_mngr_;
+        AAssetManager* jni_asset_mngr_ = nullptr;
         std::thread::id thread_id_ = std::this_thread::get_id();
     };
 
     e2d_native_lib::platform_interface::platform_interface(java_obj&& context, java_obj&& asset_mngr, AAssetManager* jni_asset_mngr)
-    : context(std::move(context))
-    , asset_mngr(std::move(asset_mngr))
-    , jni_asset_mngr(jni_asset_mngr) {}
+    : context_(std::move(context))
+    , asset_mngr_(std::move(asset_mngr))
+    , jni_asset_mngr_(jni_asset_mngr) {}
 
     bool e2d_native_lib::platform_interface::is_current_thread() const noexcept {
         return std::this_thread::get_id() == thread_id_;
+    }
+    
+    AAssetManager* e2d_native_lib::platform_interface::asset_manager() const noexcept {
+        return jni_asset_mngr_;
     }
 
     //
@@ -186,6 +191,8 @@ namespace e2d
                                                  jstring external_storage) noexcept {
         try {
             auto& inst = state().platform();
+            std::unique_lock<std::mutex> guard(inst.path_mutex);
+
             inst.internal_appdata_path = java_string(internal_appdata);
             inst.internal_cache_path = java_string(internal_cache);
             inst.external_appdata_path = java_string(external_appdata);
@@ -222,7 +229,9 @@ namespace e2d
     : internal_state(argc, argv) {}
         
     void platform_internal_state_android::register_scheme_aliases(vfs& the_vfs) {
-        auto& inst = e2d_native_lib::state().platform();  
+        auto& inst = e2d_native_lib::state().platform();
+        std::unique_lock<std::mutex> guard(inst.path_mutex);
+
         the_vfs.register_scheme<asset_file_source>("assets");
         the_vfs.register_scheme_alias("resources", url{"assets", ""});
 
@@ -304,7 +313,7 @@ namespace
     //
     
     AAssetManager* asset_file_source::asset_manager() noexcept {
-        return e2d_native_lib::state().platform().jni_asset_mngr;
+        return e2d_native_lib::state().platform().asset_manager();
     }
 
     bool asset_file_source::valid() const noexcept {
