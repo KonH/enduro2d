@@ -302,12 +302,12 @@ namespace
         return props;
     }
     
-    void grab_framebuffer_content(
+    image grab_framebuffer_content(
         debug& debug,
         const opengl::gl_framebuffer_id& fb,
-        const b2u& region,
-        image& result)
+        const b2u& region)
     {
+        image result;
         with_gl_bind_framebuffer(debug, fb,
             [&debug, &region, &result]() {
                 GLint format = GL_RGBA;
@@ -354,13 +354,13 @@ namespace
                     pixels.data()));
                 result = image(region.size, img_format, std::move(pixels));
             });
+        return result;
     }
 
-    void grab_compressed_texture(
+    image grab_compressed_texture(
         render& render,
         const texture_ptr& tex,
-        const b2u& region,
-        image& result)
+        const b2u& region)
     {
         const char vs_source[] = R"glsl(
             #version 120
@@ -455,7 +455,8 @@ namespace
         render.execute(render::target_command(rt));
         render.execute(render::viewport_command(b2u(tex->size())));
         render.execute(render::draw_command(material, geometry));
-        render.grab_render_target(rt, region, result);
+        
+        return render.grab_render_target(rt, region);
     }
     
 }
@@ -1243,10 +1244,7 @@ namespace e2d
         return *this;
     }
 
-    render& render::grab_texture(
-        const texture_ptr& tex,
-        const b2u& region,
-        image& result)
+    image render::grab_texture(const texture_ptr& tex, const b2u& region)
     {
         E2D_ASSERT(tex);
         E2D_ASSERT(tex->decl().is_color());
@@ -1255,8 +1253,7 @@ namespace e2d
         E2D_ASSERT(region.position.y + region.size.y <= tex->size().y);
 
         if ( tex->decl().is_compressed() ) {
-            grab_compressed_texture(*this, tex, region, result);
-            return *this;
+            return grab_compressed_texture(*this, tex, region);
         }
 
         gl_framebuffer_id id = gl_framebuffer_id::create(state_->dbg(), GL_FRAMEBUFFER);
@@ -1268,44 +1265,33 @@ namespace e2d
         if ( !gl_check_framebuffer(state_->dbg(), id, &fb_status) ) {
             throw bad_render_operation();
         }
-        grab_framebuffer_content(
+        return grab_framebuffer_content(
             state_->dbg(),
             id,
-            region,
-            result);
-        return *this;
+            region);
     }
         
-    render& render::grab_render_target(
-        const render_target_ptr& rt,
-        const b2u& region,
-        image& result)
+    image render::grab_render_target(const render_target_ptr& rt, const b2u& region)
     {
         E2D_ASSERT(rt);
         E2D_ASSERT(region.size.x > 0 && region.size.y > 0);
         E2D_ASSERT(region.position.x + region.size.x <= rt->size().x);
         E2D_ASSERT(region.position.y + region.size.y <= rt->size().y);
-        grab_framebuffer_content(
+        return grab_framebuffer_content(
             state_->dbg(),
             rt->state().id(),
-            region,
-            result);
-        return *this;
+            region);
     }
 
-    render& render::grab_screen(
-        const b2u& region,
-        image& result)
+    image render::grab_screen(const b2u& region)
     {
         E2D_ASSERT(region.size.x > 0 && region.size.y > 0);
         E2D_ASSERT(region.position.x + region.size.x <= state_->wnd().real_size().x);
         E2D_ASSERT(region.position.y + region.size.y <= state_->wnd().real_size().y);
-        grab_framebuffer_content(
+        return grab_framebuffer_content(
             state_->dbg(),
             state_->default_fb(),
-            region,
-            result);
-        return *this;
+            region);
     }
 
     const render::device_caps& render::device_capabilities() const noexcept {

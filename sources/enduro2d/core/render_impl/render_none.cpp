@@ -287,33 +287,22 @@ namespace e2d
         return *this;
     }
     
-    render& render::grab_texture(
-        const texture_ptr& tex,
-        const b2u& region,
-        image& result)
+    image render::grab_texture(const texture_ptr& tex, const b2u& region)
     {
         E2D_UNUSED(tex, region);
-        result.clear();
-        return *this;
+        return image();
     }
         
-    render& render::grab_render_target(
-        const render_target_ptr& rt,
-        const b2u& region,
-        image& result)
+    image render::grab_render_target(const render_target_ptr& rt, const b2u& region)
     {
         E2D_UNUSED(rt, region);
-        result.clear();
-        return *this;
+        return image();
     }
 
-    render& render::grab_screen(
-        const b2u& region,
-        image& result)
+    image render::grab_screen(const b2u& region)
     {
         E2D_UNUSED(tex);
-        result.clear();
-        return *this;
+        return image();
     }
 
     const render::device_caps& render::device_capabilities() const noexcept {

@@ -200,7 +200,7 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, b2u(0, 0, 128, 128)));
 
                 image dst;
-                r.grab_texture(tex, b2u(0, 0, 128, 128), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(0, 0, 128, 128)));
                 REQUIRE(dst.format() == image_data_format::rgba8);
                 REQUIRE(src == dst.data());
             }
@@ -216,7 +216,8 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, b2u(0, 0, 128, 128)));
 
                 image dst;
-                r.grab_texture(tex, b2u(0, 0, 128, 128), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(0, 0, 128, 128)));
+
                 if ( dst.format() == image_data_format::g8 ) {
                     REQUIRE(src == dst.data());
                 } else {
@@ -242,7 +243,8 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, b2u(0, 0, 128, 128)));
 
                 image dst;
-                r.grab_texture(tex, b2u(0, 0, 128, 128), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(0, 0, 128, 128)));
+
                 if ( dst.format() == image_data_format::rgb8 ) {
                     REQUIRE(src == dst.data());
                 } else {
@@ -270,7 +272,7 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, b2u(0, 0, 57, 31)));
 
                 image dst;
-                r.grab_texture(tex, b2u(0, 0, 57, 31), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(0, 0, 57, 31)));
                 REQUIRE(dst.format() == image_data_format::rgba8);
                 REQUIRE(src == dst.data());
             }
@@ -286,7 +288,7 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, b2u(22, 17, 31, 44)));
 
                 image dst;
-                r.grab_texture(tex, b2u(0, 0, 128, 128), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(0, 0, 128, 128)));
                 REQUIRE(dst.format() == image_data_format::rgba8);
 
                 const size_t data_size = ((tex->size().x * tex->decl().bits_per_pixel()) / 8u) * tex->size().y;
@@ -334,7 +336,7 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, v2u(0,0)));
             
                 image dst;
-                r.grab_texture(tex, b2u(src.size()), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(src.size())));
                 REQUIRE(dst.format() == image_data_format::rgba8);
                 REQUIRE(src.size() == dst.size());
 
@@ -359,7 +361,7 @@ TEST_CASE("render"){
                 REQUIRE_NOTHROW(r.update_texture(tex, src, v2u(0,0)));
             
                 image dst;
-                r.grab_texture(tex, b2u(src.size()), dst);
+                REQUIRE_NOTHROW(dst = r.grab_texture(tex, b2u(src.size())));
                 REQUIRE(dst.format() == image_data_format::rgba8);
                 REQUIRE(src.size() == dst.size());
 

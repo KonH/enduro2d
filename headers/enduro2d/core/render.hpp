@@ -962,21 +962,9 @@ namespace e2d
             const b2u& region);
 
         // very slow
-        render& grab_texture(
-            const texture_ptr& tex,
-            const b2u& region,
-            image& result);
-        
-        // very slow
-        render& grab_render_target(
-            const render_target_ptr& rt,
-            const b2u& region,
-            image& result);
-
-        // very slow
-        render& grab_screen(
-            const b2u& region,
-            image& result);
+        image grab_texture(const texture_ptr& tex, const b2u& region);
+        image grab_render_target(const render_target_ptr& rt, const b2u& region);
+        image grab_screen(const b2u& region);
 
         const device_caps& device_capabilities() const noexcept;
         bool is_pixel_supported(const pixel_declaration& decl) const noexcept;
