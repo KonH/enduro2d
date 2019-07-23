@@ -388,6 +388,7 @@ namespace
         const v2f vertices[] = {
             v2f(-1.0f, 1.0f), v2f(-1.0f, -1.0f), v2f(1.0f, 1.0f), v2f(1.0f, -1.0f)
         };
+        const u16 indices[] = {0, 1, 2, 3};
 
         shader_ptr shader = render.create_shader(vs_source, fs_source);
         if ( !shader ) {
@@ -401,9 +402,18 @@ namespace
         if ( !vbuffer ) {
             throw bad_render_operation();
         }
+
+        index_buffer_ptr ibuffer = render.create_index_buffer(
+            buffer_view(indices),
+            index_declaration::index_type::unsigned_short,
+            index_buffer::usage::static_draw);
+        if ( !ibuffer ) {
+            throw bad_render_operation();
+        }
         
         render::geometry geometry;
         geometry.add_vertices(vbuffer);
+        geometry.indices(ibuffer);
         geometry.topo(render::topology::triangles_strip);
         
         render::material material;
@@ -435,15 +445,15 @@ namespace
             }
             #undef DEFINE_CASE
         };
-
+        
         render_target_ptr rt = render.create_render_target(
             tex->size(),
             convert_to_noncompressed(tex->decl()),
             pixel_declaration::pixel_type::depth16,
             render_target::external_texture::color);
 
-        render.execute(render::viewport_command(b2u(tex->size())));
         render.execute(render::target_command(rt));
+        render.execute(render::viewport_command(b2u(tex->size())));
         render.execute(render::draw_command(material, geometry));
         render.grab_render_target(rt, region, result);
     }
