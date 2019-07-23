@@ -175,6 +175,7 @@ namespace e2d
         window& wnd() const noexcept;
         const device_caps& device_capabilities() const noexcept;
         const render_target_ptr& render_target() const noexcept;
+        const opengl::gl_framebuffer_id& default_fb() const noexcept;
     public:
         internal_state& reset_states() noexcept;
         internal_state& set_states(const state_block& sb) noexcept;

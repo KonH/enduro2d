@@ -238,6 +238,10 @@ namespace e2d
         return render_target_;
     }
     
+    const opengl::gl_framebuffer_id& render::internal_state::default_fb() const noexcept {
+        return default_fb_;
+    }
+    
     render::internal_state& render::internal_state::reset_states() noexcept {
         set_depth_state_(state_block_.depth());
         set_stencil_state_(state_block_.stencil());
