@@ -14,8 +14,7 @@ namespace
         safe_engine_initializer() {
             modules::initialize<engine>(0, nullptr,
                     engine::parameters("renderer_untests", "enduro2d")
-                        .without_audio(true)
-                        .without_graphics(false));
+                        .without_audio(true));
         }
 
         ~safe_engine_initializer() noexcept {
