@@ -89,17 +89,27 @@ namespace e2d
         return transform_.scale;
     }
 
-    const m4f& node::local_matrix() const noexcept {
+    const m4f& node::local_matrix() noexcept {
         if ( math::check_and_clear_any_flags(flags_, fm_dirty_local_matrix) ) {
             update_local_matrix_();
         }
         return local_matrix_;
     }
+    
+    const m4f& node::local_matrix() const noexcept {
+        E2D_ASSERT(!math::check_any_flags(flags_, fm_dirty_local_matrix));
+        return local_matrix_;
+    }
 
-    const m4f& node::world_matrix() const noexcept {
+    const m4f& node::world_matrix() noexcept {
         if ( math::check_and_clear_any_flags(flags_, fm_dirty_world_matrix) ) {
             update_world_matrix_();
         }
+        return world_matrix_;
+    }
+    
+    const m4f& node::world_matrix() const noexcept {
+        E2D_ASSERT(!math::check_any_flags(flags_, fm_dirty_world_matrix));
         return world_matrix_;
     }
 
@@ -405,11 +415,11 @@ namespace e2d
         }
     }
 
-    void node::update_local_matrix_() const noexcept {
+    void node::update_local_matrix_() noexcept {
         local_matrix_ = math::make_trs_matrix4(transform_);
     }
 
-    void node::update_world_matrix_() const noexcept {
+    void node::update_world_matrix_() noexcept {
         world_matrix_ = parent_
             ? local_matrix() * parent_->world_matrix()
             : local_matrix();

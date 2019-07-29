@@ -4,7 +4,7 @@
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
  ******************************************************************************/
 
-#include <enduro2d/high/systems/spine_system.hpp>
+#include <enduro2d/high/systems/spine_player_system.hpp>
 
 #include <enduro2d/high/components/spine_player.hpp>
 #include <enduro2d/high/components/spine_renderer.hpp>
@@ -14,12 +14,12 @@
 
 namespace e2d
 {
-    spine_system::spine_system()
+    spine_player_system::spine_player_system()
     {}
 
-    spine_system::~spine_system() noexcept = default;
+    spine_player_system::~spine_player_system() noexcept = default;
 
-    void spine_system::process(ecs::registry& owner) {
+    void spine_player_system::process(ecs::registry& owner) {
         float dt = the<engine>().delta_time();
         owner.for_joined_components<spine_player, spine_renderer>([dt](
             const ecs::const_entity&,

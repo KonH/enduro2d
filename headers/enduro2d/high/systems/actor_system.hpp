@@ -10,13 +10,10 @@
 
 namespace e2d
 {
-    class render_system final : public ecs::system {
+    class actor_system final : public ecs::system {
     public:
-        render_system();
-        ~render_system() noexcept final;
+        actor_system();
+        ~actor_system() noexcept final;
         void process(ecs::registry& owner) override;
-    private:
-        class internal_state;
-        std::unique_ptr<internal_state> state_;
     };
 }

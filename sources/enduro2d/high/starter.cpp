@@ -21,8 +21,12 @@
 #include <enduro2d/high/components/spine_player.hpp>
 #include <enduro2d/high/components/spine_renderer.hpp>
 
+#include <enduro2d/high/systems/actor_system.hpp>
 #include <enduro2d/high/systems/flipbook_system.hpp>
-#include <enduro2d/high/systems/render_system.hpp>
+#include <enduro2d/high/systems/model_render_system.hpp>
+#include <enduro2d/high/systems/sprite_render_system.hpp>
+#include <enduro2d/high/systems/spine_player_system.hpp>
+#include <enduro2d/high/systems/spine_render_system.hpp>
 
 namespace
 {
@@ -42,8 +46,12 @@ namespace
 
         bool initialize() final {
             ecs::registry_filler(the<world>().registry())
+                .system<actor_system>(world::priority_update)
+                .system<spine_player_system>(world::priority_update)
                 .system<flipbook_system>(world::priority_update)
-                .system<render_system>(world::priority_render);
+                .system<model_render_system>(world::priority_render)
+                .system<sprite_render_system>(world::priority_render)
+                .system<spine_render_system>(world::priority_render);
             return !application_ || application_->initialize();
         }
 

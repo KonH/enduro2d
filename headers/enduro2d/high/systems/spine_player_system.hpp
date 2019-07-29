@@ -10,10 +10,10 @@
 
 namespace e2d
 {
-    class spine_system final : public ecs::system {
+    class spine_player_system final : public ecs::system {
     public:
-        spine_system();
-        ~spine_system() noexcept final;
+        spine_player_system();
+        ~spine_player_system() noexcept final;
         void process(ecs::registry& owner) override;
     };
 }
