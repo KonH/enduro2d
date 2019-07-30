@@ -26,7 +26,15 @@ namespace e2d
                 priority_pre_render = 3000,
                 priority_render = 3500,
                 priority_post_render = 4000,
-            priority_render_section_end = 4500
+            priority_render_section_end = 4500,
+
+            priority_update_scheduler_section_begin = 1000'000,
+                priority_update_scheduler = 1001'000,
+            priority_update_scheduler_section_end = 1002'000,
+
+            priority_render_scheduler_section_begin = 1003'000,
+                priority_render_scheduler = 1004'000,
+            priority_render_scheduler_section_end = 1005'000,
         };
     public:
         world() = default;

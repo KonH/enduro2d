@@ -62,17 +62,24 @@ namespace
         }
 
         bool frame_tick() final {
-            the<world>().registry().process_systems_in_range(
-                world::priority_update_section_begin,
-                world::priority_update_section_end);
+            auto& registry = the<world>().registry();
+
+            registry.process_systems_in_range(
+                ecs::entity_id(0),
+                world::priority_update_scheduler_section_begin,
+                world::priority_update_scheduler_section_end);
+
             return !the<window>().should_close()
                 || (application_ && !application_->on_should_close());
         }
 
         void frame_render() final {
-            the<world>().registry().process_systems_in_range(
-                world::priority_render_section_begin,
-                world::priority_render_section_end);
+            auto& registry = the<world>().registry();
+
+            registry.process_systems_in_range(
+                ecs::entity_id(0),
+                world::priority_render_scheduler_section_begin,
+                world::priority_render_scheduler_section_end);
         }
     private:
         starter::application_uptr application_;

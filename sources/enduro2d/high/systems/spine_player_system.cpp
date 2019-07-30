@@ -14,12 +14,11 @@
 
 namespace e2d
 {
-    spine_player_system::spine_player_system()
-    {}
+    spine_player_system::spine_player_system() = default;
 
     spine_player_system::~spine_player_system() noexcept = default;
 
-    void spine_player_system::process(ecs::registry& owner) {
+    void spine_player_system::process(ecs::registry& owner, ecs::entity_id) {
         float dt = the<engine>().delta_time();
         owner.for_joined_components<spine_player, spine_renderer>([dt](
             const ecs::const_entity&,

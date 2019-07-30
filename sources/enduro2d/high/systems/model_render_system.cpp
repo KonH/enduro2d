@@ -100,12 +100,6 @@ namespace
             .property(matrix_vp_property_hash, m_v * m_p)
             .property(game_time_property_hash, the<engine>().time());
 
-        the_render.execute(render::command_block<3>()
-            .add_command(render::target_command(cam.target()))
-            .add_command(render::viewport_command(cam.viewport()))
-            .add_command(render::clear_command()
-                .color_value(cam.background())));
-
         owner.for_joined_components<model_renderer, renderer, actor>([&the_render, &property_cache](
             const ecs::const_entity&,
             const model_renderer& mdl_r,
@@ -115,29 +109,6 @@ namespace
             draw_mesh(the_render, mdl_r, node_r, actor, property_cache);
         });
     }
-
-    void for_all_cameras(ecs::registry& owner) {
-        static vector<std::pair<ecs::const_entity,camera>> temp_components;
-        try {
-            temp_components.reserve(owner.component_count<camera>());
-            owner.for_each_component<camera>([](const ecs::const_entity& e, const camera& cam){
-                temp_components.emplace_back(e, cam);
-            });
-            std::sort(
-                temp_components.begin(),
-                temp_components.end(),
-                [](const auto& l, const auto& r){
-                    return l.second.depth() < r.second.depth();
-                });
-            for ( auto& p : temp_components ) {
-                for_all_components(owner, p.first, p.second);
-            }
-        } catch (...) {
-            temp_components.clear();
-            throw;
-        }
-        temp_components.clear();
-    }
 }
 
 namespace e2d
@@ -146,7 +117,13 @@ namespace e2d
 
     model_render_system::~model_render_system() noexcept = default;
 
-    void model_render_system::process(ecs::registry& owner) {
-        for_all_cameras(owner);
+    void model_render_system::process(ecs::registry& owner, ecs::entity_id cam_e_id) {
+        ecs::const_entity cam_e(owner, cam_e_id);
+        if ( cam_e.valid() ) {
+            const camera* cam = owner.find_component<camera>(cam_e);
+            if ( cam ) {
+                for_all_components(owner, cam_e, *cam);
+            }
+        }
     }
 }

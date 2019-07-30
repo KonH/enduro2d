@@ -11,20 +11,19 @@
 
 namespace e2d
 {
-    actor_system::actor_system()
-    {}
+    actor_system::actor_system() = default;
 
     actor_system::~actor_system() noexcept = default;
 
-    void actor_system::process(ecs::registry& owner) {
+    void actor_system::process(ecs::registry& owner, ecs::entity_id) {
         owner.for_each_component<actor>([](
             const ecs::const_entity&,
             actor& actor)
         {
             node_iptr node = actor.node();
 
-            // just update transformation
-            (void)(node->world_matrix());
+            node->update_local_matrix();
+            node->update_world_matrix();
         });
     }
 }

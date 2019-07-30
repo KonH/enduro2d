@@ -99,7 +99,7 @@ namespace e2d
     : state_(new internal_state()) {}
     flipbook_system::~flipbook_system() noexcept = default;
 
-    void flipbook_system::process(ecs::registry& owner) {
+    void flipbook_system::process(ecs::registry& owner, ecs::entity_id) {
         state_->process(owner);
     }
 }

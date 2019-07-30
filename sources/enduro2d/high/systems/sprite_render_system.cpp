@@ -16,15 +16,40 @@
 
 #include <enduro2d/high/node.hpp>
 
-#include "render_system_impl/render_system_base.hpp"
 #include "render_system_impl/render_system_batcher.hpp"
+
+namespace
+{
+    using namespace e2d;
+
+    struct index_u16 {
+        using type = u16;
+        static index_declaration decl() noexcept {
+            return index_declaration::index_type::unsigned_short;
+        }
+    };
+
+    struct vertex_v3f_t2f_c32b {
+        struct type {
+            v3f v;
+            v2f t;
+            color32 c;
+        };
+        static vertex_declaration decl() noexcept {
+            return vertex_declaration()
+                .add_attribute<v3f>("a_vertex")
+                .add_attribute<v2f>("a_st")
+                .add_attribute<color32>("a_tint").normalized();
+        }
+    };
+
+    using batcher_type = render_system_impl::batcher<
+        index_u16,
+        vertex_v3f_t2f_c32b>;
+}
 
 namespace e2d
 {
-    using batcher_type = render_system_impl::batcher<
-        render_system_impl::index_u16,
-        render_system_impl::vertex_v3f_t2f_c32b>;
-
     class sprite_render_system::internal_state {
     public:
         internal_state()
@@ -40,8 +65,6 @@ namespace e2d
 
 namespace
 {
-    using namespace e2d;
-    
     const str_hash matrix_v_property_hash = "u_matrix_v";
     const str_hash matrix_p_property_hash = "u_matrix_p";
     const str_hash matrix_vp_property_hash = "u_matrix_vp";
@@ -157,10 +180,6 @@ namespace
             .property(matrix_vp_property_hash, m_v * m_p)
             .property(game_time_property_hash, the<engine>().time());
 
-        the<render>().execute(render::command_block<3>()
-            .add_command(render::target_command(cam.target()))
-            .add_command(render::viewport_command(cam.viewport())));
-
         owner.for_joined_components<sprite_renderer, renderer, actor>([&batcher, &property_cache](
             const ecs::const_entity&,
             const sprite_renderer& spr_r,
@@ -169,32 +188,6 @@ namespace
         {
             draw_sprite(batcher, spr_r, node_r, actor, property_cache);
         });
-    }
-
-    void for_all_cameras(
-        batcher_type& batcher,
-        ecs::registry& owner)
-    {
-        static vector<std::pair<ecs::const_entity,camera>> temp_components;
-        try {
-            temp_components.reserve(owner.component_count<camera>());
-            owner.for_each_component<camera>([](const ecs::const_entity& e, const camera& cam){
-                temp_components.emplace_back(e, cam);
-            });
-            std::sort(
-                temp_components.begin(),
-                temp_components.end(),
-                [](const auto& l, const auto& r){
-                    return l.second.depth() < r.second.depth();
-                });
-            for ( auto& p : temp_components ) {
-                for_all_components(batcher, owner, p.first, p.second);
-            }
-        } catch (...) {
-            temp_components.clear();
-            throw;
-        }
-        temp_components.clear();
     }
 }
 
@@ -205,9 +198,15 @@ namespace e2d
 
     sprite_render_system::~sprite_render_system() noexcept = default;
 
-    void sprite_render_system::process(ecs::registry& owner) {
-        for_all_cameras(state_->batcher(), owner);
-        state_->batcher().flush();
-        state_->batcher().clear(true);
+    void sprite_render_system::process(ecs::registry& owner, ecs::entity_id cam_e_id) {
+        ecs::const_entity cam_e(owner, cam_e_id);
+        if ( cam_e.valid() ) {
+            const camera* cam = owner.find_component<camera>(cam_e);
+            if ( cam ) {
+                for_all_components(state_->batcher(), owner, cam_e, *cam);
+                state_->batcher().flush();
+                state_->batcher().clear(true);
+            }
+        }
     }
 }

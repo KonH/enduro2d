@@ -14,6 +14,6 @@ namespace e2d
     public:
         spine_player_system();
         ~spine_player_system() noexcept final;
-        void process(ecs::registry& owner) override;
+        void process(ecs::registry& owner, ecs::entity_id data_source) override;
     };
 }

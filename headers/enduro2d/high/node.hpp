@@ -51,9 +51,10 @@ namespace e2d
 
         void scale(const v3f& scale) noexcept;
         const v3f& scale() const noexcept;
+        
+        void update_local_matrix() noexcept;
+        void update_world_matrix() noexcept;
 
-        const m4f& local_matrix() noexcept;
-        const m4f& world_matrix() noexcept;
         const m4f& local_matrix() const noexcept;
         const m4f& world_matrix() const noexcept;
 
@@ -142,8 +143,6 @@ namespace e2d
         };
         void mark_dirty_local_matrix_() noexcept;
         void mark_dirty_world_matrix_() noexcept;
-        void update_local_matrix_() noexcept;
-        void update_world_matrix_() noexcept;
     private:
         t3f transform_;
         gobject_iptr owner_;
