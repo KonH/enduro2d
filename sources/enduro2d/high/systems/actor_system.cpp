@@ -11,8 +11,7 @@
 
 namespace e2d
 {
-    actor_system::actor_system()
-    {}
+    actor_system::actor_system() = default;
 
     actor_system::~actor_system() noexcept = default;
 
@@ -23,8 +22,8 @@ namespace e2d
         {
             node_iptr node = actor.node();
 
-            // just update transformation
-            (void)(node->world_matrix());
+            node->update_local_matrix();
+            node->update_world_matrix();
         });
     }
 }

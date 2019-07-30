@@ -16,15 +16,40 @@
 
 #include <enduro2d/high/node.hpp>
 
-#include "render_system_impl/render_system_base.hpp"
 #include "render_system_impl/render_system_batcher.hpp"
+
+namespace
+{
+    using namespace e2d;
+
+    struct index_u16 {
+        using type = u16;
+        static index_declaration decl() noexcept {
+            return index_declaration::index_type::unsigned_short;
+        }
+    };
+
+    struct vertex_v3f_t2f_c32b {
+        struct type {
+            v3f v;
+            v2f t;
+            color32 c;
+        };
+        static vertex_declaration decl() noexcept {
+            return vertex_declaration()
+                .add_attribute<v3f>("a_vertex")
+                .add_attribute<v2f>("a_st")
+                .add_attribute<color32>("a_tint").normalized();
+        }
+    };
+
+    using batcher_type = render_system_impl::batcher<
+        index_u16,
+        vertex_v3f_t2f_c32b>;
+}
 
 namespace e2d
 {
-    using batcher_type = render_system_impl::batcher<
-        render_system_impl::index_u16,
-        render_system_impl::vertex_v3f_t2f_c32b>;
-
     class sprite_render_system::internal_state {
     public:
         internal_state()
@@ -40,8 +65,6 @@ namespace e2d
 
 namespace
 {
-    using namespace e2d;
-    
     const str_hash matrix_v_property_hash = "u_matrix_v";
     const str_hash matrix_p_property_hash = "u_matrix_p";
     const str_hash matrix_vp_property_hash = "u_matrix_vp";

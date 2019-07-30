@@ -14,8 +14,7 @@
 
 namespace e2d
 {
-    spine_player_system::spine_player_system()
-    {}
+    spine_player_system::spine_player_system() = default;
 
     spine_player_system::~spine_player_system() noexcept = default;
 
