@@ -100,12 +100,6 @@ namespace
             .property(matrix_vp_property_hash, m_v * m_p)
             .property(game_time_property_hash, the<engine>().time());
 
-        the_render.execute(render::command_block<3>()
-            .add_command(render::target_command(cam.target()))
-            .add_command(render::viewport_command(cam.viewport()))
-            .add_command(render::clear_command()
-                .color_value(cam.background())));
-
         owner.for_joined_components<model_renderer, renderer, actor>([&the_render, &property_cache](
             const ecs::const_entity&,
             const model_renderer& mdl_r,
