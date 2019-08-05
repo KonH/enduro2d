@@ -121,6 +121,34 @@ namespace
         return false;
     }
 
+    bool gl_can_render_to_texture(debug& debug, GLenum format, GLenum type) {
+        GLuint tex = 0;
+        GL_CHECK_CODE(debug, glGenTextures(1, &tex));
+        if ( !tex ) {
+            return false;
+        }
+        GL_CHECK_CODE(debug, glBindTexture(GL_TEXTURE_2D, tex));
+        GL_CHECK_CODE(debug, glTexImage2D(GL_TEXTURE_2D, 0, format, 16, 16, 0, format, type, nullptr));
+        GL_CHECK_CODE(debug, glBindTexture(GL_TEXTURE_2D, 0));
+
+        GLuint fb = 0;
+        GL_CHECK_CODE(debug, glGenFramebuffers(1, &fb));
+        if ( !fb ) {
+            return false;
+        }
+        GL_CHECK_CODE(debug, glBindFramebuffer(GL_FRAMEBUFFER, fb));
+        GL_CHECK_CODE(debug, glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0));
+
+        GLenum result;
+        GL_CHECK_CODE(debug, result = glCheckFramebufferStatus(GL_FRAMEBUFFER));
+        GL_CHECK_CODE(debug, glBindFramebuffer(GL_FRAMEBUFFER, 0));
+        
+        GL_CHECK_CODE(debug, glDeleteFramebuffers(1, &fb));
+        GL_CHECK_CODE(debug, glDeleteTextures(1, &tex));
+
+        return result == GL_FRAMEBUFFER_COMPLETE;
+    }
+
     enum class gl_version : u32 {
         gl_bit_ = 1 << 28,
         gles_bit_ = 2 << 28,
@@ -1429,6 +1457,18 @@ namespace e2d::opengl
         caps.pvrtc2_compression_supported =
             gl_has_any_extension(debug,
                 "GL_IMG_texture_compression_pvrtc2");
+        
+        caps.g8_renderable_texture_supported =
+            gl_can_render_to_texture(debug,
+                GL_ALPHA, GL_UNSIGNED_BYTE);
+
+        caps.rgb8_renderable_texture_supported =
+            gl_can_render_to_texture(debug,
+                GL_RGB, GL_UNSIGNED_BYTE);
+
+        caps.rgba8_renderable_texture_supported =
+            gl_can_render_to_texture(debug,
+                GL_RGBA, GL_UNSIGNED_BYTE);
     }
 
     gl_shader_id gl_compile_shader(

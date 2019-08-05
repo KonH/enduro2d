@@ -314,6 +314,13 @@ namespace e2d
         E2D_UNUSED(decl);
         return false;
     }
+    
+    bool render::is_pixel_supported_for_render_to_texture(
+        const pixel_declaration& decl) const noexcept
+    {
+        E2D_UNUSED(decl);
+        return false;
+    }
 
     bool render::is_index_supported(const index_declaration& decl) const noexcept {
         E2D_UNUSED(decl);

@@ -904,6 +904,10 @@ namespace e2d
             bool dxt_compression_supported = false;
             bool pvrtc_compression_supported = false;
             bool pvrtc2_compression_supported = false;
+
+            bool g8_renderable_texture_supported = false;
+            bool rgb8_renderable_texture_supported = false;
+            bool rgba8_renderable_texture_supported = false;
         };
     public:
         render(debug& d, window& w);
@@ -981,6 +985,7 @@ namespace e2d
         bool is_pixel_supported(const pixel_declaration& decl) const noexcept;
         bool is_index_supported(const index_declaration& decl) const noexcept;
         bool is_vertex_supported(const vertex_declaration& decl) const noexcept;
+        bool is_pixel_supported_for_render_to_texture(const pixel_declaration& decl) const noexcept;
     private:
         class internal_state;
         std::unique_ptr<internal_state> state_;

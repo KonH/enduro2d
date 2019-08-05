@@ -410,8 +410,6 @@ namespace
         const b2u& region)
     {
         const char vs_source[] = R"glsl(
-            #version 120
-
             attribute vec2 a_position;
             varying vec2 v_uv;
 
@@ -422,8 +420,6 @@ namespace
         )glsl";
 
         const char fs_source[] = R"glsl(
-            #version 120
-
             uniform sampler2D u_texture;
             varying vec2 v_uv;
 
@@ -436,6 +432,10 @@ namespace
             v2f(-1.0f, 1.0f), v2f(-1.0f, -1.0f), v2f(1.0f, 1.0f), v2f(1.0f, -1.0f)
         };
         const u16 indices[] = {0, 1, 2, 3};
+
+        if ( !render.is_pixel_supported_for_render_to_texture(pixel_declaration::pixel_type::rgba8) ) {
+            throw bad_render_operation();
+        }
 
         shader_ptr shader = render.create_shader(vs_source, fs_source);
         if ( !shader ) {
@@ -1300,7 +1300,7 @@ namespace e2d
         E2D_ASSERT(region.position.x + region.size.x <= tex->size().x);
         E2D_ASSERT(region.position.y + region.size.y <= tex->size().y);
 
-        if ( tex->decl().is_compressed() ) {
+        if ( !is_pixel_supported_for_render_to_texture(tex->decl()) ) {
             return grab_compressed_texture(*this, tex, region);
         }
 
@@ -1309,7 +1309,7 @@ namespace e2d
             throw bad_render_operation();
         }
         gl_attach_texture(state_->dbg(), id, tex->state().id(), GL_COLOR_ATTACHMENT0);
-        GLenum fb_status = GL_FRAMEBUFFER_COMPLETE;
+        GLenum fb_status;
         if ( !gl_check_framebuffer(state_->dbg(), id, &fb_status) ) {
             throw bad_render_operation();
         }
@@ -1378,6 +1378,39 @@ namespace e2d
             case pixel_declaration::pixel_type::rgba_pvrtc2_v2:
             case pixel_declaration::pixel_type::rgba_pvrtc4_v2:
                 return caps.pvrtc2_compression_supported;
+            default:
+                E2D_ASSERT_MSG(false, "unexpected pixel type");
+                return false;
+        }
+    }
+        
+    bool render::is_pixel_supported_for_render_to_texture(
+        const pixel_declaration& decl) const noexcept
+    {
+        E2D_ASSERT(is_in_main_thread());
+        const device_caps& caps = device_capabilities();
+        switch ( decl.type() ) {
+            case pixel_declaration::pixel_type::g8:
+                return caps.g8_renderable_texture_supported;
+            case pixel_declaration::pixel_type::rgb8:
+                return caps.rgb8_renderable_texture_supported;
+            case pixel_declaration::pixel_type::rgba8:
+                return caps.rgba8_renderable_texture_supported;
+            case pixel_declaration::pixel_type::depth16:
+            case pixel_declaration::pixel_type::depth24:
+            case pixel_declaration::pixel_type::depth24_stencil8:
+            case pixel_declaration::pixel_type::ga8:
+            case pixel_declaration::pixel_type::rgb_dxt1:
+            case pixel_declaration::pixel_type::rgba_dxt1:
+            case pixel_declaration::pixel_type::rgba_dxt3:
+            case pixel_declaration::pixel_type::rgba_dxt5:
+            case pixel_declaration::pixel_type::rgb_pvrtc2:
+            case pixel_declaration::pixel_type::rgb_pvrtc4:
+            case pixel_declaration::pixel_type::rgba_pvrtc2:
+            case pixel_declaration::pixel_type::rgba_pvrtc4:
+            case pixel_declaration::pixel_type::rgba_pvrtc2_v2:
+            case pixel_declaration::pixel_type::rgba_pvrtc4_v2:
+                return false;
             default:
                 E2D_ASSERT_MSG(false, "unexpected pixel type");
                 return false;
