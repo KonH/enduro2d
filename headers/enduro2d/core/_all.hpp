@@ -20,3 +20,4 @@
 #include "render.inl"
 #include "vfs.hpp"
 #include "window.hpp"
+#include "batcher.hpp"
