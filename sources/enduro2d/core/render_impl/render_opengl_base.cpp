@@ -1022,7 +1022,6 @@ namespace e2d::opengl
         #define DEFINE_CASE(x,y) case render::topology::x: return y;
         switch ( t ) {
             DEFINE_CASE(triangles, GL_TRIANGLES);
-            DEFINE_CASE(triangles_fan, GL_TRIANGLE_FAN);
             DEFINE_CASE(triangles_strip, GL_TRIANGLE_STRIP);
             default:
                 E2D_ASSERT_MSG(false, "unexpected render topology");

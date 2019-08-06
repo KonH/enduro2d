@@ -332,7 +332,6 @@ namespace e2d
     public:
         enum class topology : u8 {
             triangles,
-            triangles_fan,
             triangles_strip
         };
 
