@@ -159,8 +159,6 @@ namespace e2d
         // try to reuse last batch
         if ( batches_.size() ) {
             auto& last = batches_.back();
-            E2D_ASSERT(last.vb_index < vertex_buffers_.size());
-            E2D_ASSERT(last.ib_index < index_buffers_.size());
             auto& vb = vertex_buffers_[last.vb_index];
             auto& ib = index_buffers_[last.ib_index];
 

@@ -32,10 +32,11 @@ namespace e2d
         private:
             u8* data_ = nullptr;
             size_t size_ = 0;
-            size_t stride_ = 0;
+            size_t stride_ = 1;
         };
 
         class index_iterator final {
+            friend class batcher;
         public:
             index_iterator() = default;
             index_iterator(u8* data, size_t size, batch_index_t offset);
@@ -281,7 +282,10 @@ namespace e2d
     inline batcher::vertex_iterator<T>::vertex_iterator(u8* data, size_t size, size_t stride)
     : data_(data)
     , size_(size)
-    , stride_(stride) {}
+    , stride_(stride) {
+        E2D_ASSERT(data_ && size_);
+        E2D_ASSERT(stride_ > 0);
+    }
     
     template < typename T >
     inline T& batcher::vertex_iterator<T>::operator [](u32 index) const noexcept {
@@ -321,7 +325,9 @@ namespace e2d
     inline batcher::index_iterator::index_iterator(u8* data, size_t size, batch_index_t offset)
     : indices_(reinterpret_cast<batch_index_t*>(data))
     , size_(size / sizeof(batch_index_t))
-    , offset_(offset) {}
+    , offset_(offset) {
+        E2D_ASSERT(indices_ && size_);
+    }
 
     inline void batcher::index_iterator::operator = (const batch_index_t& r) noexcept {
         E2D_ASSERT(size_ > 0);
@@ -554,7 +560,7 @@ namespace e2d
         const bool is_strip = src_batch.topology() != topology::triangles;
         const size_t vert_stride = math::align_ceil(sizeof(typename BatchType::vertex_type), vertex_stride_);
         const size_t vb_size = src_batch.vertex_count() * vert_stride;
-        const size_t ib_size = src_batch.index_count() * index_stride_ + (is_strip ? 2 : 0);
+        const size_t ib_size = (src_batch.index_count() + (is_strip ? 2 : 0)) * index_stride_;
         const vert_decl_ptr vert_decl = cache_vert_decl_(BatchType::vertex_type::decl());
         batch_& dst_batch = append_batch_(mtr, src_batch.topology(), vert_decl, vert_stride, vb_size, ib_size);
 
@@ -565,17 +571,19 @@ namespace e2d
         batch_index_t idx_offset = math::numeric_cast<batch_index_t>((vb.offset + vert_stride-1) / vert_stride);
         auto vert_iter = vertex_iterator<typename BatchType::vertex_type>(vb.content.data() + vb.offset, vb_size, vert_stride);
         auto idx_iter = index_iterator(ib.content.data() + ib.offset, ib_size, idx_offset);
+        const bool first_strip = is_strip && !dst_batch.idx_count;
+        const bool break_strip = is_strip && dst_batch.idx_count;
 
-        if ( is_strip ) {
+        if ( break_strip ) {
             break_strip_(src_batch, vert_iter, idx_iter);
         } else {
             continue_list_(src_batch, vert_iter, idx_iter);
         }
         
         vb.offset += vb_size;
-        ib.offset += ib_size;
+        ib.offset += ib_size - (first_strip ? 2*index_stride_ : 0);
         dst_batch.vert_count += src_batch.vertex_count();
-        dst_batch.idx_count += src_batch.index_count() + (is_strip ? 2 : 0);
+        dst_batch.idx_count += src_batch.index_count() + (break_strip ? 2 : 0);
         dirty_ = true;
     }
     
@@ -616,7 +624,15 @@ namespace e2d
         vertex_iterator<typename BatchType::vertex_type> vert_iter,
         index_iterator idx_iter) const noexcept
     {
-        E2D_ASSERT(false);
+        batch_index_t* indices = idx_iter.indices_;
+        ++idx_iter;
+        ++idx_iter;
+
+        src.get_vertices(vert_iter);
+        src.get_indices(idx_iter);
+
+        indices[0] = indices[-1];
+        indices[1] = indices[2];
     }
         
     template < typename BatchType >
