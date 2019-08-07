@@ -124,17 +124,19 @@ namespace
     enum class gl_version : u32 {
         gl_bit_ = 1 << 28,
         gles_bit_ = 2 << 28,
+        any_gl_mask_ = gl_bit_ | gles_bit_,
 
         gl_210 = 210 | gl_bit_,
         gl_300 = 300 | gl_bit_,
         gl_410 = 410 | gl_bit_,
+        gl_430 = 430 | gl_bit_,
         gles_200 = 200 | gles_bit_,
-        gles_300 = 300 | gles_bit_
+        gles_300 = 300 | gles_bit_,
+        gles_320 = 320 | gles_bit_,
     };
 
     bool operator>=(gl_version lhs, gl_version rhs) noexcept {
-        constexpr u32 mask = u32(gl_version::gl_bit_)
-                           | u32(gl_version::gles_bit_);
+        constexpr u32 mask = u32(gl_version::any_gl_mask_);
         return (u32(lhs) & mask) == (u32(rhs) & mask)
             && (u32(lhs) & ~mask) >= (u32(rhs) & ~mask);
     }
@@ -162,6 +164,34 @@ namespace
     #endif
 
         return gl_version(ver_bit | (major * 100 + minor * 10));
+    }
+
+    void gl_use_implementation_from_extensions(debug& debug, gl_version version) noexcept
+    {
+    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+        if ( !(version >= gl_version::gl_300) ) {
+            if ( gl_has_any_extension(debug, "GL_EXT_framebuffer_object") ) {
+                glBindFramebuffer = glBindFramebufferEXT;
+                glBindRenderbuffer = glBindRenderbufferEXT;
+                glCheckFramebufferStatus = glCheckFramebufferStatusEXT;
+                glDeleteFramebuffers = glDeleteFramebuffersEXT;
+                glDeleteRenderbuffers = glDeleteRenderbuffersEXT;
+                glFramebufferRenderbuffer = glFramebufferRenderbufferEXT;
+                glFramebufferTexture2D = glFramebufferTexture2DEXT;
+                glGenFramebuffers = glGenFramebuffersEXT;
+                glGenRenderbuffers = glGenRenderbuffersEXT;
+                glRenderbufferStorage = glRenderbufferStorageEXT;
+            }
+        }
+        if ( !(version >= gl_version::gl_430) ) {
+            if ( gl_has_any_extension(debug, "GL_ARB_debug_output") ) {
+                glDebugMessageCallback = glDebugMessageCallbackARB;
+                glDebugMessageControl = glDebugMessageControlARB;
+                glDebugMessageInsert = glDebugMessageInsertARB;
+                glGetDebugMessageLog = glGetDebugMessageLogARB;
+            }
+        }
+    #endif
     }
 }
 
@@ -1307,7 +1337,7 @@ namespace e2d::opengl
             max_combined_texture_image_units);
     }
 
-    void gl_fill_device_caps(debug& debug, render::device_caps& caps) noexcept {
+    void gl_fill_device_caps(debug& debug, render::device_caps& caps, gl_device_caps& caps_ext) noexcept {
         GLint max_texture_size = 0;
         GLint max_renderbuffer_size = 0;
         GLint max_cube_map_texture_size = 0;
@@ -1429,6 +1459,14 @@ namespace e2d::opengl
         caps.pvrtc2_compression_supported =
             gl_has_any_extension(debug,
                 "GL_IMG_texture_compression_pvrtc2");
+
+        caps_ext.debug_output_supported =
+            version >= gl_version::gles_320 ||
+            version >= gl_version::gl_430 ||
+            gl_has_any_extension(debug,
+                "GL_ARB_debug_output");
+
+        gl_use_implementation_from_extensions(debug, version);
     }
     
     bool gl_has_extension(debug& debug, str_view name) noexcept {

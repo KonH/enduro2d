@@ -214,7 +214,7 @@ namespace e2d
 
         gl_trace_info(debug_);
         gl_trace_limits(debug_);
-        gl_fill_device_caps(debug_, device_caps_);
+        gl_fill_device_caps(debug_, device_caps_, device_caps_ext_);
 
         GL_CHECK_CODE(debug_, glPixelStorei(GL_PACK_ALIGNMENT, 1));
         GL_CHECK_CODE(debug_, glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
@@ -235,6 +235,10 @@ namespace e2d
 
     const render::device_caps& render::internal_state::device_capabilities() const noexcept {
         return device_caps_;
+    }
+    
+    const opengl::gl_device_caps& render::internal_state::device_capabilities_ext() const noexcept {
+        return device_caps_ext_;
     }
 
     const render_target_ptr& render::internal_state::render_target() const noexcept {
@@ -398,14 +402,14 @@ namespace e2d
     }
 
     void render::internal_state::create_debug_output_() noexcept {
-        if ( !gl_has_extension(debug_, "GL_ARB_debug_output") ) {
+        if ( !device_caps_ext_.debug_output_supported ) {
             return;
         }
 
-		GL_CHECK_CODE(debug_, glDebugMessageCallbackARB(debug_output_callback_, this));
+		GL_CHECK_CODE(debug_, glDebugMessageCallback(debug_output_callback_, this));
 
 		// disable notifications
-		GL_CHECK_CODE(debug_, glDebugMessageControlARB(
+		GL_CHECK_CODE(debug_, glDebugMessageControl(
             GL_DONT_CARE,
             GL_DONT_CARE,
             GL_DEBUG_SEVERITY_NOTIFICATION,

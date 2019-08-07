@@ -174,6 +174,7 @@ namespace e2d
         debug& dbg() const noexcept;
         window& wnd() const noexcept;
         const device_caps& device_capabilities() const noexcept;
+        const opengl::gl_device_caps& device_capabilities_ext() const noexcept;
         const render_target_ptr& render_target() const noexcept;
     public:
         internal_state& reset_states() noexcept;
@@ -203,6 +204,7 @@ namespace e2d
         debug& debug_;
         window& window_;
         device_caps device_caps_;
+        opengl::gl_device_caps device_caps_ext_;
         state_block state_block_;
         shader_ptr shader_program_;
         render_target_ptr render_target_;

@@ -63,6 +63,10 @@
 
 namespace e2d::opengl
 {
+    struct gl_device_caps {
+        bool debug_output_supported = false;
+    };
+
     class gl_buffer_id final : private noncopyable {
         gl_buffer_id(debug& debug, GLuint id, GLenum target, bool owned) noexcept;
     public:
@@ -294,7 +298,7 @@ namespace e2d::opengl
 {
     void gl_trace_info(debug& debug) noexcept;
     void gl_trace_limits(debug& debug) noexcept;
-    void gl_fill_device_caps(debug& debug, render::device_caps& caps) noexcept;
+    void gl_fill_device_caps(debug& debug, render::device_caps& caps, gl_device_caps& ext) noexcept;
     bool gl_has_extension(debug& debug, str_view name) noexcept;
 
     gl_shader_id gl_compile_shader(
