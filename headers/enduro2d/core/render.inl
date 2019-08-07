@@ -137,34 +137,6 @@ namespace e2d
     }
 
     //
-    // render::property_block
-    //
-
-    template < typename T >
-    render::property_block& render::property_block::property(str_hash name, T&& v) {
-        properties_.assign(name, std::forward<T>(v));
-        return *this;
-    }
-
-    template < typename T >
-    const T* render::property_block::property(str_hash name) const noexcept {
-        const property_value* prop = properties_.find(name);
-        return prop
-            ? stdex::get_if<T>(prop)
-            : nullptr;
-    }
-
-    template < typename F >
-    void render::property_block::foreach_by_samplers(F&& f) const {
-        samplers_.foreach(std::forward<F>(f));
-    }
-
-    template < typename F >
-    void render::property_block::foreach_by_properties(F&& f) const {
-        properties_.foreach(std::forward<F>(f));
-    }
-
-    //
     // render::command_block
     //
 

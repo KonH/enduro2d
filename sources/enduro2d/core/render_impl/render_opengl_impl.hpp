@@ -112,19 +112,16 @@ namespace e2d
         internal_state(
             debug& debug,
             opengl::gl_buffer_id id,
-            std::size_t size,
-            const vertex_declaration& decl);
+            std::size_t size);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
         const opengl::gl_buffer_id& id() const noexcept;
         std::size_t size() const noexcept;
-        const vertex_declaration& decl() const noexcept;
     private:
         debug& debug_;
         opengl::gl_buffer_id id_;
         std::size_t size_ = 0;
-        vertex_declaration decl_;
     };
 
     //

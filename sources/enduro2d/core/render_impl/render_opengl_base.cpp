@@ -130,6 +130,7 @@ namespace
 
         gl_210 = 210 | gl_bit_,
         gl_300 = 300 | gl_bit_,
+        gl_400 = 400 | gl_bit_,
         gl_410 = 410 | gl_bit_,
         gl_430 = 430 | gl_bit_,
         gles_200 = 200 | gles_bit_,
@@ -1429,27 +1430,6 @@ namespace e2d::opengl
             gl_has_any_extension(debug,
                 "GL_OES_element_index_uint");
 
-        caps.depth16_supported =
-            version >= gl_version::gl_210 ||
-            version >= gl_version::gles_300 ||
-            gl_has_any_extension(debug,
-                "GL_OES_depth_texture",
-                "GL_ARB_depth_texture");
-
-        caps.depth24_supported =
-            version >= gl_version::gl_210 ||
-            version >= gl_version::gles_300 ||
-            gl_has_any_extension(debug,
-                "GL_OES_depth24",
-                "GL_ARB_depth_texture");
-
-        caps.depth24_stencil8_supported =
-            version >= gl_version::gl_300 ||
-            version >= gl_version::gles_300 ||
-            gl_has_any_extension(debug,
-                "GL_OES_packed_depth_stencil",
-                "GL_EXT_packed_depth_stencil");
-
         caps.dxt_compression_supported =
             gl_has_any_extension(debug,
                 "GL_EXT_texture_compression_s3tc");
@@ -1461,6 +1441,43 @@ namespace e2d::opengl
         caps.pvrtc2_compression_supported =
             gl_has_any_extension(debug,
                 "GL_IMG_texture_compression_pvrtc2");
+        
+        caps_ext.depth16_supported =
+            version >= gl_version::gl_210 ||
+            version >= gl_version::gles_300 ||
+            gl_has_any_extension(debug,
+                "GL_OES_depth_texture",
+                "GL_ARB_depth_texture");
+
+        caps_ext.depth16_stencil8_supported = false; // TODO
+
+        caps_ext.depth24_supported =
+            version >= gl_version::gl_210 ||
+            version >= gl_version::gles_300 ||
+            gl_has_any_extension(debug,
+                "GL_OES_depth24",
+                "GL_ARB_depth_texture");
+
+        caps_ext.depth24_stencil8_supported =
+            version >= gl_version::gl_300 ||
+            version >= gl_version::gles_300 ||
+            gl_has_any_extension(debug,
+                "GL_OES_packed_depth_stencil",
+                "GL_EXT_packed_depth_stencil");
+        
+        caps_ext.depth32_supported =
+            version >= gl_version::gl_300 ||
+            version >= gl_version::gles_300 ||
+            gl_has_any_extension(debug,
+                "GL_OES_depth32",
+                "GL_ARB_depth_texture",
+                "GL_ARB_depth_buffer_float");
+
+        caps_ext.depth32_stencil8_supported =
+            version >= gl_version::gl_300 ||
+            version >= gl_version::gles_300 ||
+            gl_has_any_extension(debug,
+                "GL_ARB_depth_buffer_float");
 
         caps_ext.debug_output_supported =
             version >= gl_version::gles_320 ||

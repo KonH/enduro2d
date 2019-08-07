@@ -195,7 +195,6 @@ namespace e2d
         public:
             material mtr;
             topology topo;
-            //size_t vert_offset = 0;
             size_t idx_offset = 0;
             size_t vert_count = 0;
             size_t idx_count = 0;

@@ -23,8 +23,11 @@ namespace
 
     const pixel_type_description pixel_type_descriptions[] = {
         {"depth16",          16, false, true,  false, pixel_declaration::pixel_type::depth16,          false, v2u(1)},
+        {"depth16_stencil8",  0, false, true,  true,  pixel_declaration::pixel_type::depth16_stencil8, false, v2u(1)},
         {"depth24",          24, false, true,  false, pixel_declaration::pixel_type::depth24,          false, v2u(1)},
         {"depth24_stencil8", 32, false, true,  true,  pixel_declaration::pixel_type::depth24_stencil8, false, v2u(1)},
+        {"depth32",          32, false, true,  false, pixel_declaration::pixel_type::depth32,          false, v2u(1)},
+        {"depth32_stencil8",  0, false, true,  true,  pixel_declaration::pixel_type::depth32_stencil8, false, v2u(1)},
 
         {"g8",                8, true,  false, false, pixel_declaration::pixel_type::g8,               false, v2u(1)},
         {"ga8",              16, true,  false, false, pixel_declaration::pixel_type::ga8,              false, v2u(1)},
@@ -104,19 +107,31 @@ namespace
             E2D_UNUSED(command);
         }
 
+        void operator()(const render::bind_vertex_buffers_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::bind_pipeline_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::bind_const_buffer_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::bind_textures_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::scissor_command& command) const {
+            render_.execute(command);
+        }
+
         void operator()(const render::draw_command& command) const {
             render_.execute(command);
         }
 
-        void operator()(const render::clear_command& command) const {
-            render_.execute(command);
-        }
-
-        void operator()(const render::target_command& command) const {
-            render_.execute(command);
-        }
-
-        void operator()(const render::viewport_command& command) const {
+        void operator()(const render::draw_indexed_command& command) const {
             render_.execute(command);
         }
     private:
@@ -312,10 +327,9 @@ namespace e2d
     //
     // depth_state
     //
-
-    render::depth_state& render::depth_state::range(f32 near, f32 far) noexcept {
-        range_near_ = near;
-        range_far_ = far;
+    
+    render::depth_state& render::depth_state::test(bool enable) noexcept {
+        test_ = enable;
         return *this;
     }
 
@@ -328,13 +342,9 @@ namespace e2d
         func_ = func;
         return *this;
     }
-
-    f32 render::depth_state::range_near() const noexcept {
-        return range_near_;
-    }
-
-    f32 render::depth_state::range_far() const noexcept {
-        return range_far_;
+    
+    bool render::depth_state::test() const noexcept {
+        return test_;
     }
 
     bool render::depth_state::write() const noexcept {
@@ -348,9 +358,14 @@ namespace e2d
     //
     // stencil_state
     //
+    
+    render::stencil_state& render::stencil_state::test(bool enabled) noexcept {
+        test_ = enabled;
+        return *this;
+    }
 
     render::stencil_state& render::stencil_state::write(u8 mask) noexcept {
-        write_ = mask;
+        write_mask_ = mask;
         return *this;
     }
 
@@ -369,7 +384,7 @@ namespace e2d
     }
 
     u8 render::stencil_state::write() const noexcept {
-        return write_;
+        return write_mask_;
     }
 
     render::compare_func render::stencil_state::func() const noexcept {
@@ -397,33 +412,47 @@ namespace e2d
     }
 
     //
-    // culling_state
+    // rasterization_state
     //
-
-    render::culling_state& render::culling_state::mode(culling_mode mode) noexcept {
-        mode_ = mode;
+    
+    render::rasterization_state& render::rasterization_state::polygon_offset(float factor, float units) noexcept {
+        polygon_offset_factor_ = factor;
+        polygon_offset_units_ = units;
         return *this;
     }
 
-    render::culling_state& render::culling_state::face(culling_face face) noexcept {
-        face_ = face;
+    render::rasterization_state& render::rasterization_state::culling(culling_mode mode) noexcept {
+        culling_ = mode;
         return *this;
     }
 
-    render::culling_mode render::culling_state::mode() const noexcept {
-        return mode_;
+    render::rasterization_state& render::rasterization_state::front_face_ccw(bool value) noexcept {
+        front_face_ccw_ = value;
+        return *this;
     }
 
-    render::culling_face render::culling_state::face() const noexcept {
-        return face_;
+    float render::rasterization_state::polygon_offset_factor() const noexcept {
+        return polygon_offset_factor_;
+    }
+
+    float render::rasterization_state::polygon_offset_units() const noexcept {
+        return polygon_offset_units_;
+    }
+
+    render::culling_mode render::rasterization_state::culling() const noexcept {
+        return culling_;
+    }
+
+    bool render::rasterization_state::front_face_ccw() const noexcept {
+        return front_face_ccw_;
     }
 
     //
     // blending_state
     //
-
-    render::blending_state& render::blending_state::constant_color(const color& c) noexcept {
-        constant_color_ = c;
+    
+    render::blending_state& render::blending_state::enable(bool value) noexcept {
+        enabled_ = value;
         return *this;
     }
 
@@ -497,9 +526,9 @@ namespace e2d
         alpha_equation_ = equation;
         return *this;
     }
-
-    const color& render::blending_state::constant_color() const noexcept {
-        return constant_color_;
+    
+    bool render::blending_state::enabled() const noexcept {
+        return enabled_;
     }
 
     render::blending_color_mask render::blending_state::color_mask() const noexcept {
@@ -531,47 +560,7 @@ namespace e2d
     }
 
     //
-    // capabilities_state
-    //
-
-    render::capabilities_state& render::capabilities_state::culling(bool enable) noexcept {
-        culling_ = enable;
-        return *this;
-    }
-
-    render::capabilities_state& render::capabilities_state::blending(bool enable) noexcept {
-        blending_ = enable;
-        return *this;
-    }
-
-    render::capabilities_state& render::capabilities_state::depth_test(bool enable) noexcept {
-        depth_test_ = enable;
-        return *this;
-    }
-
-    render::capabilities_state& render::capabilities_state::stencil_test(bool enable) noexcept {
-        stencil_test_ = enable;
-        return *this;
-    }
-
-    bool render::capabilities_state::culling() const noexcept {
-        return culling_;
-    }
-
-    bool render::capabilities_state::blending() const noexcept {
-        return blending_;
-    }
-
-    bool render::capabilities_state::depth_test() const noexcept {
-        return depth_test_;
-    }
-
-    bool render::capabilities_state::stencil_test() const noexcept {
-        return stencil_test_;
-    }
-
-    //
-    // render_state
+    // state_block
     //
 
     render::state_block& render::state_block::depth(const depth_state& state) noexcept {
@@ -584,18 +573,13 @@ namespace e2d
         return *this;
     }
 
-    render::state_block& render::state_block::culling(const culling_state& state) noexcept {
-        culling_ = state;
+    render::state_block& render::state_block::rasterization(const rasterization_state& state) noexcept {
+        rasterization_ = state;
         return *this;
     }
 
     render::state_block& render::state_block::blending(const blending_state& state) noexcept {
         blending_ = state;
-        return *this;
-    }
-
-    render::state_block& render::state_block::capabilities(const capabilities_state& state) noexcept {
-        capabilities_ = state;
         return *this;
     }
 
@@ -607,16 +591,12 @@ namespace e2d
         return stencil_;
     }
 
-    render::culling_state& render::state_block::culling() noexcept {
-        return culling_;
+    render::rasterization_state& render::state_block::rasterization() noexcept {
+        return rasterization_;
     }
 
     render::blending_state& render::state_block::blending() noexcept {
         return blending_;
-    }
-
-    render::capabilities_state& render::state_block::capabilities() noexcept {
-        return capabilities_;
     }
 
     const render::depth_state& render::state_block::depth() const noexcept {
@@ -627,16 +607,12 @@ namespace e2d
         return stencil_;
     }
 
-    const render::culling_state& render::state_block::culling() const noexcept {
-        return culling_;
-    }
-
     const render::blending_state& render::state_block::blending() const noexcept {
         return blending_;
     }
-
-    const render::capabilities_state& render::state_block::capabilities() const noexcept {
-        return capabilities_;
+    
+    const render::rasterization_state& render::state_block::rasterization() const noexcept {
+        return rasterization_;
     }
 
     //
@@ -699,433 +675,426 @@ namespace e2d
     render::sampler_mag_filter render::sampler_state::mag_filter() const noexcept {
         return mag_filter_;
     }
-
+    
     //
-    // render::property_block
-    //
-
-    render::property_block& render::property_block::clear() noexcept {
-        properties_.clear();
-        samplers_.clear();
-        return *this;
-    }
-
-    render::property_block& render::property_block::merge(const property_block& pb) {
-        properties_.merge(pb.properties_);
-        samplers_.merge(pb.samplers_);
-        return *this;
-    }
-
-    bool render::property_block::equals(const property_block& other) const noexcept {
-        if ( properties_.size() != other.properties_.size() ) {
-            return false;
-        }
-        if ( samplers_.size() != other.samplers_.size() ) {
-            return false;
-        }
-        return properties_.equals(other.properties_)
-            && samplers_.equals(other.samplers_);
-    }
-
-    render::property_block& render::property_block::sampler(str_hash name, const sampler_state& s) {
-        samplers_.assign(name, s);
-        return *this;
-    }
-
-    render::sampler_state* render::property_block::sampler(str_hash name) noexcept {
-        return samplers_.find(name);
-    }
-
-    const render::sampler_state* render::property_block::sampler(str_hash name) const noexcept {
-        return samplers_.find(name);
-    }
-
-    render::property_block& render::property_block::property(str_hash name, const property_value& v) {
-        properties_.assign(name, v);
-        return *this;
-    }
-
-    render::property_value* render::property_block::property(str_hash name) noexcept {
-        return properties_.find(name);
-    }
-
-    const render::property_value* render::property_block::property(str_hash name) const noexcept {
-        return properties_.find(name);
-    }
-
-    std::size_t render::property_block::sampler_count() const noexcept {
-        return samplers_.size();
-    }
-
-    std::size_t render::property_block::property_count() const noexcept {
-        return properties_.size();
-    }
-
-    //
-    // pass_state
+    // render::sampler_block
     //
 
-    render::pass_state& render::pass_state::shader(const shader_ptr& shader) noexcept {
-        shader_ = shader;
-        return *this;
-    }
-
-    render::pass_state& render::pass_state::states(const state_block& render_state) noexcept {
-        states_ = render_state;
-        return *this;
-    }
-
-    render::pass_state& render::pass_state::properties(const property_block& properties) noexcept {
-        properties_ = properties;
-        return *this;
-    }
-
-    shader_ptr& render::pass_state::shader() noexcept {
-        return shader_;
-    }
-
-    render::state_block& render::pass_state::states() noexcept {
-        return states_;
-    }
-
-    render::property_block& render::pass_state::properties() noexcept {
-        return properties_;
-    }
-
-    const shader_ptr& render::pass_state::shader() const noexcept {
-        return shader_;
-    }
-
-    const render::state_block& render::pass_state::states() const noexcept {
-        return states_;
-    }
-
-    const render::property_block& render::pass_state::properties() const noexcept {
-        return properties_;
-    }
-
-    //
-    // material
-    //
-
-    render::material& render::material::clear() noexcept {
-        return *this = material();
-    }
-
-    bool render::material::equals(const material& other) const noexcept {
-        if ( pass_count_ != other.pass_count_ ) {
-            return false;
-        }
-        for ( std::size_t i = 0, e = pass_count_; i < e; ++i ) {
-            if ( passes_[i] != other.passes_[i] ) {
-                return false;
+    render::sampler_block& render::sampler_block::bind(str_hash name, const sampler_state& state) noexcept {
+        for ( std::size_t i = 0; i < count_; ++i ) {
+            if ( names_[i] == name ) {
+                samplers_[i] = state;
+                return *this;
             }
         }
-        return properties_ == other.properties_;
-    }
-
-    render::material& render::material::add_pass(const pass_state& pass) noexcept {
-        E2D_ASSERT(pass_count_ < max_pass_count);
-        passes_[pass_count_] = pass;
-        ++pass_count_;
+        E2D_ASSERT(count_ < samplers_.size());
+        names_[count_] = name;
+        samplers_[count_] = state;
+        ++count_;
         return *this;
     }
 
-    std::size_t render::material::pass_count() const noexcept {
-        return pass_count_;
+    std::size_t render::sampler_block::count() const noexcept {
+        return count_;
     }
 
-    render::material& render::material::properties(const property_block& properties) noexcept {
-        properties_ = properties;
-        return *this;
+    str_hash render::sampler_block::name(std::size_t index) const noexcept {
+        E2D_ASSERT(index < count_);
+        return names_[index];
     }
 
-    render::pass_state& render::material::pass(std::size_t index) noexcept {
-        return passes_[index];
-    }
-
-    const render::pass_state& render::material::pass(std::size_t index) const noexcept {
-        return passes_[index];
-    }
-
-    render::property_block& render::material::properties() noexcept {
-        return properties_;
-    }
-
-    const render::property_block& render::material::properties() const noexcept {
-        return properties_;
+    const render::sampler_state& render::sampler_block::sampler(std::size_t index) const noexcept {
+        E2D_ASSERT(index < count_);
+        return samplers_[index];
     }
 
     //
-    // geometry
+    // render::renderpass_desc
     //
 
-    render::geometry& render::geometry::clear() noexcept {
-        return *this = geometry();
+    render::renderpass_desc::renderpass_desc() {
+        color_.clear_value = color::clear();
+        depth_.clear_value = 1.0f;
+        stencil_.clear_value = 0;
+        depth_range_ = v2f(0.0f, 1.0f);
     }
 
-    bool render::geometry::equals(const geometry& other) const noexcept {
-        if ( topology_ != other.topology_ ) {
-            return false;
-        }
-        if ( indices_ != other.indices_ ) {
-            return false;
-        }
-        if ( vertices_count_ != other.vertices_count_ ) {
-            return false;
-        }
-        for ( std::size_t i = 0, e = vertices_count_; i < e; ++i ) {
-            if ( vertices_[i] != other.vertices_[i] ) {
-                return false;
-            }
-        }
-        return true;
+    render::renderpass_desc::renderpass_desc(const render_target_ptr& rt) noexcept {
+        target_ = rt;
+        color_.clear_value = color::clear();
+        depth_.clear_value = 1.0f;
+        stencil_.clear_value = 0;
+        depth_range_ = v2f(0.0f, 1.0f);
     }
 
-    render::geometry& render::geometry::add_vertices(const vertex_buffer_ptr& vb) noexcept {
-        E2D_ASSERT(vertices_count_ < max_vertices_count);
-        vertices_[vertices_count_] = vb;
-        ++vertices_count_;
+    render::renderpass_desc& render::renderpass_desc::target(const render_target_ptr& value) noexcept {
+        target_ = value;
         return *this;
     }
 
-    std::size_t render::geometry::vertices_count() const noexcept {
-        return vertices_count_;
+    const render_target_ptr& render::renderpass_desc::target() const noexcept {
+        return target_;
     }
 
-    render::geometry& render::geometry::topo(topology tp) noexcept {
-        topology_ = tp;
+    render::renderpass_desc& render::renderpass_desc::viewport(const b2u& value) noexcept {
+        viewport_ = value;
         return *this;
     }
 
-    render::geometry& render::geometry::indices(const index_buffer_ptr& ib) noexcept {
-        indices_ = ib;
+    const b2u& render::renderpass_desc::viewport() const noexcept {
+        return viewport_;
+    }
+            
+    render::renderpass_desc& render::renderpass_desc::depth_range(const v2f& value) noexcept {
+        depth_range_ = value;
         return *this;
     }
 
-    render::geometry& render::geometry::vertices(std::size_t index, const vertex_buffer_ptr& vb) noexcept {
-        E2D_ASSERT(index < vertices_count_);
-        vertices_[index] = vb;
+    const v2f& render::renderpass_desc::depth_range() const noexcept {
+        return depth_range_;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::states(const state_block& states) noexcept {
+        states_ = states;
         return *this;
     }
 
-    render::topology& render::geometry::topo() noexcept {
+    const render::state_block& render::renderpass_desc::states() const noexcept {
+        return states_;
+    }
+            
+    render::renderpass_desc& render::renderpass_desc::color_clear(const color& value) noexcept {
+        color_.clear_value = value;
+        color_.load_op = attachment_load_op::clear;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::color_load() noexcept {
+        color_.load_op = attachment_load_op::load;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::color_invalidate() noexcept {
+        color_.load_op = attachment_load_op::invalidate;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::color_store() noexcept {
+        color_.store_op = attachment_store_op::store;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::color_discard() noexcept {
+        color_.store_op = attachment_store_op::discard;
+        return *this;
+    }
+
+    const color& render::renderpass_desc::color_clear_value() const noexcept {
+        E2D_ASSERT(color_.load_op == attachment_load_op::clear);
+        return color_.clear_value;
+    }
+
+    render::attachment_load_op render::renderpass_desc::color_load_op() const noexcept {
+        return color_.load_op;
+    }
+
+    render::attachment_store_op render::renderpass_desc::color_store_op() const noexcept {
+        return color_.store_op;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::depth_clear(float value) noexcept {
+        depth_.clear_value = value;
+        depth_.load_op = attachment_load_op::clear;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::depth_load() noexcept {
+        depth_.load_op = attachment_load_op::load;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::depth_invalidate() noexcept {
+        depth_.load_op = attachment_load_op::invalidate;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::depth_store() noexcept {
+        depth_.store_op = attachment_store_op::store;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::depth_discard() noexcept {
+        depth_.store_op = attachment_store_op::discard;
+        return *this;
+    }
+
+    float render::renderpass_desc::depth_clear_value() const noexcept {
+        E2D_ASSERT(depth_.load_op == attachment_load_op::clear);
+        return depth_.clear_value;
+    }
+
+    render::attachment_load_op render::renderpass_desc::depth_load_op() const noexcept {
+        return depth_.load_op;
+    }
+
+    render::attachment_store_op render::renderpass_desc::depth_store_op() const noexcept {
+        return depth_.store_op;
+    }
+            
+    render::renderpass_desc& render::renderpass_desc::stencil_clear(u8 value) noexcept {
+        stencil_.clear_value = value;
+        stencil_.load_op = attachment_load_op::clear;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::stencil_load() noexcept {
+        stencil_.load_op = attachment_load_op::load;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::stencil_invalidate() noexcept {
+        stencil_.load_op = attachment_load_op::invalidate;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::stencil_store() noexcept {
+        stencil_.store_op = attachment_store_op::store;
+        return *this;
+    }
+
+    render::renderpass_desc& render::renderpass_desc::stencil_discard() noexcept {
+        stencil_.store_op = attachment_store_op::discard;
+        return *this;
+    }
+
+    u8 render::renderpass_desc::clear_stencil() const noexcept {
+        E2D_ASSERT(stencil_.load_op == attachment_load_op::clear);
+        return stencil_.clear_value;
+    }
+
+    render::attachment_load_op render::renderpass_desc::stencil_load_op() const noexcept {
+        return stencil_.load_op;
+    }
+
+    render::attachment_store_op render::renderpass_desc::stencil_store_op() const noexcept {
+        return stencil_.store_op;
+    }
+
+    //
+    // render::bind_vertex_buffers_command
+    //
+
+    render::bind_vertex_buffers_command& render::bind_vertex_buffers_command::add(
+        const vertex_buffer_ptr& buffer,
+        const vertex_attribs_ptr& attribs,
+        std::size_t offset) noexcept
+    {
+        return bind(count_, buffer, attribs, offset);
+    }
+
+    render::bind_vertex_buffers_command& render::bind_vertex_buffers_command::bind(
+        std::size_t index,
+        const vertex_buffer_ptr& buffer,
+        const vertex_attribs_ptr& attribs,
+        std::size_t offset) noexcept
+    {
+        E2D_ASSERT(index < buffers_.size());
+        count_ = math::max(index+1, count_);
+
+        buffers_[index] = buffer;
+        attribs_[index] = attribs;
+        offsets_[index] = offset;
+        return *this;
+    }
+
+    std::size_t render::bind_vertex_buffers_command::binding_count() const noexcept {
+        return count_;
+    }
+
+    const vertex_buffer_ptr& render::bind_vertex_buffers_command::vertices(std::size_t index) const noexcept {
+        E2D_ASSERT(index < count_);
+        return buffers_[index];
+    }
+
+    const vertex_attribs_ptr& render::bind_vertex_buffers_command::attributes(std::size_t index) const noexcept {
+        E2D_ASSERT(index < count_);
+        return attribs_[index];
+    }
+
+    std::size_t render::bind_vertex_buffers_command::vertex_offset(std::size_t index) const noexcept {
+        E2D_ASSERT(index < count_);
+        return offsets_[index];
+    }
+
+    //
+    // render::bind_pipeline_command
+    //
+        
+    render::bind_pipeline_command::bind_pipeline_command(const shader_ptr& shader)
+    : shader_(shader) {}
+
+    const shader_ptr& render::bind_pipeline_command::shader() const noexcept {
+        return shader_;
+    }
+        
+    //
+    // render::bind_const_buffer_command
+    //
+
+    render::bind_const_buffer_command::bind_const_buffer_command(const const_buffer_ptr& cb, const_buffer::scope scope)
+    : buffer_(cb)
+    , scope_(scope) {}
+
+    const const_buffer_ptr& render::bind_const_buffer_command::buffer() const noexcept {
+        return buffer_;
+    }
+
+    const_buffer::scope render::bind_const_buffer_command::scope() const noexcept {
+        return scope_;
+    }
+
+    //
+    // render::bind_textures_command
+    //
+
+    render::bind_textures_command::bind_textures_command(const sampler_block& block, const_buffer::scope scope)
+    : sampler_block_(block)
+    , scope_(scope) {}
+
+    render::bind_textures_command& render::bind_textures_command::bind(str_hash name, const sampler_state& sampler) noexcept {
+        sampler_block_.bind(name, sampler);
+        return *this;
+    }
+
+    render::bind_textures_command& render::bind_textures_command::scope(const_buffer::scope value) noexcept {
+        scope_ = value;
+        return *this;
+    }
+            
+    const_buffer::scope render::bind_textures_command::scope() const noexcept {
+        return scope_;
+    }
+
+    std::size_t render::bind_textures_command::count() const noexcept {
+        return sampler_block_.count();
+    }
+
+    str_hash render::bind_textures_command::name(std::size_t index) const noexcept {
+        return sampler_block_.name(index);
+    }
+
+    const render::sampler_state& render::bind_textures_command::sampler(std::size_t index) const noexcept {
+        return sampler_block_.sampler(index);
+    }
+
+    //
+    // render::scissor_command
+    //
+
+    render::scissor_command::scissor_command(const b2u& scissor_rect) noexcept
+    : scissor_rect_(scissor_rect)
+    , scissoring_(true) {}
+
+    render::scissor_command& render::scissor_command::scissor_rect(const b2u& value) noexcept {
+        scissor_rect_ = value;
+        return *this;
+    }
+
+    render::scissor_command& render::scissor_command::scissoring(bool value) noexcept {
+        scissoring_ = value;
+        return *this;
+    }
+
+    const b2u& render::scissor_command::scissor_rect() const noexcept {
+        E2D_ASSERT(scissoring_);
+        return scissor_rect_;
+    }
+
+    bool render::scissor_command::scissoring() const noexcept {
+        return scissoring_;
+    }
+        
+    //
+    // render::draw_command
+    //
+
+    render::draw_command& render::draw_command::topo(topology value) noexcept {
+        topology_ = value;
+        return *this;
+    }
+
+    render::draw_command& render::draw_command::vertex_range(u32 first, u32 count) noexcept {
+        first_vertex_ = first;
+        vertex_count_ = count;
+        return *this;
+    }
+
+    render::draw_command& render::draw_command::first_verex(u32 value) noexcept {
+        first_vertex_ = value;
+        return *this;
+    }
+
+    render::draw_command& render::draw_command::vertex_count(u32 value) noexcept {
+        vertex_count_ = value;
+        return *this;
+    }
+
+    u32 render::draw_command::first_vertex() const noexcept {
+        return first_vertex_;
+    }
+
+    u32 render::draw_command::vertex_count() const noexcept {
+        return vertex_count_;
+    }
+
+    render::topology render::draw_command::topo() const noexcept {
         return topology_;
     }
 
-    index_buffer_ptr& render::geometry::indices() noexcept {
-        return indices_;
-    }
-
-    vertex_buffer_ptr& render::geometry::vertices(std::size_t index) noexcept {
-        E2D_ASSERT(index < vertices_count_);
-        return vertices_[index];
-    }
-
-    const render::topology& render::geometry::topo() const noexcept {
-        return topology_;
-    }
-
-    const index_buffer_ptr& render::geometry::indices() const noexcept {
-        return indices_;
-    }
-
-    const vertex_buffer_ptr& render::geometry::vertices(std::size_t index) const noexcept {
-        E2D_ASSERT(index < vertices_count_);
-        return vertices_[index];
-    }
-
     //
-    // draw_command
+    // render::draw_indexed_command
     //
+        
+    render::draw_indexed_command& render::draw_indexed_command::indices(const index_buffer_ptr& value) noexcept {
+        index_buffer_ = value;
+        return *this;
+    }
 
-    render::draw_command::draw_command(const material& mat, const geometry& geo) noexcept
-    : material_(&mat)
-    , geometry_(&geo) {}
+    render::draw_indexed_command& render::draw_indexed_command::topo(topology value) noexcept {
+        topology_ = value;
+        return *this;
+    }
 
-    render::draw_command::draw_command(const material& mat, const geometry& geo, const property_block& props) noexcept
-    : material_(&mat)
-    , geometry_(&geo)
-    , properties_(&props) {}
-
-    render::draw_command& render::draw_command::index_range(std::size_t first, std::size_t count) noexcept {
+    render::draw_indexed_command& render::draw_indexed_command::index_range(u32 first, u32 count) noexcept {
         first_index_ = first;
         index_count_ = count;
         return *this;
     }
 
-    render::draw_command& render::draw_command::first_index(std::size_t value) noexcept {
+    render::draw_indexed_command& render::draw_indexed_command::first_index(u32 value) noexcept {
         first_index_ = value;
         return *this;
     }
 
-    render::draw_command& render::draw_command::index_count(std::size_t value) noexcept {
+    render::draw_indexed_command& render::draw_indexed_command::index_count(u32 value) noexcept {
         index_count_ = value;
         return *this;
     }
-
-    render::draw_command& render::draw_command::material_ref(const material& value) noexcept {
-        material_ = &value;
-        return *this;
-    }
-
-    render::draw_command& render::draw_command::geometry_ref(const geometry& value) noexcept {
-        geometry_ = &value;
-        return *this;
-    }
-
-    render::draw_command& render::draw_command::properties_ref(const property_block& value) {
-        properties_ = &value;
-        return *this;
-    }
-
-    std::size_t render::draw_command::first_index() const noexcept {
+            
+    u32 render::draw_indexed_command::first_index() const noexcept {
         return first_index_;
     }
 
-    std::size_t render::draw_command::index_count() const noexcept {
+    u32 render::draw_indexed_command::index_count() const noexcept {
         return index_count_;
     }
 
-    const render::material& render::draw_command::material_ref() const noexcept {
-        E2D_ASSERT_MSG(material_, "draw command with empty material");
-        return *material_;
+    render::topology render::draw_indexed_command::topo() const noexcept {
+        return topology_;
     }
 
-    const render::geometry& render::draw_command::geometry_ref() const noexcept {
-        E2D_ASSERT_MSG(material_, "draw command with empty geometry");
-        return *geometry_;
-    }
-
-    const render::property_block& render::draw_command::properties_ref() const noexcept {
-        static property_block empty_property_block;
-        return properties_ ? *properties_ : empty_property_block;
-    }
-
-    //
-    // clear_command
-    //
-
-    render::clear_command::clear_command(buffer clear_buffer) noexcept
-    : clear_buffer_(clear_buffer) {}
-
-    render::clear_command& render::clear_command::color_value(const color& value) noexcept {
-        color_value_ = value;
-        return *this;
-    }
-
-    render::clear_command& render::clear_command::depth_value(f32 value) noexcept {
-        depth_value_ = value;
-        return *this;
-    }
-
-    render::clear_command& render::clear_command::stencil_value(u8 value) noexcept {
-        stencil_value_ = value;
-        return *this;
-    }
-
-    color& render::clear_command::color_value() noexcept {
-        return color_value_;
-    }
-
-    f32& render::clear_command::depth_value() noexcept {
-        return depth_value_;
-    }
-
-    u8& render::clear_command::stencil_value() noexcept {
-        return stencil_value_;
-    }
-
-    const color& render::clear_command::color_value() const noexcept {
-        return color_value_;
-    }
-
-    f32 render::clear_command::depth_value() const noexcept {
-        return depth_value_;
-    }
-
-    u8 render::clear_command::stencil_value() const noexcept {
-        return stencil_value_;
-    }
-
-    render::clear_command::buffer& render::clear_command::clear_buffer() noexcept {
-        return clear_buffer_;
-    }
-
-    render::clear_command::buffer render::clear_command::clear_buffer() const noexcept {
-        return clear_buffer_;
-    }
-
-    //
-    // target_command
-    //
-
-    render::target_command::target_command(const render_target_ptr& rt) noexcept
-    : target_(rt) {}
-
-    render::target_command& render::target_command::target(const render_target_ptr& value) noexcept {
-        target_ = value;
-        return *this;
-    }
-
-    render_target_ptr& render::target_command::target() noexcept {
-        return target_;
-    }
-
-    const render_target_ptr& render::target_command::target() const noexcept {
-        return target_;
-    }
-
-    //
-    // viewport_command
-    //
-
-    render::viewport_command::viewport_command(const b2u& viewport_rect) noexcept
-    : viewport_rect_(viewport_rect) {}
-
-    render::viewport_command::viewport_command(const b2u& viewport_rect, const b2u& scissor_rect) noexcept
-    : viewport_rect_(viewport_rect)
-    , scissor_rect_(scissor_rect)
-    , scissoring_(true) {}
-
-    render::viewport_command& render::viewport_command::viewport_rect(const b2u& value) noexcept {
-        viewport_rect_ = value;
-        return *this;
-    }
-
-    render::viewport_command& render::viewport_command::scissor_rect(const b2u& value) noexcept {
-        scissor_rect_ = value;
-        scissoring_ = true;
-        return *this;
-    }
-
-    render::viewport_command& render::viewport_command::scissoring(bool value) noexcept {
-        scissoring_ = value;
-        return *this;
-    }
-
-    b2u& render::viewport_command::viewport_rect() noexcept {
-        return viewport_rect_;
-    }
-
-    b2u& render::viewport_command::scissor_rect() noexcept {
-        return scissor_rect_;
-    }
-
-    bool& render::viewport_command::scissoring() noexcept {
-        return scissoring_;
-    }
-
-    const b2u& render::viewport_command::viewport_rect() const noexcept {
-        return viewport_rect_;
-    }
-
-    const b2u& render::viewport_command::scissor_rect() const noexcept {
-        return scissor_rect_;
-    }
-
-    bool render::viewport_command::scissoring() const noexcept {
-        return scissoring_;
+    const index_buffer_ptr& render::draw_indexed_command::indices() const noexcept {
+        return index_buffer_;
     }
 
     //
@@ -1145,9 +1114,8 @@ namespace e2d
     bool operator==(const render::state_block& l, const render::state_block& r) noexcept {
         return l.depth() == r.depth()
             && l.stencil() == r.stencil()
-            && l.culling() == r.culling()
-            && l.blending() == r.blending()
-            && l.capabilities() == r.capabilities();
+            && l.rasterization() == r.rasterization()
+            && l.blending() == r.blending();
     }
 
     bool operator!=(const render::state_block& l, const render::state_block& r) noexcept {
@@ -1155,10 +1123,9 @@ namespace e2d
     }
 
     bool operator==(const render::depth_state& l, const render::depth_state& r) noexcept {
-        return math::approximately(l.range_near(), r.range_near())
-            && math::approximately(l.range_far(), r.range_far())
+        return l.test() == r.test()
             && l.write() == r.write()
-            && l.func() == r.func();
+            && (!l.test() || l.func() == r.func());
     }
 
     bool operator!=(const render::depth_state& l, const render::depth_state& r) noexcept {
@@ -1166,6 +1133,9 @@ namespace e2d
     }
 
     bool operator==(const render::stencil_state& l, const render::stencil_state& r) noexcept {
+        if ( !l.test() ) {
+            return !r.test();
+        }
         return l.write() == r.write()
             && l.ref() == r.ref()
             && l.mask() == r.mask()
@@ -1179,17 +1149,22 @@ namespace e2d
         return !(l == r);
     }
 
-    bool operator==(const render::culling_state& l, const render::culling_state& r) noexcept {
-        return l.mode() == r.mode()
-            && l.face() == r.face();
+    bool operator==(const render::rasterization_state& l, const render::rasterization_state& r) noexcept {
+        return l.polygon_offset_factor() == r.polygon_offset_factor()
+            && l.polygon_offset_units() == r.polygon_offset_units()
+            && l.culling() == r.culling()
+            && l.front_face_ccw() == r.front_face_ccw();
     }
 
-    bool operator!=(const render::culling_state& l, const render::culling_state& r) noexcept {
+    bool operator!=(const render::rasterization_state& l, const render::rasterization_state& r) noexcept {
         return !(l == r);
     }
 
     bool operator==(const render::blending_state& l, const render::blending_state& r) noexcept {
-        return l.constant_color() == r.constant_color()
+        if ( !l.enabled() ) {
+            return !r.enabled();
+        }
+        return l.enabled() == r.enabled()
             && l.color_mask() == r.color_mask()
             && l.src_rgb_factor() == r.src_rgb_factor()
             && l.dst_rgb_factor() == r.dst_rgb_factor()
@@ -1203,25 +1178,6 @@ namespace e2d
         return !(l == r);
     }
 
-    bool operator==(const render::capabilities_state& l, const render::capabilities_state& r) noexcept {
-        return l.culling() == r.culling()
-            && l.blending() == r.blending()
-            && l.depth_test() == r.depth_test()
-            && l.stencil_test() == r.stencil_test();
-    }
-
-    bool operator!=(const render::capabilities_state& l, const render::capabilities_state& r) noexcept {
-        return !(l == r);
-    }
-
-    bool operator==(const render::property_block& l, const render::property_block& r) noexcept {
-        return l.equals(r);
-    }
-
-    bool operator!=(const render::property_block& l, const render::property_block& r) noexcept {
-        return !(l == r);
-    }
-
     bool operator==(const render::sampler_state& l, const render::sampler_state& r) noexcept {
         return l.texture() == r.texture()
             && l.s_wrap() == r.s_wrap()
@@ -1231,32 +1187,6 @@ namespace e2d
     }
 
     bool operator!=(const render::sampler_state& l, const render::sampler_state& r) noexcept {
-        return !(l == r);
-    }
-
-    bool operator==(const render::material& l, const render::material& r) noexcept {
-        return l.equals(r);
-    }
-
-    bool operator!=(const render::material& l, const render::material& r) noexcept {
-        return !(l == r);
-    }
-
-    bool operator==(const render::pass_state& l, const render::pass_state& r) noexcept {
-        return l.shader() == r.shader()
-            && l.states() == r.states()
-            && l.properties() == r.properties();
-    }
-
-    bool operator!=(const render::pass_state& l, const render::pass_state& r) noexcept {
-        return !(l == r);
-    }
-
-    bool operator==(const render::geometry& l, const render::geometry& r) noexcept {
-        return l.equals(r);
-    }
-
-    bool operator!=(const render::geometry& l, const render::geometry& r) noexcept {
         return !(l == r);
     }
 }

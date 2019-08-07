@@ -69,6 +69,13 @@
 namespace e2d::opengl
 {
     struct gl_device_caps {
+        bool depth16_supported = false;
+        bool depth16_stencil8_supported = false;
+        bool depth24_supported = false;
+        bool depth24_stencil8_supported = false;
+        bool depth32_supported = false;
+        bool depth32_stencil8_supported = false;
+
         bool debug_output_supported = false;
     };
 

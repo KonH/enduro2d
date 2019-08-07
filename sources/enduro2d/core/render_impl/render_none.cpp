@@ -211,13 +211,44 @@ namespace e2d
         E2D_UNUSED(indices, decl, usage);
         return nullptr;
     }
+    
+    index_buffer_ptr create_index_buffer(
+        size_t size,
+        const index_declaration& decl,
+        index_buffer::usage usage)
+    {
+        E2D_UNUSED(size, decl, usage);
+        return nullptr;
+    }
 
     vertex_buffer_ptr render::create_vertex_buffer(
         buffer_view vertices,
-        const vertex_declaration& decl,
         vertex_buffer::usage usage)
     {
-        E2D_UNUSED(vertices, decl, usage);
+        E2D_UNUSED(vertices, usage);
+        return nullptr;
+    }
+    
+    vertex_buffer_ptr create_vertex_buffer(
+        size_t size,
+        vertex_buffer::usage usage)
+    {
+        E2D_UNUSED(size, usage);
+        return nullptr;
+    }
+        
+    vertex_attribs_ptr create_vertex_attribs(
+        const vertex_declaration& decl)
+    {
+        E2D_UNUSED(decl);
+        return nullptr;
+    }
+
+    const_buffer_ptr create_const_buffer(
+        const shader_ptr& shader,
+        const_buffer::scope scope)
+    {
+        E2D_UNUSED(shader, scope);
         return nullptr;
     }
 
@@ -230,27 +261,51 @@ namespace e2d
         E2D_UNUSED(size, color_decl, depth_decl, external_texture);
         return nullptr;
     }
+    
+    render& render::begin_pass(const renderpass_desc& desc) {
+        E2D_UNUSED(desc);
+        return *this;
+    }
+
+    render& render::end_pass() {
+        return *this;
+    }
+    
+    render& render::execute(const bind_vertex_buffers_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const bind_pipeline_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const bind_const_buffer_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const bind_textures_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const scissor_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
 
     render& render::execute(const draw_command& command) {
         E2D_UNUSED(command);
         return *this;
     }
 
-    render& render::execute(const clear_command& command) {
+    render& render::execute(const draw_indexed_command& command) {
         E2D_UNUSED(command);
         return *this;
     }
 
-    render& render::execute(const target_command& command) {
-        E2D_UNUSED(command);
-        return *this;
-    }
-
-    render& render::execute(const viewport_command& command) {
-        E2D_UNUSED(command);
-        return *this;
-    }
-    
     render& render::update_buffer(
         const index_buffer_ptr& ibuffer,
         buffer_view indices,
@@ -266,6 +321,14 @@ namespace e2d
         std::size_t offset)
     {
         E2D_UNUSED(vbuffer, vertices, offset);
+        return *this;
+    }
+    
+    render& render::update_buffer(
+        const const_buffer_ptr& cbuffer,
+        const property_map<property_value>& properties)
+    {
+        E2D_UNUSED(cbuffer, properties);
         return *this;
     }
 
