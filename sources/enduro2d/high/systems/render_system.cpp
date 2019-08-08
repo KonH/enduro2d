@@ -14,6 +14,8 @@
 #include "render_system_impl/render_system_batcher.hpp"
 #include "render_system_impl/render_system_drawer.hpp"
 
+#if 0
+
 namespace
 {
     using namespace e2d;
@@ -121,3 +123,5 @@ namespace e2d
         state_->process(owner);
     }
 }
+
+#endif

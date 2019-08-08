@@ -10,6 +10,8 @@
 #include <enduro2d/high/components/model_renderer.hpp>
 #include <enduro2d/high/components/sprite_renderer.hpp>
 
+#if 0
+
 namespace
 {
     using namespace e2d;
@@ -224,3 +226,5 @@ namespace e2d::render_system_impl
     , render_(r)
     , batcher_(d, r) {}
 }
+
+#endif

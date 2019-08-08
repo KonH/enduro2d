@@ -10,6 +10,8 @@
 #include <enduro2d/high/assets/shader_asset.hpp>
 #include <enduro2d/high/assets/texture_asset.hpp>
 
+#if 0
+
 namespace
 {
     using namespace e2d;
@@ -1187,3 +1189,5 @@ namespace e2d
         });
     }
 }
+
+#endif

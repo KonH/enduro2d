@@ -11,6 +11,8 @@
 #include "../library.hpp"
 #include "../model.hpp"
 
+#if 0
+
 namespace e2d
 {
     class model_asset final : public content_asset<model_asset, model> {
@@ -19,3 +21,5 @@ namespace e2d
         static load_async_result load_async(const library& library, str_view address);
     };
 }
+
+#endif

@@ -185,9 +185,7 @@ namespace e2d
     private:
         void set_depth_state_(const depth_state& ds) noexcept;
         void set_stencil_state_(const stencil_state& ss) noexcept;
-        void set_culling_state_(const culling_state& cs) noexcept;
         void set_blending_state_(const blending_state& bs) noexcept;
-        void set_capabilities_state_(const capabilities_state& cs) noexcept;
         void create_debug_output_() noexcept;
         static void GLAPIENTRY debug_output_callback_(
             GLenum source,

@@ -14,6 +14,8 @@
 #include "render_system_base.hpp"
 #include "render_system_batcher.hpp"
 
+#if 0
+
 namespace e2d::render_system_impl
 {
     class bad_drawer_operation final : public exception {
@@ -79,3 +81,5 @@ namespace e2d::render_system_impl
         ctx.flush();
     }
 }
+
+#endif

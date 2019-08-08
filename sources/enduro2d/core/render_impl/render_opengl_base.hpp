@@ -292,8 +292,6 @@ namespace e2d::opengl
     GLenum convert_topology(render::topology t) noexcept;
     GLenum convert_stencil_op(render::stencil_op sa) noexcept;
     GLenum convert_compare_func(render::compare_func cf) noexcept;
-    GLenum convert_culling_mode(render::culling_mode cm) noexcept;
-    GLenum convert_culling_face(render::culling_face cf) noexcept;
     GLenum convert_blending_factor(render::blending_factor bf) noexcept;
     GLenum convert_blending_equation(render::blending_equation be) noexcept;
 

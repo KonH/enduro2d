@@ -6,6 +6,8 @@
 
 #include <enduro2d/high/components/model_renderer.hpp>
 
+#if 0
+
 namespace e2d
 {
     const char* factory_loader<model_renderer>::schema_source = R"json({
@@ -50,3 +52,5 @@ namespace e2d
         return true;
     }
 }
+
+#endif

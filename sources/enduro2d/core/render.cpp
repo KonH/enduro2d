@@ -383,6 +383,10 @@ namespace e2d
         return *this;
     }
 
+    bool render::stencil_state::test() const noexcept {
+        return test_;
+    }
+
     u8 render::stencil_state::write() const noexcept {
         return write_mask_;
     }

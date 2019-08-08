@@ -169,6 +169,14 @@ namespace
                 framebuffer_size, 0.f, 1.f);
 
             auto& the_batcher = the<batcher>();
+            auto& the_render = the<render>();
+
+            the_render.begin_pass(render::renderpass_desc()
+                .color_clear({0.f, 0.0f, 0.f, 1.f})
+                .color_store()
+                .depth_clear(1.0f)
+                .depth_discard()
+                .viewport(the<window>().real_size()));
 
             batcher::material mtr1 = batcher::material()
                 .shader(shader1_)
@@ -242,13 +250,8 @@ namespace
                     b2f(0.0f, 0.0f, 1.0f, -1.0f),
                     color32::blue()));
 
-            the<render>().execute(render::command_block<64>()
-                .add_command(render::viewport_command(
-                    the<window>().real_size()))
-                .add_command(render::clear_command()
-                    .color_value({0.f, 0.0f, 0.f, 1.f})));
-
             the_batcher.flush();
+            the_render.end_pass();
         }
     private:
         shader_ptr shader1_;

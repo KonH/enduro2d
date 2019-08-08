@@ -11,6 +11,8 @@
 #include "../factory.hpp"
 #include "../assets/material_asset.hpp"
 
+#if 0
+
 namespace e2d
 {
     class renderer final {
@@ -99,3 +101,5 @@ namespace e2d
         return materials_;
     }
 }
+
+#endif

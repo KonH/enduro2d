@@ -5,6 +5,7 @@
  ******************************************************************************/
 
 #include <enduro2d/high/model.hpp>
+#if 0
 
 namespace
 {
@@ -227,3 +228,5 @@ namespace e2d
         return !(l == r);
     }
 }
+
+#endif

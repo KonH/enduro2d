@@ -10,6 +10,8 @@
 
 #include "assets/mesh_asset.hpp"
 
+#if 0
+
 namespace e2d
 {
     class model final {
@@ -44,3 +46,5 @@ namespace e2d
     bool operator==(const model& l, const model& r) noexcept;
     bool operator!=(const model& l, const model& r) noexcept;
 }
+
+#endif

@@ -8,6 +8,33 @@
 #include "render_impl/render_opengl_base.hpp"
 #include "render_impl/render_opengl_impl.hpp"
 
+namespace e2d
+{
+    batcher::batcher(debug& d)
+    : debug_(d) {}
+
+    batcher::~batcher() noexcept = default;
+    
+    void batcher::flush() {}
+    
+    batcher::batch_& batcher::append_batch_(
+        const material& mtr,
+        topology topo,
+        vert_decl_ptr vert_decl,
+        size_t vert_stride,
+        size_t min_vb_size,
+        size_t min_ib_size)
+    {
+        return *(batch_*)(nullptr);
+    }
+    
+    batcher::vert_decl_ptr batcher::cache_vert_decl_(const vertex_declaration& decl) {
+        return nullptr;
+    }
+}
+
+#if 0
+
 namespace 
 {
     using namespace e2d;
@@ -350,3 +377,5 @@ namespace e2d
         batches_.clear();
     }
 }
+
+#endif

@@ -10,6 +10,8 @@
 
 #include <enduro2d/high/assets/material_asset.hpp>
 
+#if 0
+
 namespace e2d::render_system_impl
 {
     class bad_batcher_operation final : public exception {
@@ -267,3 +269,5 @@ namespace e2d::render_system_impl
         return math::max(osize * 2u, nsize);
     }
 }
+
+#endif

@@ -11,6 +11,8 @@
 #include "../factory.hpp"
 #include "../assets/model_asset.hpp"
 
+#if 0
+
 namespace e2d
 {
     class model_renderer final {
@@ -53,3 +55,5 @@ namespace e2d
         return model_;
     }
 }
+
+#endif

@@ -122,12 +122,10 @@ namespace e2d
     vertex_buffer::internal_state::internal_state(
         debug& debug,
         gl_buffer_id id,
-        std::size_t size,
-        const vertex_declaration& decl)
+        std::size_t size)
     : debug_(debug)
     , id_(std::move(id))
-    , size_(size)
-    , decl_(decl) {
+    , size_(size) {
         E2D_ASSERT(!id_.empty());
     }
 
@@ -141,10 +139,6 @@ namespace e2d
 
     std::size_t vertex_buffer::internal_state::size() const noexcept {
         return size_;
-    }
-
-    const vertex_declaration& vertex_buffer::internal_state::decl() const noexcept {
-        return decl_;
     }
 
     //
@@ -248,9 +242,7 @@ namespace e2d
     render::internal_state& render::internal_state::reset_states() noexcept {
         set_depth_state_(state_block_.depth());
         set_stencil_state_(state_block_.stencil());
-        set_culling_state_(state_block_.culling());
         set_blending_state_(state_block_.blending());
-        set_capabilities_state_(state_block_.capabilities());
         return *this;
     }
 
@@ -265,19 +257,9 @@ namespace e2d
             state_block_.stencil(sb.stencil());
         }
 
-        if ( sb.culling() != state_block_.culling() ) {
-            set_culling_state_(sb.culling());
-            state_block_.culling(sb.culling());
-        }
-
         if ( sb.blending() != state_block_.blending() ) {
             set_blending_state_(sb.blending());
             state_block_.blending(sb.blending());
-        }
-
-        if ( sb.capabilities() != state_block_.capabilities() ) {
-            set_capabilities_state_(sb.capabilities());
-            state_block_.capabilities(sb.capabilities());
         }
 
         return *this;
@@ -328,7 +310,7 @@ namespace e2d
     }
 
     void render::internal_state::set_depth_state_(const depth_state& ds) noexcept {
-    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+    /*#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
         GL_CHECK_CODE(debug_, glDepthRange(
             math::numeric_cast<GLclampd>(math::saturate(ds.range_near())),
             math::numeric_cast<GLclampd>(math::saturate(ds.range_far()))));
@@ -338,7 +320,7 @@ namespace e2d
             math::numeric_cast<GLclampf>(math::saturate(ds.range_far()))));
     #else
     #   error unknown render mode
-    #endif
+    #endif*/
         GL_CHECK_CODE(debug_, glDepthMask(
             ds.write() ? GL_TRUE : GL_FALSE));
         GL_CHECK_CODE(debug_, glDepthFunc(
@@ -358,19 +340,12 @@ namespace e2d
             convert_stencil_op(ss.pass())));
     }
 
-    void render::internal_state::set_culling_state_(const culling_state& cs) noexcept {
-        GL_CHECK_CODE(debug_, glFrontFace(
-            convert_culling_mode(cs.mode())));
-        GL_CHECK_CODE(debug_, glCullFace(
-            convert_culling_face(cs.face())));
-    }
-
     void render::internal_state::set_blending_state_(const blending_state& bs) noexcept {
-        GL_CHECK_CODE(debug_, glBlendColor(
+        /*GL_CHECK_CODE(debug_, glBlendColor(
             math::numeric_cast<GLclampf>(math::saturate(bs.constant_color().r)),
             math::numeric_cast<GLclampf>(math::saturate(bs.constant_color().g)),
             math::numeric_cast<GLclampf>(math::saturate(bs.constant_color().b)),
-            math::numeric_cast<GLclampf>(math::saturate(bs.constant_color().a))));
+            math::numeric_cast<GLclampf>(math::saturate(bs.constant_color().a))));*/
         GL_CHECK_CODE(debug_, glBlendFuncSeparate(
             convert_blending_factor(bs.src_rgb_factor()),
             convert_blending_factor(bs.dst_rgb_factor()),
@@ -384,21 +359,6 @@ namespace e2d
             (utils::enum_to_underlying(bs.color_mask()) & utils::enum_to_underlying(blending_color_mask::g)) != 0,
             (utils::enum_to_underlying(bs.color_mask()) & utils::enum_to_underlying(blending_color_mask::b)) != 0,
             (utils::enum_to_underlying(bs.color_mask()) & utils::enum_to_underlying(blending_color_mask::a)) != 0));
-    }
-
-    void render::internal_state::set_capabilities_state_(const capabilities_state& cs) noexcept {
-        const auto enable_or_disable = [](GLenum cap, bool enable) noexcept {
-            if ( enable ) {
-                glEnable(cap);
-            } else {
-                glDisable(cap);
-            }
-        };
-
-        GL_CHECK_CODE(debug_, enable_or_disable(GL_CULL_FACE, cs.culling()));
-        GL_CHECK_CODE(debug_, enable_or_disable(GL_BLEND, cs.blending()));
-        GL_CHECK_CODE(debug_, enable_or_disable(GL_DEPTH_TEST, cs.depth_test()));
-        GL_CHECK_CODE(debug_, enable_or_disable(GL_STENCIL_TEST, cs.stencil_test()));
     }
 
     void render::internal_state::create_debug_output_() noexcept {
