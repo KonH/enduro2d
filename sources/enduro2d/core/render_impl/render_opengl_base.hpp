@@ -76,6 +76,9 @@ namespace e2d::opengl
         bool depth32_supported = false;
         bool depth32_stencil8_supported = false;
 
+        bool framebuffer_discard_supported = false; // GLES2 only
+        bool framebuffer_invalidate_supported = false; // GLES3 or GL4
+
         bool debug_output_supported = false;
     };
 
@@ -294,6 +297,7 @@ namespace e2d::opengl
     GLenum convert_compare_func(render::compare_func cf) noexcept;
     GLenum convert_blending_factor(render::blending_factor bf) noexcept;
     GLenum convert_blending_equation(render::blending_equation be) noexcept;
+    GLenum convert_culling_mode(render::culling_mode cm) noexcept;
 
     uniform_type glsl_type_to_uniform_type(GLenum t) noexcept;
     attribute_type glsl_type_to_attribute_type(GLenum t) noexcept;
@@ -309,7 +313,8 @@ namespace e2d::opengl
     void gl_trace_info(debug& debug) noexcept;
     void gl_trace_limits(debug& debug) noexcept;
     void gl_fill_device_caps(debug& debug, render::device_caps& caps, gl_device_caps& ext) noexcept;
-    bool gl_has_extension(debug& debug, str_view name) noexcept;
+
+    void gl_depth_range(debug& debug, float near, float far) noexcept;
 
     gl_shader_id gl_compile_shader(
         debug& debug,

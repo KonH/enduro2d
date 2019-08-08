@@ -142,6 +142,39 @@ namespace e2d
     }
 
     //
+    // vertex_attribs
+    //
+
+    const vertex_attribs::internal_state& vertex_attribs::state() const noexcept {
+        return *state_;
+    }
+
+    vertex_attribs::vertex_attribs(internal_state_uptr state)
+    : state_(std::move(state)) {}
+    vertex_attribs::~vertex_attribs() noexcept = default;
+
+    const vertex_declaration& vertex_attribs::decl() const noexcept {
+        static vertex_declaration decl;
+        return decl;
+    }
+
+    //
+    // const_buffer
+    //
+
+    const const_buffer::internal_state& const_buffer::state() const noexcept {
+        return *state_;
+    }
+
+    const_buffer::const_buffer(internal_state_uptr state)
+    : state_(std::move(state)) {}
+    const_buffer::~const_buffer() noexcept = default;
+
+    std::size_t const_buffer::buffer_size() const noexcept {
+        return 0u;
+    }
+
+    //
     // render_target
     //
 
@@ -262,12 +295,20 @@ namespace e2d
         return nullptr;
     }
     
-    render& render::begin_pass(const renderpass_desc& desc) {
-        E2D_UNUSED(desc);
+    render& render::begin_pass(
+        const renderpass_desc& desc,
+        const const_buffer_ptr& cbuffer,
+        const sampler_block& samplers)
+    {
+        E2D_UNUSED(desc, cbuffer, samplers);
         return *this;
     }
 
     render& render::end_pass() {
+        return *this;
+    }
+        
+    render& render::present() {
         return *this;
     }
     
@@ -353,6 +394,11 @@ namespace e2d
     const render::device_caps& render::device_capabilities() const noexcept {
         static device_caps caps;
         return caps;
+    }
+    
+    const render::statistics& render::frame_statistic() const noexcept {
+        static statistics stats;
+        return stats;
     }
 
     bool render::is_pixel_supported(const pixel_declaration& decl) const noexcept {

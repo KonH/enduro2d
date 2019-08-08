@@ -137,8 +137,11 @@ namespace
                 the<vfs>().read(url("resources://bin/library/cube_1.png")));
             texture3_ = the<render>().create_texture(
                 the<vfs>().read(url("resources://bin/library/ship.png")));
+            rpass_cbuffer_ = the<render>().create_const_buffer(
+                shader1_,
+                const_buffer::scope::render_pass);
 
-            if ( !shader1_ || !shader1_ || !texture1_ || !texture2_ || !texture3_ ) {
+            if ( !shader1_ || !shader2_ || !texture1_ || !texture2_ || !texture3_ || !rpass_cbuffer_ ) {
                 return false;
             }
 
@@ -167,23 +170,26 @@ namespace
             const auto framebuffer_size = the<window>().real_size().cast_to<f32>();
             const auto projection = math::make_orthogonal_lh_matrix4(
                 framebuffer_size, 0.f, 1.f);
+            
+            render::property_map<render::property_value> props;
+            props.assign("u_MVP", projection);
+            the<render>().update_buffer(rpass_cbuffer_, props);
 
-            auto& the_batcher = the<batcher>();
-            auto& the_render = the<render>();
-
-            the_render.begin_pass(render::renderpass_desc()
-                .color_clear({0.f, 0.0f, 0.f, 1.f})
-                .color_store()
-                .depth_clear(1.0f)
-                .depth_discard()
-                .viewport(the<window>().real_size()));
+            the<render>().begin_pass(
+                render::renderpass_desc()
+                    .color_clear({0.f, 0.0f, 0.f, 1.f})
+                    .color_store()
+                    .depth_clear(1.0f)
+                    .depth_discard()
+                    .viewport(the<window>().real_size()),
+                rpass_cbuffer_,
+                {});
 
             batcher::material mtr1 = batcher::material()
                 .shader(shader1_)
                 .blend(batcher::blend_mode()
                     .src_factor(render::blending_factor::src_alpha)
                     .dst_factor(render::blending_factor::one_minus_src_alpha))
-                .property("u_MVP", projection)
                 .sampler("u_texture", render::sampler_state()
                     .texture(texture1_)
                     .min_filter(render::sampler_min_filter::linear)
@@ -194,20 +200,18 @@ namespace
                 .blend(batcher::blend_mode()
                     .src_factor(render::blending_factor::src_alpha)
                     .dst_factor(render::blending_factor::one_minus_src_alpha))
-                .property("u_MVP", projection)
                 .sampler("u_texture", render::sampler_state()
                     .texture(texture2_)
                     .min_filter(render::sampler_min_filter::linear)
                     .mag_filter(render::sampler_mag_filter::linear));
 
-            auto batch = the_batcher.alloc_batch<vertex2>(4, 6,
+            auto batch = the<batcher>().alloc_batch<vertex2>(4, 6,
                 batcher::topology::triangles,
                 batcher::material()
                     .shader(shader2_)
                     .blend(batcher::blend_mode()
                         .src_factor(render::blending_factor::src_alpha)
-                        .dst_factor(render::blending_factor::one_minus_src_alpha))
-                    .property("u_MVP", projection));
+                        .dst_factor(render::blending_factor::one_minus_src_alpha)));
             batch.vertices[0] = vertex2(v3f(- 90.0f,  170.0f, 0.0f), color32::red());
             batch.vertices[1] = vertex2(v3f(-120.0f, -210.0f, 0.0f), color32::green());
             batch.vertices[2] = vertex2(v3f( 120.0f,  230.0f, 0.0f), color32::blue());
@@ -215,43 +219,43 @@ namespace
             batch.indices++ = 0;  batch.indices++ = 1;  batch.indices++ = 2;
             batch.indices++ = 1;  batch.indices++ = 2;  batch.indices++ = 3;
 
-            the_batcher.add_batch(
+            the<batcher>().add_batch(
                 mtr1,
                 rect_batch(
                     b2f(100.0f, -50.0f, 100.0f, 100.0f),
                     b2f(0.0f, 0.0f, 1.0f, -1.0f),
                     color32::green()));
             
-            the_batcher.add_batch(
+            the<batcher>().add_batch(
                 mtr1,
                 rect_batch(
                     b2f(50.0f, 50.0f, 100.0f, 100.0f),
                     b2f(0.0f, 0.0f, 1.0f, -1.0f),
                     color32::green()));
             
-            the_batcher.add_batch(
+            the<batcher>().add_batch(
                 mtr2,
                 rect_batch_strip(
                     b2f(-200.0f, -50.0f, 100.0f, 100.0f),
                     b2f(0.0f, 0.0f, 1.0f, -1.0f),
                     color32::blue()));
             
-            the_batcher.add_batch(
+            the<batcher>().add_batch(
                 mtr2,
                 rect_batch_strip(
                     b2f(-250.0f, -180.0f, 100.0f, 100.0f),
                     b2f(0.0f, 0.0f, 1.0f, -1.0f),
                     color32::blue()));
             
-            the_batcher.add_batch(
+            the<batcher>().add_batch(
                 mtr2,
                 rect_batch_strip(
                     b2f(-170.0f, 130.0f, 100.0f, 100.0f),
                     b2f(0.0f, 0.0f, 1.0f, -1.0f),
                     color32::blue()));
 
-            the_batcher.flush();
-            the_render.end_pass();
+            the<batcher>().flush();
+            the<render>().end_pass();
         }
     private:
         shader_ptr shader1_;
@@ -259,6 +263,7 @@ namespace
         texture_ptr texture1_;
         texture_ptr texture2_;
         texture_ptr texture3_;
+        const_buffer_ptr rpass_cbuffer_;
     };
 }
 

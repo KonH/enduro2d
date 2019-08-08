@@ -145,62 +145,44 @@ namespace e2d
             blending_equation alpha_equation_ = blending_equation::add;
             bool enabled_ = false;
         };
-
+        
         using sampler_state = render::sampler_state;
+        using sampler_block = render::sampler_block;
 
         class material final {
         public:
-            using sampler_state_t = std::pair<str_hash, render::sampler_state>;
-            using properties_t = render::property_map<render::property_value>;
-        public:
             material() = default;
 
-            template < typename T >
-            material& property(str_hash name, T&& v);
+            material& cbuffer(const const_buffer_ptr& value) noexcept;
             material& shader(const shader_ptr& value) noexcept;
             material& sampler(str_view name, const sampler_state& value) noexcept;
             material& blend(const blend_mode& value) noexcept;
 
             [[nodiscard]] const shader_ptr& shader() const noexcept;
-            [[nodiscard]] const sampler_state_t& sampler() const noexcept;
-            [[nodiscard]] const properties_t& properties() const noexcept;
+            [[nodiscard]] const sampler_block& samplers() const noexcept;
+            [[nodiscard]] const const_buffer_ptr& cbuffer() const noexcept;
             [[nodiscard]] const blend_mode& blend() const noexcept;
 
             [[nodiscard]] bool operator == (const material& r) const noexcept;
         private:
             shader_ptr shader_;
-            sampler_state_t sampler_;
+            sampler_block samplers_;
             blend_mode blend_;
-            properties_t properties_; // TODO: optimize
+            const_buffer_ptr cbuffer_;
         };
 
     private:
-        struct vertex_declaration_hash {
-            size_t operator ()(const vertex_declaration& x) const noexcept;
-        };
-
-        struct vertex_declaration_equal {
-            bool operator ()(const vertex_declaration& l, const vertex_declaration& r) const noexcept;
-        };
-
-        using unique_vert_decl_t = std::unordered_set<
-            vertex_declaration,
-            vertex_declaration_hash,
-            vertex_declaration_equal>;
-        using vert_decl_ptr = const vertex_declaration*;
-
         class batch_ final {
         public:
             batch_(const material &mtr);
         public:
             material mtr;
-            topology topo;
-            size_t idx_offset = 0;
-            size_t vert_count = 0;
-            size_t idx_count = 0;
-            u32 vb_index = ~0u;
-            u32 ib_index = ~0u;
-            vert_decl_ptr vert_decl = nullptr;
+            vertex_attribs_ptr attribs;
+            topology topo = topology::triangles;
+            u32 idx_offset = 0;
+            u32 idx_count = 0;
+            u8 vb_index = 0xFF;
+            u8 ib_index = 0xFF;
         };
 
         class buffer_ final {
@@ -218,7 +200,7 @@ namespace e2d
         static constexpr size_t index_buffer_size_ = max_vertex_count_ * 3 * index_stride_;
 
     public:
-        batcher(debug& d);
+        batcher(debug& d, render& r);
         ~batcher() noexcept final;
 
         template < typename BatchType >
@@ -254,19 +236,17 @@ namespace e2d
         batch_& append_batch_(
             const material& mtr,
             topology topo,
-            vert_decl_ptr vert_decl,
+            vertex_attribs_ptr attribs,
             size_t vert_stride,
             size_t min_vb_size,
             size_t min_ib_size);
 
-        vert_decl_ptr cache_vert_decl_(const vertex_declaration& decl);
-
     private:
         debug& debug_;
+        render& render_;
         std::vector<batch_> batches_;
         std::vector<buffer_> vertex_buffers_;
         std::vector<buffer_> index_buffers_;
-        unique_vert_decl_t unique_vert_decl_;
         bool dirty_ = false;
     };
 }
@@ -518,14 +498,12 @@ namespace e2d
         str_view name,
         const sampler_state& value) noexcept
     {
-        sampler_.first = name;
-        sampler_.second = value;
+        samplers_.bind(name, value);
         return *this;
     }
     
-    template < typename T >
-    inline batcher::material& batcher::material::property(str_hash name, T&& v) {
-        properties_.assign(name, v);
+    inline batcher::material& batcher::material::cbuffer(const const_buffer_ptr& cb) noexcept {
+        cbuffer_ = cb;
         return *this;
     }
     
@@ -538,12 +516,12 @@ namespace e2d
         return shader_;
     }
 
-    inline const batcher::material::sampler_state_t& batcher::material::sampler() const noexcept {
-        return sampler_;
+    inline const batcher::sampler_block& batcher::material::samplers() const noexcept {
+        return samplers_;
     }
 
-    inline const batcher::material::properties_t& batcher::material::properties() const noexcept {
-        return properties_;
+    inline const const_buffer_ptr& batcher::material::cbuffer() const noexcept {
+        return cbuffer_;
     }
 
     inline const batcher::blend_mode& batcher::material::blend() const noexcept {
@@ -560,8 +538,8 @@ namespace e2d
         const size_t vert_stride = math::align_ceil(sizeof(typename BatchType::vertex_type), vertex_stride_);
         const size_t vb_size = src_batch.vertex_count() * vert_stride;
         const size_t ib_size = (src_batch.index_count() + (is_strip ? 2 : 0)) * index_stride_;
-        const vert_decl_ptr vert_decl = cache_vert_decl_(BatchType::vertex_type::decl());
-        batch_& dst_batch = append_batch_(mtr, src_batch.topology(), vert_decl, vert_stride, vb_size, ib_size);
+        vertex_attribs_ptr attribs = render_.create_vertex_attribs(BatchType::vertex_type::decl());
+        batch_& dst_batch = append_batch_(mtr, src_batch.topology(), attribs, vert_stride, vb_size, ib_size);
 
         auto& vb = vertex_buffers_[dst_batch.vb_index];
         auto& ib = index_buffers_[dst_batch.ib_index];
@@ -581,7 +559,6 @@ namespace e2d
         
         vb.offset += vb_size;
         ib.offset += ib_size - (first_strip ? 2*index_stride_ : 0);
-        dst_batch.vert_count += src_batch.vertex_count();
         dst_batch.idx_count += src_batch.index_count() + (break_strip ? 2 : 0);
         dirty_ = true;
     }
@@ -596,8 +573,8 @@ namespace e2d
         const size_t vert_stride = math::align_ceil(sizeof(VertexType), vertex_stride_);
         const size_t vb_size = vertex_count * vert_stride;
         const size_t ib_size = index_count * index_stride_;
-        const vert_decl_ptr vert_decl = cache_vert_decl_(VertexType::decl());
-        batch_& dst_batch = append_batch_(mtr, topo, vert_decl, vert_stride, vb_size, ib_size);
+        vertex_attribs_ptr attribs = render_.create_vertex_attribs(VertexType::decl());
+        batch_& dst_batch = append_batch_(mtr, topo, attribs, vert_stride, vb_size, ib_size);
         
         auto& vb = vertex_buffers_[dst_batch.vb_index];
         auto& ib = index_buffers_[dst_batch.ib_index];
@@ -610,8 +587,7 @@ namespace e2d
         
         vb.offset += vb_size;
         ib.offset += ib_size;
-        dst_batch.vert_count += vertex_count;
-        dst_batch.idx_count += index_count;
+        dst_batch.idx_count += u32(index_count);
         dirty_ = true;
 
         return result;

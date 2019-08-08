@@ -339,7 +339,8 @@ namespace e2d
         enum class scope : u8 {
             render_pass,
             material,
-            draw_command
+            draw_command,
+            last_
         };
         // TODO: update frequency ?
     public:
@@ -536,18 +537,18 @@ namespace e2d
 
         class rasterization_state final {
         public:
-            rasterization_state& polygon_offset(float factor, float units) noexcept;
+            //rasterization_state& polygon_offset(float factor, float units) noexcept;
             rasterization_state& culling(culling_mode mode) noexcept;
             rasterization_state& front_face_ccw(bool value) noexcept;
 
-            float polygon_offset_factor() const noexcept;
-            float polygon_offset_units() const noexcept;
+            //float polygon_offset_factor() const noexcept;
+            //float polygon_offset_units() const noexcept;
 
             culling_mode culling() const noexcept;
             bool front_face_ccw() const noexcept;
         private:
-            float polygon_offset_factor_ = 0.0f;
-            float polygon_offset_units_ = 0.0f;
+            //float polygon_offset_factor_ = 0.0f;
+            //float polygon_offset_units_ = 0.0f;
             culling_mode culling_ = culling_mode::none;
             bool front_face_ccw_ = true;
         };
@@ -645,6 +646,27 @@ namespace e2d
             sampler_mag_filter mag_filter_ = sampler_mag_filter::linear;
         };
 
+        class sampler_block final {
+        public:
+            enum class scope : u8 {
+                render_pass,
+                material,
+                last_
+            };
+        public:
+            sampler_block() = default;
+
+            sampler_block& bind(str_hash name, const sampler_state& state) noexcept;
+
+            std::size_t count() const noexcept;
+            str_hash name(std::size_t index) const noexcept;
+            const sampler_state& sampler(std::size_t index) const noexcept;
+        private:
+            std::array<str_hash, max_samplers_in_block> names_;
+            std::array<sampler_state, max_samplers_in_block> samplers_;
+            std::size_t count_ = 0;
+        };
+
         using property_value = stdex::variant<
             i32, f32,
             v2i, v3i, v4i,
@@ -678,21 +700,6 @@ namespace e2d
         private:
             flat_map<str_hash, T> values_;
         };
-
-        class sampler_block final {
-        public:
-            sampler_block() = default;
-
-            sampler_block& bind(str_hash name, const sampler_state& state) noexcept;
-
-            std::size_t count() const noexcept;
-            str_hash name(std::size_t index) const noexcept;
-            const sampler_state& sampler(std::size_t index) const noexcept;
-        private:
-            std::array<str_hash, max_samplers_in_block> names_;
-            std::array<sampler_state, max_samplers_in_block> samplers_;
-            std::size_t count_ = 0;
-        };
         
         class renderpass_desc final {
         public:
@@ -713,7 +720,7 @@ namespace e2d
             
             renderpass_desc& color_clear(const color& value) noexcept;
             renderpass_desc& color_load() noexcept;
-            renderpass_desc& color_invalidate() noexcept;
+            //renderpass_desc& color_invalidate() noexcept;
             renderpass_desc& color_store() noexcept;
             renderpass_desc& color_discard() noexcept;
             [[nodiscard]] const color& color_clear_value() const noexcept;
@@ -722,7 +729,7 @@ namespace e2d
 
             renderpass_desc& depth_clear(float value) noexcept;
             renderpass_desc& depth_load() noexcept;
-            renderpass_desc& depth_invalidate() noexcept;
+            //renderpass_desc& depth_invalidate() noexcept;
             renderpass_desc& depth_store() noexcept;
             renderpass_desc& depth_discard() noexcept;
             [[nodiscard]] float depth_clear_value() const noexcept;
@@ -731,7 +738,7 @@ namespace e2d
             
             renderpass_desc& stencil_clear(u8 value) noexcept;
             renderpass_desc& stencil_load() noexcept;
-            renderpass_desc& stencil_invalidate() noexcept;
+            //renderpass_desc& stencil_invalidate() noexcept;
             renderpass_desc& stencil_store() noexcept;
             renderpass_desc& stencil_discard() noexcept;
             [[nodiscard]] u8 clear_stencil() const noexcept;
@@ -780,9 +787,9 @@ namespace e2d
             std::size_t vertex_offset(std::size_t index) const noexcept;
 
         private:
-            std::array<vertex_buffer_ptr,max_vertex_buffer_count> buffers_;
-            std::array<vertex_attribs_ptr,max_vertex_buffer_count> attribs_;
-            std::array<std::size_t,max_vertex_buffer_count> offsets_;
+            std::array<vertex_buffer_ptr, max_vertex_buffer_count> buffers_;
+            std::array<vertex_attribs_ptr, max_vertex_buffer_count> attribs_;
+            std::array<std::size_t, max_vertex_buffer_count> offsets_;
             std::size_t count_ = 0;
         };
         
@@ -805,25 +812,19 @@ namespace e2d
             const_buffer::scope scope() const noexcept;
         private:
             const_buffer_ptr buffer_;
-            const_buffer::scope scope_ = const_buffer::scope(~0u);
+            const_buffer::scope scope_ = const_buffer::scope::last_;
         };
         
         class bind_textures_command final {
         public:
             bind_textures_command() = default;
-            bind_textures_command(const sampler_block& block, const_buffer::scope scope);
+            bind_textures_command(const sampler_block& block);
 
             bind_textures_command& bind(str_hash name, const sampler_state& sampler) noexcept;
-            bind_textures_command& scope(const_buffer::scope value) noexcept;
             
-            const_buffer::scope scope() const noexcept;
-            std::size_t count() const noexcept;
-
-            str_hash name(std::size_t index) const noexcept;
-            const sampler_state& sampler(std::size_t index) const noexcept;
+            const sampler_block& samplers() const noexcept;
         private:
             sampler_block sampler_block_;
-            const_buffer::scope scope_ = const_buffer::scope(~0u);
         };
         
         class scissor_command final {
@@ -845,15 +846,19 @@ namespace e2d
         public:
             draw_command() = default;
 
+            draw_command& cbuffer(const const_buffer_ptr& value) noexcept;
+
             draw_command& topo(topology value) noexcept;
             draw_command& vertex_range(u32 first, u32 count) noexcept;
-            draw_command& first_verex(u32 value) noexcept;
+            draw_command& first_vertex(u32 value) noexcept;
             draw_command& vertex_count(u32 value) noexcept;
 
             u32 first_vertex() const noexcept;
             u32 vertex_count() const noexcept;
             topology topo() const noexcept;
+            const const_buffer_ptr& cbuffer() const noexcept;
         private:
+            const_buffer_ptr cbuffer_;
             topology topology_ = topology::triangles;
             u32 first_vertex_ = 0;
             u32 vertex_count_ = 0;
@@ -863,6 +868,7 @@ namespace e2d
         public:
             draw_indexed_command() = default;
 
+            draw_indexed_command& cbuffer(const const_buffer_ptr& value) noexcept;
             draw_indexed_command& indices(const index_buffer_ptr& value) noexcept;
             draw_indexed_command& topo(topology value) noexcept;
 
@@ -874,7 +880,9 @@ namespace e2d
             u32 index_count() const noexcept;
             topology topo() const noexcept;
             const index_buffer_ptr& indices() const noexcept;
+            const const_buffer_ptr& cbuffer() const noexcept;
         private:
+            const_buffer_ptr cbuffer_;
             index_buffer_ptr index_buffer_;
             topology topology_ = topology::triangles;
             u32 first_index_ = 0;
@@ -941,6 +949,15 @@ namespace e2d
             bool pvrtc_compression_supported = false;
             bool pvrtc2_compression_supported = false;
         };
+
+        struct statistics {
+            // framebuffer load/store counter
+            // framebuffer reusing at one frame
+            // draw call counter
+            // framebuffer bind counter
+            
+            u32 render_pass_count = 0;
+        };
     public:
         render(debug& d, window& w);
         ~render() noexcept final;
@@ -994,8 +1011,12 @@ namespace e2d
             const pixel_declaration& depth_decl,
             render_target::external_texture external_texture);
 
-        render& begin_pass(const renderpass_desc& desc);
+        render& begin_pass(
+            const renderpass_desc& desc,
+            const const_buffer_ptr& cbuffer,
+            const sampler_block& samplers);
         render& end_pass();
+        render& present();
 
         template < std::size_t N >
         render& execute(const command_block<N>& commands);
@@ -1035,6 +1056,8 @@ namespace e2d
             const b2u& region);
 
         const device_caps& device_capabilities() const noexcept;
+        const statistics& frame_statistic() const noexcept;
+
         bool is_pixel_supported(const pixel_declaration& decl) const noexcept;
         bool is_index_supported(const index_declaration& decl) const noexcept;
         bool is_vertex_supported(const vertex_declaration& decl) const noexcept;

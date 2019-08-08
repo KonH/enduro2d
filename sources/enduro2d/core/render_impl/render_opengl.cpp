@@ -164,6 +164,42 @@ namespace e2d
     std::size_t vertex_buffer::buffer_size() const noexcept {
         return state_->size();
     }
+    
+    //
+    // vertex_attribs
+    //
+    
+    const vertex_attribs::internal_state& vertex_attribs::state() const noexcept {
+        return *state_;
+    }
+
+    vertex_attribs::vertex_attribs(internal_state_uptr state)
+    : state_(std::move(state)) {
+        E2D_ASSERT(state_);
+    }
+    vertex_attribs::~vertex_attribs() noexcept = default;
+    
+    const vertex_declaration& vertex_attribs::decl() const noexcept {
+        return state_->decl();
+    }
+
+    //
+    // const_buffer
+    //
+    
+    const const_buffer::internal_state& const_buffer::state() const noexcept {
+        return *state_;
+    }
+
+    const_buffer::const_buffer(internal_state_uptr state)
+    : state_(std::move(state)) {
+        E2D_ASSERT(state_);
+    }
+    const_buffer::~const_buffer() noexcept = default;
+    
+    std::size_t const_buffer::buffer_size() const noexcept {
+        return state_->size();
+    }
 
     //
     // render_target
@@ -568,8 +604,7 @@ namespace e2d
             return nullptr;
         }
 
-        // TODO
-        return nullptr;
+        return state_->create_vertex_attribs(decl);
     }
         
     const_buffer_ptr render::create_const_buffer(
@@ -707,48 +742,106 @@ namespace e2d
                 std::move(depth_rb)));
     }
     
-    render& render::begin_pass(const renderpass_desc& desc) {
-        // TODO
+    render& render::begin_pass(
+        const renderpass_desc& desc,
+        const const_buffer_ptr& cbuffer,
+        const sampler_block& samplers)
+    {
+        E2D_ASSERT(is_in_main_thread());
+        state_->begin_render_pass(desc);
+        state_->bind_const_buffer(const_buffer::scope::render_pass, cbuffer);
+        state_->bind_textures(sampler_block::scope::render_pass, samplers);
         return *this;
     }
 
     render& render::end_pass() {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
+
+        state_->end_render_pass();
+        state_->bind_const_buffer(const_buffer::scope::render_pass, nullptr);
+        state_->bind_textures(sampler_block::scope::render_pass, {});
+        return *this;
+    }
+        
+    render& render::present() {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(!state_->inside_render_pass());
+        // TODO: check unpresented changes
+
+        state_->on_present();
+        state_->wnd().swap_buffers();
         return *this;
     }
         
     render& render::execute(const bind_vertex_buffers_command& command) {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        for ( size_t i = 0; i < command.binding_count(); ++i ) {
+            state_->bind_vertex_buffer(
+                i,
+                command.vertices(i),
+                command.attributes(i),
+                command.vertex_offset(i));
+        }
         return *this;
     }
 
     render& render::execute(const bind_pipeline_command& command) {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        state_->set_shader_program(command.shader());
         return *this;
     }
 
     render& render::execute(const bind_const_buffer_command& command) {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(command.scope() != const_buffer::scope::render_pass);
+
+        state_->bind_const_buffer(command.scope(), command.buffer());
         return *this;
     }
 
     render& render::execute(const bind_textures_command& command) {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        state_->bind_textures(sampler_block::scope::material, command.samplers());
         return *this;
     }
 
     render& render::execute(const scissor_command& command) {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
         // TODO
         return *this;
     }
 
     render& render::execute(const draw_command& command) {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(command.vertex_count() > 0);
+        E2D_ASSERT(state_->inside_render_pass());
+
+        state_->bind_const_buffer(
+            const_buffer::scope::draw_command,
+            command.cbuffer());
+        state_->draw(
+            command.topo(),
+            command.first_vertex(),
+            command.vertex_count());
+
         return *this;
     }
 
     render& render::execute(const draw_indexed_command& command) {
-        // TODO
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(command.index_count() > 0);
+        E2D_ASSERT(state_->inside_render_pass());
+        
+        state_->bind_index_buffer(command.indices());
+        state_->bind_const_buffer(
+            const_buffer::scope::draw_command,
+            command.cbuffer());
+        state_->draw_indexed(
+            command.topo(),
+            command.first_index(),
+            command.index_count());
         return *this;
     }
 
@@ -770,6 +863,7 @@ namespace e2d
                     math::numeric_cast<GLsizeiptr>(indices.size()),
                     indices.data()));
             });
+        ibuffer->state().on_content_update(state_->frame_id());
         return *this;
     }
 
@@ -789,6 +883,7 @@ namespace e2d
                     math::numeric_cast<GLsizeiptr>(vertices.size()),
                     vertices.data()));
             });
+        vbuffer->state().on_content_update(state_->frame_id());
         return *this;
     }
     
@@ -796,7 +891,11 @@ namespace e2d
         const const_buffer_ptr& cbuffer,
         const property_map<property_value>& properties)
     {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(cbuffer);
+
         // TODO
+        cbuffer->state().on_content_update(state_->frame_id());
         return *this;
     }
 
@@ -868,12 +967,18 @@ namespace e2d
                 });
         }
 
+        tex->state().on_content_update(state_->frame_id());
         return *this;
     }
 
     const render::device_caps& render::device_capabilities() const noexcept {
         E2D_ASSERT(is_in_main_thread());
         return state_->device_capabilities();
+    }
+    
+    const render::statistics& render::frame_statistic() const noexcept {
+        E2D_ASSERT(is_in_main_thread());
+        return state_->last_stats();
     }
 
     bool render::is_pixel_supported(const pixel_declaration& decl) const noexcept {

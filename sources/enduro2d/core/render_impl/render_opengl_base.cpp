@@ -1136,6 +1136,19 @@ namespace e2d::opengl
         }
         #undef DEFINE_CASE
     }
+    
+    GLenum convert_culling_mode(render::culling_mode cm) noexcept {
+        #define DEFINE_CASE(x,y) case render::culling_mode::x: return y;
+        switch ( cm ) {
+            DEFINE_CASE(back, GL_BACK);
+            DEFINE_CASE(front, GL_FRONT);
+            DEFINE_CASE(back_and_front, GL_FRONT_AND_BACK);
+            default:
+                E2D_ASSERT_MSG(false, "unexpected render culling mode");
+                return 0;
+        }
+        #undef DEFINE_CASE
+    }
 
     uniform_type glsl_type_to_uniform_type(GLenum t) noexcept {
         #define DEFINE_CASE(x,y) case x: return uniform_type::y
@@ -1453,6 +1466,14 @@ namespace e2d::opengl
             version >= gl_version::gles_300 ||
             gl_has_any_extension(debug,
                 "GL_ARB_depth_buffer_float");
+        
+        caps_ext.framebuffer_discard_supported =
+            gl_has_any_extension(debug,
+                "GL_EXT_discard_framebuffer");
+
+        caps_ext.framebuffer_invalidate_supported =
+            version >= gl_version::gl_430 ||
+            version >= gl_version::gles_300;
 
         caps_ext.debug_output_supported =
             version >= gl_version::gles_320 ||
@@ -1463,8 +1484,18 @@ namespace e2d::opengl
         gl_use_implementation_from_extensions(debug, version);
     }
     
-    bool gl_has_extension(debug& debug, str_view name) noexcept {
-        return gl_has_any_extension(debug, name);
+    void gl_depth_range(debug& debug, float near, float far) noexcept {
+    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+        GL_CHECK_CODE(debug, glDepthRange(
+            math::numeric_cast<GLclampd>(math::saturate(near)),
+            math::numeric_cast<GLclampd>(math::saturate(far))));
+    #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
+        GL_CHECK_CODE(debug, glDepthRangef(
+            math::numeric_cast<GLclampf>(math::saturate(near)),
+            math::numeric_cast<GLclampf>(math::saturate(far))));
+    #else
+    #   error unknown render mode
+    #endif
     }
 
     gl_shader_id gl_compile_shader(

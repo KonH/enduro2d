@@ -419,11 +419,11 @@ namespace e2d
     // rasterization_state
     //
     
-    render::rasterization_state& render::rasterization_state::polygon_offset(float factor, float units) noexcept {
+    /*render::rasterization_state& render::rasterization_state::polygon_offset(float factor, float units) noexcept {
         polygon_offset_factor_ = factor;
         polygon_offset_units_ = units;
         return *this;
-    }
+    }*/
 
     render::rasterization_state& render::rasterization_state::culling(culling_mode mode) noexcept {
         culling_ = mode;
@@ -435,13 +435,13 @@ namespace e2d
         return *this;
     }
 
-    float render::rasterization_state::polygon_offset_factor() const noexcept {
+    /*float render::rasterization_state::polygon_offset_factor() const noexcept {
         return polygon_offset_factor_;
     }
 
     float render::rasterization_state::polygon_offset_units() const noexcept {
         return polygon_offset_units_;
-    }
+    }*/
 
     render::culling_mode render::rasterization_state::culling() const noexcept {
         return culling_;
@@ -778,10 +778,10 @@ namespace e2d
         return *this;
     }
 
-    render::renderpass_desc& render::renderpass_desc::color_invalidate() noexcept {
+    /*render::renderpass_desc& render::renderpass_desc::color_invalidate() noexcept {
         color_.load_op = attachment_load_op::invalidate;
         return *this;
-    }
+    }*/
 
     render::renderpass_desc& render::renderpass_desc::color_store() noexcept {
         color_.store_op = attachment_store_op::store;
@@ -817,10 +817,10 @@ namespace e2d
         return *this;
     }
 
-    render::renderpass_desc& render::renderpass_desc::depth_invalidate() noexcept {
+    /*render::renderpass_desc& render::renderpass_desc::depth_invalidate() noexcept {
         depth_.load_op = attachment_load_op::invalidate;
         return *this;
-    }
+    }*/
 
     render::renderpass_desc& render::renderpass_desc::depth_store() noexcept {
         depth_.store_op = attachment_store_op::store;
@@ -856,10 +856,10 @@ namespace e2d
         return *this;
     }
 
-    render::renderpass_desc& render::renderpass_desc::stencil_invalidate() noexcept {
+    /*render::renderpass_desc& render::renderpass_desc::stencil_invalidate() noexcept {
         stencil_.load_op = attachment_load_op::invalidate;
         return *this;
-    }
+    }*/
 
     render::renderpass_desc& render::renderpass_desc::stencil_store() noexcept {
         stencil_.store_op = attachment_store_op::store;
@@ -961,34 +961,16 @@ namespace e2d
     // render::bind_textures_command
     //
 
-    render::bind_textures_command::bind_textures_command(const sampler_block& block, const_buffer::scope scope)
-    : sampler_block_(block)
-    , scope_(scope) {}
+    render::bind_textures_command::bind_textures_command(const sampler_block& block)
+    : sampler_block_(block) {}
 
     render::bind_textures_command& render::bind_textures_command::bind(str_hash name, const sampler_state& sampler) noexcept {
         sampler_block_.bind(name, sampler);
         return *this;
     }
 
-    render::bind_textures_command& render::bind_textures_command::scope(const_buffer::scope value) noexcept {
-        scope_ = value;
-        return *this;
-    }
-            
-    const_buffer::scope render::bind_textures_command::scope() const noexcept {
-        return scope_;
-    }
-
-    std::size_t render::bind_textures_command::count() const noexcept {
-        return sampler_block_.count();
-    }
-
-    str_hash render::bind_textures_command::name(std::size_t index) const noexcept {
-        return sampler_block_.name(index);
-    }
-
-    const render::sampler_state& render::bind_textures_command::sampler(std::size_t index) const noexcept {
-        return sampler_block_.sampler(index);
+    const render::sampler_block& render::bind_textures_command::samplers() const noexcept {
+        return sampler_block_;
     }
 
     //
@@ -1021,6 +1003,11 @@ namespace e2d
     //
     // render::draw_command
     //
+    
+    render::draw_command& render::draw_command::cbuffer(const const_buffer_ptr& value) noexcept {
+        cbuffer_ = value;
+        return *this;
+    }
 
     render::draw_command& render::draw_command::topo(topology value) noexcept {
         topology_ = value;
@@ -1033,7 +1020,7 @@ namespace e2d
         return *this;
     }
 
-    render::draw_command& render::draw_command::first_verex(u32 value) noexcept {
+    render::draw_command& render::draw_command::first_vertex(u32 value) noexcept {
         first_vertex_ = value;
         return *this;
     }
@@ -1054,11 +1041,20 @@ namespace e2d
     render::topology render::draw_command::topo() const noexcept {
         return topology_;
     }
+    
+    const const_buffer_ptr& render::draw_command::cbuffer() const noexcept {
+        return cbuffer_;
+    }
 
     //
     // render::draw_indexed_command
     //
-        
+    
+    render::draw_indexed_command& render::draw_indexed_command::cbuffer(const const_buffer_ptr& value) noexcept {
+        cbuffer_ = value;
+        return *this;
+    }
+
     render::draw_indexed_command& render::draw_indexed_command::indices(const index_buffer_ptr& value) noexcept {
         index_buffer_ = value;
         return *this;
@@ -1099,6 +1095,10 @@ namespace e2d
 
     const index_buffer_ptr& render::draw_indexed_command::indices() const noexcept {
         return index_buffer_;
+    }
+    
+    const const_buffer_ptr& render::draw_indexed_command::cbuffer() const noexcept {
+        return cbuffer_;
     }
 
     //
@@ -1154,9 +1154,9 @@ namespace e2d
     }
 
     bool operator==(const render::rasterization_state& l, const render::rasterization_state& r) noexcept {
-        return l.polygon_offset_factor() == r.polygon_offset_factor()
-            && l.polygon_offset_units() == r.polygon_offset_units()
-            && l.culling() == r.culling()
+        //return l.polygon_offset_factor() == r.polygon_offset_factor()
+        //    && l.polygon_offset_units() == r.polygon_offset_units()
+        return l.culling() == r.culling()
             && l.front_face_ccw() == r.front_face_ccw();
     }
 

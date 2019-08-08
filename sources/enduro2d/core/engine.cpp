@@ -447,7 +447,8 @@ namespace e2d
                 the<window>());
 
             safe_module_initialize<batcher>(
-                the<debug>());
+                the<debug>(),
+                the<render>());
 
             // setup dbgui
 
@@ -491,8 +492,8 @@ namespace e2d
 
                 if ( the<window>().enabled() ) {
                     app->frame_render();
-                    the<dbgui>().frame_render();
-                    the<window>().swap_buffers();
+                    //the<dbgui>().frame_render();  // TODO
+                    the<render>().present();  // TODO: remove?
                 }
 
                 state_->calculate_end_frame_timers();
