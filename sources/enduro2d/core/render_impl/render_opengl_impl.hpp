@@ -34,11 +34,20 @@ namespace e2d
         void with_uniform_location(str_hash name, F&& f) const;
         template < typename F >
         void with_attribute_location(str_hash name, F&& f) const;
+        size_t get_buffer_size(const_buffer::scope scope) const noexcept;
+        void bind_buffer(const const_buffer_ptr& cb) const noexcept;
     private:
         debug& debug_;
         opengl::gl_program_id id_;
-        hash_map<str_hash, opengl::uniform_info> uniforms_;
-        hash_map<str_hash, opengl::attribute_info> attributes_;
+        flat_map<str_hash, opengl::uniform_info> uniforms_;
+        flat_map<str_hash, opengl::attribute_info> attributes_;
+        struct cbuffer {
+            std::weak_ptr<const_buffer> buffer;
+            u32 block_size = 0;
+            u32 version = 0;
+            GLint location = -1;
+        };
+        mutable std::array<cbuffer, u32(const_buffer::scope::last_)> cbuffers_;
     };
 
     template < typename F >
@@ -74,13 +83,11 @@ namespace e2d
         const opengl::gl_texture_id& id() const noexcept;
         const v2u& size() const noexcept;
         const pixel_declaration& decl() const noexcept;
-        void on_content_update(u32 frame_id) const noexcept;
     private:
         debug& debug_;
         opengl::gl_texture_id id_;
         v2u size_;
         pixel_declaration decl_;
-        mutable u32 last_update_frame_id_ = 0;
     };
 
     //
@@ -100,13 +107,11 @@ namespace e2d
         const opengl::gl_buffer_id& id() const noexcept;
         std::size_t size() const noexcept;
         const index_declaration& decl() const noexcept;
-        void on_content_update(u32 frame_id) const noexcept;
     private:
         debug& debug_;
         opengl::gl_buffer_id id_;
         std::size_t size_ = 0;
         index_declaration decl_;
-        mutable u32 last_update_frame_id_ = 0;
     };
 
     //
@@ -124,12 +129,10 @@ namespace e2d
         debug& dbg() const noexcept;
         const opengl::gl_buffer_id& id() const noexcept;
         std::size_t size() const noexcept;
-        void on_content_update(u32 frame_id) const noexcept;
     private:
         debug& debug_;
         opengl::gl_buffer_id id_;
         std::size_t size_ = 0;
-        mutable u32 last_update_frame_id_ = 0;
     };
 
     //
@@ -161,17 +164,25 @@ namespace e2d
         internal_state(
             debug& debug,
             opengl::gl_buffer_id id,
-            std::size_t size);
+            std::size_t size,
+            scope scope);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
         const opengl::gl_buffer_id& id() const noexcept;
         std::size_t size() const noexcept;
+        float* data() const noexcept;
+        scope binding_scope() const noexcept;
+        u32 version() const noexcept;
+        bool is_compatible_with(const shader_ptr& shader) const noexcept;
         void on_content_update(u32 frame_id) const noexcept;
     private:
         debug& debug_;
         opengl::gl_buffer_id id_;
         std::size_t size_ = 0;
+        scope binding_scope_ = scope::last_;
+        mutable std::unique_ptr<float[]> content_;
+        mutable u32 version_ = 0;
         mutable u32 last_update_frame_id_ = 0;
     };
 
@@ -248,14 +259,13 @@ namespace e2d
             const vertex_attribs_ptr& attribs,
             std::size_t offset) noexcept;
         void bind_const_buffer(
-            const_buffer::scope scope,
             const const_buffer_ptr& cbuffer) noexcept;
         void bind_textures(
             sampler_block::scope scope,
             const sampler_block& samplers) noexcept;
 
         void draw(topology topo, u32 first, u32 count) noexcept;
-        void draw_indexed(topology topo, u32 first, u32 count) noexcept;
+        void draw_indexed(topology topo, u32 count, size_t offset) noexcept;
         
         vertex_attribs_ptr create_vertex_attribs(
             const vertex_declaration& decl);
@@ -266,6 +276,10 @@ namespace e2d
         void set_blending_state_(const blending_state& bs) noexcept;
         void set_render_target_(const render_target_ptr& rt) noexcept;
         void reset_render_target_() noexcept;
+        void commit_changes_() noexcept;
+        void bind_vertex_attributes_() noexcept;
+        void bind_cbuffers_() noexcept;
+        void bind_textures_() noexcept;
         void create_debug_output_() noexcept;
         static void GLAPIENTRY debug_output_callback_(
             GLenum source,
@@ -276,13 +290,22 @@ namespace e2d
             const GLchar* message,
             const void* userParam);
     private:
-        enum class dirty_flag : u32 {
-            vertex_buffer = 1 << 0,
-            index_buffer = 1 << 1,
-            const_buffer = 1 << 2,
-            textures = 1 << 3,
-            shader = 1 << 4,
+        enum class dirty_flag_bits : u32 {
+            none = 0,
+            vertex_attribs = 1 << 0,
+
+            pass_cbuffer = 1 << 2,
+            mtr_cbuffer = 1 << 3,
+            draw_cbuffer = 1 << 4,
+            cbuffers = pass_cbuffer | mtr_cbuffer | draw_cbuffer,
+
+            pass_textures = 1 << 5,
+            mtr_textures = 1 << 6,
+            textures = pass_textures | mtr_textures,
+
+            pipeline = vertex_attribs | cbuffers | textures,
         };
+        using enabled_attribs_t = std::bitset<max_attribute_count>;
     private:
         debug& debug_;
         window& window_;
@@ -309,11 +332,12 @@ namespace e2d
             vertex_buffer_ptr buffer;
             vertex_attribs_ptr attribs;
             std::size_t offset;
-            bool dirty = true;
         };
-        std::array<vb_binding, 8> vertex_buffers_;
+        std::array<vb_binding, max_vertex_buffer_count> vertex_buffers_;
         std::array<const_buffer_ptr, u32(const_buffer::scope::last_)> cbuffers_;
-        dirty_flag dirty_flags_;
+        index_buffer_ptr index_buffer_;
+        enabled_attribs_t enabled_attribs_;
+        dirty_flag_bits dirty_flags_ = dirty_flag_bits::none;
 
         // statistic
         statistics current_stat_;

@@ -201,6 +201,14 @@ namespace e2d
         return state_->size();
     }
 
+    const_buffer::scope const_buffer::binding_scope() const noexcept {
+        return state_->binding_scope();
+    }
+
+    bool const_buffer::is_compatible_with(const shader_ptr& shader) const noexcept {
+        return state_->is_compatible_with(shader);
+    }
+
     //
     // render_target
     //
@@ -748,8 +756,10 @@ namespace e2d
         const sampler_block& samplers)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(!cbuffer || cbuffer->binding_scope() == const_buffer::scope::render_pass);
+
         state_->begin_render_pass(desc);
-        state_->bind_const_buffer(const_buffer::scope::render_pass, cbuffer);
+        state_->bind_const_buffer(cbuffer);
         state_->bind_textures(sampler_block::scope::render_pass, samplers);
         return *this;
     }
@@ -759,8 +769,6 @@ namespace e2d
         E2D_ASSERT(state_->inside_render_pass());
 
         state_->end_render_pass();
-        state_->bind_const_buffer(const_buffer::scope::render_pass, nullptr);
-        state_->bind_textures(sampler_block::scope::render_pass, {});
         return *this;
     }
         
@@ -794,9 +802,10 @@ namespace e2d
 
     render& render::execute(const bind_const_buffer_command& command) {
         E2D_ASSERT(is_in_main_thread());
-        E2D_ASSERT(command.scope() != const_buffer::scope::render_pass);
+        E2D_ASSERT(command.buffer());
+        E2D_ASSERT(command.buffer()->binding_scope() != const_buffer::scope::render_pass);
 
-        state_->bind_const_buffer(command.scope(), command.buffer());
+        state_->bind_const_buffer(command.buffer());
         return *this;
     }
 
@@ -818,9 +827,7 @@ namespace e2d
         E2D_ASSERT(command.vertex_count() > 0);
         E2D_ASSERT(state_->inside_render_pass());
 
-        state_->bind_const_buffer(
-            const_buffer::scope::draw_command,
-            command.cbuffer());
+        state_->bind_const_buffer(command.cbuffer());
         state_->draw(
             command.topo(),
             command.first_vertex(),
@@ -835,13 +842,11 @@ namespace e2d
         E2D_ASSERT(state_->inside_render_pass());
         
         state_->bind_index_buffer(command.indices());
-        state_->bind_const_buffer(
-            const_buffer::scope::draw_command,
-            command.cbuffer());
+        state_->bind_const_buffer(command.cbuffer());
         state_->draw_indexed(
             command.topo(),
-            command.first_index(),
-            command.index_count());
+            command.index_count(),
+            command.index_offset());
         return *this;
     }
 
@@ -863,7 +868,6 @@ namespace e2d
                     math::numeric_cast<GLsizeiptr>(indices.size()),
                     indices.data()));
             });
-        ibuffer->state().on_content_update(state_->frame_id());
         return *this;
     }
 
@@ -883,19 +887,56 @@ namespace e2d
                     math::numeric_cast<GLsizeiptr>(vertices.size()),
                     vertices.data()));
             });
-        vbuffer->state().on_content_update(state_->frame_id());
         return *this;
     }
     
     render& render::update_buffer(
         const const_buffer_ptr& cbuffer,
-        const property_map<property_value>& properties)
+        const shader_ptr& shader,
+        const property_map& properties)
     {
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(cbuffer);
+        E2D_ASSERT(shader);
+        if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
+            // TODO
+            E2D_ASSERT(false);
+        } else {
 
-        // TODO
-        cbuffer->state().on_content_update(state_->frame_id());
+            properties.foreach([&shader, &cbuffer](str_hash name, const auto& value) noexcept{
+                using T = std::remove_const_t<std::remove_reference_t<decltype(value)>>;
+
+                shader->state().with_uniform_location(name, [&cbuffer, &value](auto& info) noexcept{
+                    /*
+                    float* dst = cbuffer->state().data();
+                    size_t buffer_size = cbuffer->state().size();
+                    const size_t off = info.offset / sizeof(float);
+                    
+                    E2D_ASSERT(info.scope == cbuffer->binding_scope());
+                    E2D_ASSERT(off + sizeof(value) <= buffer_size);
+
+                    if constexpr( std::is_same_v<T, f32> ) {
+                        std::memcpy(dst + off, &value, sizeof(value));
+                    } else if constexpr( std::is_same_v<T, v2f> ) {
+                        std::memcpy(dst + off, value.data(), sizeof(value));
+                    } else if constexpr( std::is_same_v<T, v3f> || std::is_same_v<T, v4f> || std::is_same_v<T, m4f> ) {
+                        E2D_ASSERT(off % 4 == 0);
+                        std::memcpy(dst + off, value.data(), sizeof(value));
+                    } else if constexpr( std::is_same_v<T, m2f> ) {
+                        E2D_ASSERT(off % 4 == 0);
+                        std::memcpy(dst + off, value.data(), sizeof(value));
+                        std::memcpy(dst + off, value.data(), sizeof(value));
+                    } else if constexpr( std::is_same_v<T, m3f> ) {
+                        E2D_ASSERT(off % 4 == 0);
+                        std::memcpy(dst + off, value.data(), sizeof(value));
+                        std::memcpy(dst + off + 4, value.data(), sizeof(value));
+                        std::memcpy(dst + off + 8, value.data(), sizeof(value));
+                    } else {
+                        static_assert(false, "unexpected property type");
+                    }*/
+                });
+            });
+        }
         return *this;
     }
 
@@ -966,8 +1007,6 @@ namespace e2d
                         pixels.data()));
                 });
         }
-
-        tex->state().on_content_update(state_->frame_id());
         return *this;
     }
 

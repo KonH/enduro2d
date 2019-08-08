@@ -1475,6 +1475,12 @@ namespace e2d::opengl
             version >= gl_version::gl_430 ||
             version >= gl_version::gles_300;
 
+        caps_ext.uniform_buffer_supported =
+            version >= gl_version::gl_300 ||
+            version >= gl_version::gles_300 ||
+            gl_has_any_extension(debug,
+                "GL_ARB_uniform_buffer_object");
+
         caps_ext.debug_output_supported =
             version >= gl_version::gles_320 ||
             version >= gl_version::gl_430 ||

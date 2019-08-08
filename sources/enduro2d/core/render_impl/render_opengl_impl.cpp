@@ -44,6 +44,22 @@ namespace
         h = utils::hash_combine(h, hash_of(x.bytes_per_vertex()));
         return h;
     }
+    
+    template < typename T >
+    void set_flag_inplace(T& le, T re) noexcept {
+        auto l = utils::enum_to_underlying(le);
+        auto r = utils::enum_to_underlying(re);
+        le = static_cast<T>(l | r);
+    }
+
+    template < typename T >
+    bool check_flag_and_reset(T& le, T re) noexcept {
+        auto l = utils::enum_to_underlying(le);
+        auto r = utils::enum_to_underlying(re);
+        bool res = (l & r) == r;
+        le = static_cast<T>(l & r);
+        return res;
+    }
 }
 
 namespace e2d
@@ -82,6 +98,26 @@ namespace e2d
         return id_;
     }
 
+    size_t shader::internal_state::get_buffer_size(const_buffer::scope scope) const noexcept {
+        return cbuffers_[u32(scope)].block_size;
+    }
+
+    void shader::internal_state::bind_buffer(const const_buffer_ptr& cb) const noexcept {
+        E2D_ASSERT(cb);
+        auto& curr = cbuffers_[u32(cb->binding_scope())];
+        if ( curr.buffer.lock() != cb ||
+             curr.version != cb->state().version() )
+        {
+            GL_CHECK_CODE(debug_, glUniform4fv(
+                curr.location,
+                GLsizei(cb->state().size() / sizeof(v4f)),
+                cb->state().data()));
+
+            curr.buffer = cb;
+            curr.version = cb->state().version();
+        }
+    }
+
     //
     // texture::internal_state
     //
@@ -112,11 +148,6 @@ namespace e2d
 
     const pixel_declaration& texture::internal_state::decl() const noexcept {
         return decl_;
-    }
-        
-    void texture::internal_state::on_content_update(u32 frame_id) const noexcept {
-        // TODO
-        last_update_frame_id_ = frame_id;
     }
 
     //
@@ -150,11 +181,6 @@ namespace e2d
     const index_declaration& index_buffer::internal_state::decl() const noexcept {
         return decl_;
     }
-        
-    void index_buffer::internal_state::on_content_update(u32 frame_id) const noexcept {
-        // TODO
-        last_update_frame_id_ = frame_id;
-    }
 
     //
     // vertex_buffer::internal_state
@@ -180,11 +206,6 @@ namespace e2d
 
     std::size_t vertex_buffer::internal_state::size() const noexcept {
         return size_;
-    }
-        
-    void vertex_buffer::internal_state::on_content_update(u32 frame_id) const noexcept {
-        // TODO
-        last_update_frame_id_ = frame_id;
     }
     
     //
@@ -218,11 +239,16 @@ namespace e2d
     const_buffer::internal_state::internal_state(
         debug& debug,
         gl_buffer_id id,
-        std::size_t size)
+        std::size_t size,
+        scope scope)
     : debug_(debug)
     , id_(std::move(id))
-    , size_(size) {
-        E2D_ASSERT(!id_.empty());
+    , size_(size)
+    , binding_scope_(scope) {
+        E2D_ASSERT(size % sizeof(v4f) == 0);
+        if ( id_.empty() ) {
+            content_.reset(new float[size_]);
+        }
     }
 
     debug& const_buffer::internal_state::dbg() const noexcept {
@@ -236,10 +262,30 @@ namespace e2d
     std::size_t const_buffer::internal_state::size() const noexcept {
         return size_;
     }
-        
+    
+    const_buffer::scope const_buffer::internal_state::binding_scope() const noexcept {
+        return binding_scope_;
+    }
+
+    bool const_buffer::internal_state::is_compatible_with(const shader_ptr& shader) const noexcept {
+        return false; // TODO
+    }
+
+    u32 const_buffer::internal_state::version() const noexcept {
+        return version_;
+    }
+    
+    float* const_buffer::internal_state::data() const noexcept {
+        return content_.get();
+    }
+
     void const_buffer::internal_state::on_content_update(u32 frame_id) const noexcept {
-        // TODO
+        E2D_ASSERT_MSG(frame_id > last_update_frame_id_,
+            "only one update per frame are allowed for const_buffer,"
+            "use another const_buffer if you need more updates");
+
         last_update_frame_id_ = frame_id;
+        ++version_;
     }
 
     //
@@ -295,7 +341,7 @@ namespace e2d
     //
     // render::internal_state
     //
-
+    
     render::internal_state::internal_state(debug& debug, window& window)
     : debug_(debug)
     , window_(window)
@@ -406,6 +452,7 @@ namespace e2d
         GL_CHECK_CODE(debug_, glUseProgram(*sp_id));
 
         shader_program_ = sp;
+        set_flag_inplace(dirty_flags_, dirty_flag_bits::pipeline);
         return *this;
     }
     
@@ -436,60 +483,44 @@ namespace e2d
     void render::internal_state::end_render_pass() noexcept {
         E2D_ASSERT(inside_render_pass_);
         inside_render_pass_ = false;
+        
+        const bool is_default_fb = !!render_target_;
+        GLenum attachments[8];
+        GLsizei count = 0;
 
-    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
-        if ( device_caps_ext_.framebuffer_discard_supported &&
-             !device_caps_ext_.framebuffer_invalidate_supported )
-        {
-            GLenum attachments[8];
-            GLsizei count = 0;
-
-            if ( color_store_op_ == attachment_store_op::discard ) {
-                attachments[count++] = GL_COLOR_EXT;
-            }
-            if ( depth_store_op_ == attachment_store_op::discard ) {
-                attachments[count++] = GL_DEPTH_EXT;
-            }
-            if ( stencil_store_op_ == attachment_store_op::discard ) {
-                attachments[count++] = GL_STENCIL_EXT;
-            }
-            if ( count ) {
-                GL_CHECK_CODE(debug_, glScissor(
-                    math::numeric_cast<GLint>(render_area_.position.x),
-                    math::numeric_cast<GLint>(render_area_.position.y),
-                    math::numeric_cast<GLsizei>(render_area_.size.x),
-                    math::numeric_cast<GLsizei>(render_area_.size.y)));
-
-                GL_CHECK_CODE(debug_, glDiscardFramebufferEXT(
-                    GL_FRAMEBUFFER,
-                    count,
-                    attachments));
-            }
+        if ( color_store_op_ == attachment_store_op::discard ) {
+            attachments[count++] = is_default_fb ? GL_COLOR : GL_COLOR_ATTACHMENT0;
         }
-    #endif
-
-        if ( device_caps_ext_.framebuffer_invalidate_supported ) {
-            GLenum attachments[8];
-            GLsizei count = 0;
-
-            if ( color_store_op_ == attachment_store_op::discard ) {
-                attachments[count++] = GL_COLOR_ATTACHMENT0;
-            }
-            if ( depth_store_op_ == attachment_store_op::discard ) {
-                attachments[count++] = GL_DEPTH_ATTACHMENT;
-            }
-            if ( stencil_store_op_ == attachment_store_op::discard ) {
-                attachments[count++] = GL_STENCIL_ATTACHMENT;
-            }
-            if ( count ) {
+        // TOD: depth_stencil_attachment for depth_stencil texture
+        if ( depth_store_op_ == attachment_store_op::discard ) {
+            attachments[count++] = is_default_fb ? GL_DEPTH : GL_DEPTH_ATTACHMENT;
+        }
+        if ( stencil_store_op_ == attachment_store_op::discard ) {
+            attachments[count++] = is_default_fb ? GL_STENCIL : GL_STENCIL_ATTACHMENT;
+        }
+        if ( count ) {
+            if ( device_caps_ext_.framebuffer_invalidate_supported ) {
                 GL_CHECK_CODE(debug_, glInvalidateSubFramebuffer(
-                    GL_DRAW_FRAMEBUFFER,
+                    GL_FRAMEBUFFER,
                     count,
                     attachments,
                     math::numeric_cast<GLint>(render_area_.position.x),
                     math::numeric_cast<GLint>(render_area_.position.y),
                     math::numeric_cast<GLsizei>(render_area_.size.x),
                     math::numeric_cast<GLsizei>(render_area_.size.y)));
+            }
+            else
+            if ( device_caps_ext_.framebuffer_discard_supported ) {
+                GL_CHECK_CODE(debug_, glScissor(
+                    math::numeric_cast<GLint>(render_area_.position.x),
+                    math::numeric_cast<GLint>(render_area_.position.y),
+                    math::numeric_cast<GLsizei>(render_area_.size.x),
+                    math::numeric_cast<GLsizei>(render_area_.size.y)));
+                // TODO: enable scissor
+                GL_CHECK_CODE(debug_, glDiscardFramebufferEXT(
+                    GL_FRAMEBUFFER,
+                    count,
+                    attachments));
             }
         }
         
@@ -499,6 +530,19 @@ namespace e2d
         stencil_store_op_ = attachment_store_op::discard;
 
         set_render_target_(nullptr);
+
+        // reset vertex attribs
+        for ( size_t i = 0; i < max_attribute_count; ++i ) {
+            GL_CHECK_CODE(debug_, glDisableVertexAttribArray(GLuint(i)));
+        }
+        GL_CHECK_CODE(debug_, glBindBuffer(
+            GL_ARRAY_BUFFER, 0));
+        GL_CHECK_CODE(debug_, glBindBuffer(
+            GL_ELEMENT_ARRAY_BUFFER, 0));
+
+        index_buffer_ = nullptr;
+        vertex_buffers_ = {};
+        enabled_attribs_ = {};
     }
     
     void render::internal_state::set_render_target_(const render_target_ptr& rt) noexcept {
@@ -527,40 +571,164 @@ namespace e2d
             const vertex_attribs_ptr& attribs,
             std::size_t offset) noexcept
     {
+        E2D_ASSERT(!vbuffer == !attribs);
+
         auto& curr = vertex_buffers_[index];
-
-        curr.dirty = 
-            !(curr.buffer == vbuffer &&
-             curr.attribs == attribs &&
-             curr.offset == offset);
-
-        curr.buffer = vbuffer;
-        curr.attribs = attribs;
-        curr.offset = offset;
+        if ( curr.buffer != vbuffer ||
+             curr.attribs != attribs ||
+             curr.offset != offset )
+        {
+            set_flag_inplace(dirty_flags_, dirty_flag_bits::vertex_attribs);
+            curr.buffer = vbuffer;
+            curr.attribs = attribs;
+            curr.offset = offset;
+        }
     }
     
     void render::internal_state::bind_const_buffer(
-        const_buffer::scope scope,
         const const_buffer_ptr& cbuffer) noexcept
     {
-        cbuffers_[u32(scope)] = cbuffer;
+        switch ( cbuffer->binding_scope() ) {
+            case const_buffer::scope::render_pass:
+                if ( cbuffers_[0] != cbuffer ) {
+                    cbuffers_[0] = cbuffer;
+                    set_flag_inplace(dirty_flags_, dirty_flag_bits::pass_cbuffer);
+                }
+                break;
+            case const_buffer::scope::material:
+                if ( cbuffers_[1] != cbuffer ) {
+                    cbuffers_[1] = cbuffer;
+                    set_flag_inplace(dirty_flags_, dirty_flag_bits::mtr_cbuffer);
+                }
+                break;
+            case const_buffer::scope::draw_command:
+                if ( cbuffers_[2] != cbuffer ) {
+                    cbuffers_[2] = cbuffer;
+                    set_flag_inplace(dirty_flags_, dirty_flag_bits::draw_cbuffer);
+                }
+                break;
+        }
     }
     
     void render::internal_state::bind_index_buffer(
         const index_buffer_ptr& ibuffer) noexcept
     {
+        index_buffer_ = ibuffer;
     }
     
     void render::internal_state::bind_textures(
         sampler_block::scope scope,
         const sampler_block& samplers) noexcept
     {
+        // TODO
+    }
+    
+    void render::internal_state::bind_vertex_attributes_() noexcept {
+        if ( !check_flag_and_reset(dirty_flags_, dirty_flag_bits::vertex_attribs) ) {
+            return;
+        }
+        enabled_attribs_t new_attribs;
+        for ( auto& vb : vertex_buffers_ ) {
+            if ( !vb.buffer || !vb.attribs ) {
+                continue;
+            }
+            const gl_buffer_id& buf_id = vb.buffer->state().id();
+            GL_CHECK_CODE(debug_, glBindBuffer(buf_id.target(), *buf_id));
+
+            const vertex_declaration& decl = vb.attribs->decl();
+            for ( size_t i = 0; i < decl.attribute_count(); ++i ) {
+                const auto& vai = decl.attribute(i);
+                const size_t off = vb.offset + vai.stride;
+                shader_program_->state().with_attribute_location(vai.name,
+                    [this, &vai, off, &decl, &new_attribs](const attribute_info& ai) noexcept{
+                        const GLuint rows = math::numeric_cast<GLuint>(vai.rows);
+                        for ( GLuint row = 0; row < rows; ++row ) {
+                            GLuint index = math::numeric_cast<GLuint>(ai.location) + row;
+                            new_attribs[index] = true;
+                            GL_CHECK_CODE(debug_, glVertexAttribPointer(
+                                index,
+                                math::numeric_cast<GLint>(vai.columns),
+                                convert_attribute_type(vai.type),
+                                vai.normalized ? GL_TRUE : GL_FALSE,
+                                math::numeric_cast<GLsizei>(decl.bytes_per_vertex()),
+                                reinterpret_cast<const GLvoid*>(off + row * vai.row_size())));
+                        }
+                    });
+            }
+        }
+        for ( size_t i = 0; i < enabled_attribs_.size(); ++i ) {
+            if ( enabled_attribs_[i] != new_attribs[i] ) {
+                GL_CHECK_CODE(debug_, glEnableVertexAttribArray(GLuint(i)));
+            } else {
+                GL_CHECK_CODE(debug_, glDisableVertexAttribArray(GLuint(i)));
+            }
+        }
+        enabled_attribs_ = new_attribs;
+        
+        GL_CHECK_CODE(debug_, glBindBuffer(GL_ARRAY_BUFFER, 0));
+    }
+
+    void render::internal_state::bind_cbuffers_() noexcept {
+        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_cbuffer) ) {
+            shader_program_->state().bind_buffer(cbuffers_[0]);
+        }
+        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_cbuffer) ) {
+            shader_program_->state().bind_buffer(cbuffers_[1]);
+        }
+        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::draw_cbuffer) ) {
+            shader_program_->state().bind_buffer(cbuffers_[2]);
+        }
+    }
+
+    void render::internal_state::bind_textures_() noexcept {
+        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_textures) ) {
+            // TODO
+        }
+        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_textures) ) {
+            // TODO
+        }
+    }
+
+    void render::internal_state::commit_changes_() noexcept {
+        E2D_ASSERT(shader_program_);
+
+        if ( dirty_flags_ == dirty_flag_bits::none ) {
+            return;
+        }
+
+        bind_vertex_attributes_();
+        bind_cbuffers_();
+        bind_textures_();
+
+        dirty_flags_ = dirty_flag_bits::none;
     }
 
     void render::internal_state::draw(topology topo, u32 first, u32 count) noexcept {
+        commit_changes_();
+
+        GL_CHECK_CODE(debug_, glDrawArrays(
+            convert_topology(topo),
+            first,
+            count));
+        
+        stats().draw_calls++;
     }
 
-    void render::internal_state::draw_indexed(topology topo, u32 first, u32 count) noexcept {
+    void render::internal_state::draw_indexed(topology topo, u32 count, size_t offset) noexcept {
+        E2D_ASSERT(index_buffer_);
+        commit_changes_();
+
+        GL_CHECK_CODE(debug_, glBindBuffer(
+            GL_ELEMENT_ARRAY_BUFFER,
+            *index_buffer_->state().id()));
+
+        GL_CHECK_CODE(debug_, glDrawElements(
+            convert_topology(topo),
+            count,
+            convert_index_type(index_buffer_->decl().type()),
+            reinterpret_cast<void*>(offset)));
+
+        stats().draw_calls++;
     }
 
     void render::internal_state::set_depth_state_(const depth_state& ds) noexcept {

@@ -134,9 +134,7 @@ namespace e2d
             }
 
             render_.execute(render::bind_textures_command(batch.mtr.samplers()));
-            render_.execute(render::bind_const_buffer_command(
-                batch.mtr.cbuffer(),
-                const_buffer::scope::material));
+            render_.execute(render::bind_const_buffer_command(batch.mtr.cbuffer()));
 
             // TODO: render states
 

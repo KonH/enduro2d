@@ -76,61 +76,56 @@ namespace e2d
     // render::property_map
     //
 
-    template < typename T >
-    T* render::property_map<T>::find(str_hash key) noexcept {
+    inline
+    render::property_map::property_value*
+    render::property_map::find(str_hash key) noexcept {
         const auto iter = values_.find(key);
         return iter != values_.end()
             ? &iter->second
             : nullptr;
     }
 
-    template < typename T >
-    const T* render::property_map<T>::find(str_hash key) const noexcept {
+    inline
+    const render::property_map::property_value*
+    render::property_map::find(str_hash key) const noexcept {
         const auto iter = values_.find(key);
         return iter != values_.end()
             ? &iter->second
             : nullptr;
     }
 
-    template < typename T >
-    void render::property_map<T>::assign(str_hash key, T&& value) {
+    inline void render::property_map::assign(str_hash key, property_value&& value) {
         values_[key] = std::move(value);
     }
 
-    template < typename T >
-    void render::property_map<T>::assign(str_hash key, const T& value) {
+    inline void render::property_map::assign(str_hash key, const property_value& value) {
         values_[key] = value;
     }
 
-    template < typename T >
-    void render::property_map<T>::clear() noexcept {
+    inline void render::property_map::clear() noexcept {
         values_.clear();
     }
 
-    template < typename T >
-    std::size_t render::property_map<T>::size() const noexcept {
+    inline std::size_t render::property_map::size() const noexcept {
         return values_.size();
     }
 
-    template < typename T >
     template < typename F >
-    void render::property_map<T>::foreach(F&& f) const {
+    inline void render::property_map::foreach(F&& f) const {
         for ( const auto& [name, value] : values_ ) {
             f(name, value);
         }
     }
 
-    template < typename T >
-    void render::property_map<T>::merge(const property_map& other) {
+    inline void render::property_map::merge(const property_map& other) {
         if ( this != &other ) {
-            other.foreach([this](str_hash name, const T& value){
+            other.foreach([this](str_hash name, const property_value& value){
                 assign(name, value);
             });
         }
     }
 
-    template < typename T >
-    bool render::property_map<T>::equals(const property_map& other) const noexcept {
+    inline bool render::property_map::equals(const property_map& other) const noexcept {
         return this == &other
             ? true
             : values_ == other.values_;

@@ -14,7 +14,15 @@ namespace
         attribute vec2 a_uv;
         attribute vec4 a_color;
 
-        uniform mat4 u_MVP;
+    #if UNIFORM_BUFFER
+        uniform PerPass {
+            mat4 view_proj;
+        } u_pass;
+        #define u_pass_view_proj u_pass.view_proj
+    #else
+        uniform vec4 u_pass_block[4];
+        #define u_pass_view_proj mat4(u_pass_block[0], u_pass_block[1], u_pass_block[2], u_pass_block[3]);
+    #endif
 
         varying vec4 v_color;
         varying vec2 v_uv;
@@ -22,17 +30,17 @@ namespace
         void main(){
           v_color = a_color;
           v_uv = a_uv;
-          gl_Position = vec4(a_position, 0.0, 1.0) * u_MVP;
+          gl_Position = vec4(a_position, 0.0, 1.0) * u_pass_view_proj;
         }
     )glsl";
 
     const char* fs1_source_cstr = R"glsl(
-        uniform sampler2D u_texture;
+        uniform sampler2D u_mtr_texture;
         varying vec4 v_color;
         varying vec2 v_uv;
 
         void main(){
-            gl_FragColor = v_color * texture2D(u_texture, v_uv);
+            gl_FragColor = v_color * texture2D(u_mtr_texture, v_uv);
         }
     )glsl";
     
@@ -40,13 +48,21 @@ namespace
         attribute vec3 a_position;
         attribute vec4 a_color;
 
-        uniform mat4 u_MVP;
+    #if UNIFORM_BUFFER
+        uniform PerPass {
+            mat4 view_proj;
+        } u_pass;
+        #define u_pass_view_proj u_pass.view_proj
+    #else
+        uniform vec4 u_pass_block[4];
+        #define u_pass_view_proj mat4(u_pass_block[0], u_pass_block[1], u_pass_block[2], u_pass_block[3]);
+    #endif
 
         varying vec4 v_color;
 
         void main(){
           v_color = a_color;
-          gl_Position = vec4(a_position, 1.0) * u_MVP;
+          gl_Position = vec4(a_position, 1.0) * u_pass_view_proj;
         }
     )glsl";
 
@@ -141,7 +157,10 @@ namespace
                 shader1_,
                 const_buffer::scope::render_pass);
 
-            if ( !shader1_ || !shader2_ || !texture1_ || !texture2_ || !texture3_ || !rpass_cbuffer_ ) {
+            if ( !shader1_ || !shader2_ ||
+                 !texture1_ || !texture2_ || !texture3_ ||
+                 !rpass_cbuffer_ || !rpass_cbuffer_->is_compatible_with(shader2_) )
+            {
                 return false;
             }
 
@@ -171,9 +190,9 @@ namespace
             const auto projection = math::make_orthogonal_lh_matrix4(
                 framebuffer_size, 0.f, 1.f);
             
-            render::property_map<render::property_value> props;
-            props.assign("u_MVP", projection);
-            the<render>().update_buffer(rpass_cbuffer_, props);
+            render::property_map props;
+            props.assign("view_proj", projection);
+            the<render>().update_buffer(rpass_cbuffer_, shader1_, props);
 
             the<render>().begin_pass(
                 render::renderpass_desc()
@@ -204,14 +223,17 @@ namespace
                     .texture(texture2_)
                     .min_filter(render::sampler_min_filter::linear)
                     .mag_filter(render::sampler_mag_filter::linear));
+            
+            batcher::material mtr3 = batcher::material()
+                .shader(shader1_)
+                .sampler("u_texture", render::sampler_state()
+                    .texture(texture3_)
+                    .min_filter(render::sampler_min_filter::linear)
+                    .mag_filter(render::sampler_mag_filter::linear));
 
             auto batch = the<batcher>().alloc_batch<vertex2>(4, 6,
                 batcher::topology::triangles,
-                batcher::material()
-                    .shader(shader2_)
-                    .blend(batcher::blend_mode()
-                        .src_factor(render::blending_factor::src_alpha)
-                        .dst_factor(render::blending_factor::one_minus_src_alpha)));
+                batcher::material().shader(shader2_));
             batch.vertices[0] = vertex2(v3f(- 90.0f,  170.0f, 0.0f), color32::red());
             batch.vertices[1] = vertex2(v3f(-120.0f, -210.0f, 0.0f), color32::green());
             batch.vertices[2] = vertex2(v3f( 120.0f,  230.0f, 0.0f), color32::blue());

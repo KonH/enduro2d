@@ -79,6 +79,8 @@ namespace e2d::opengl
         bool framebuffer_discard_supported = false; // GLES2 only
         bool framebuffer_invalidate_supported = false; // GLES3 or GL4
 
+        bool uniform_buffer_supported = false;
+
         bool debug_output_supported = false;
     };
 
@@ -354,19 +356,22 @@ namespace e2d::opengl
 {
     struct uniform_info {
         str_hash name;
-        GLint size = 0;
-        GLint location = -1;
+        u16 size = 0;
+        u16 offset = 0;
         uniform_type type = uniform_type::floating_point;
+        const_buffer::scope scope = const_buffer::scope::last_;
     public:
         uniform_info(
             str_hash nname,
-            GLint nsize,
-            GLint nlocation,
-            uniform_type ntype) noexcept
+            u16 nsize,
+            u16 noffset,
+            uniform_type ntype,
+            const_buffer::scope nscope) noexcept
         : name(std::move(nname))
         , size(nsize)
-        , location(nlocation)
-        , type(ntype) {}
+        , offset(noffset)
+        , type(ntype)
+        , scope(nscope) {}
     };
 
     struct attribute_info {

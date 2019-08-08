@@ -945,16 +945,11 @@ namespace e2d
     // render::bind_const_buffer_command
     //
 
-    render::bind_const_buffer_command::bind_const_buffer_command(const const_buffer_ptr& cb, const_buffer::scope scope)
-    : buffer_(cb)
-    , scope_(scope) {}
+    render::bind_const_buffer_command::bind_const_buffer_command(const const_buffer_ptr& cb)
+    : buffer_(cb) {}
 
     const const_buffer_ptr& render::bind_const_buffer_command::buffer() const noexcept {
         return buffer_;
-    }
-
-    const_buffer::scope render::bind_const_buffer_command::scope() const noexcept {
-        return scope_;
     }
 
     //
@@ -1065,14 +1060,14 @@ namespace e2d
         return *this;
     }
 
-    render::draw_indexed_command& render::draw_indexed_command::index_range(u32 first, u32 count) noexcept {
-        first_index_ = first;
+    render::draw_indexed_command& render::draw_indexed_command::index_range(u32 count, size_t offset) noexcept {
+        index_offset_ = offset;
         index_count_ = count;
         return *this;
     }
 
-    render::draw_indexed_command& render::draw_indexed_command::first_index(u32 value) noexcept {
-        first_index_ = value;
+    render::draw_indexed_command& render::draw_indexed_command::index_offset(size_t value) noexcept {
+        index_offset_ = value;
         return *this;
     }
 
@@ -1081,8 +1076,8 @@ namespace e2d
         return *this;
     }
             
-    u32 render::draw_indexed_command::first_index() const noexcept {
-        return first_index_;
+    size_t render::draw_indexed_command::index_offset() const noexcept {
+        return index_offset_;
     }
 
     u32 render::draw_indexed_command::index_count() const noexcept {

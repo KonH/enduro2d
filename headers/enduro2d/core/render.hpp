@@ -667,14 +667,12 @@ namespace e2d
             std::size_t count_ = 0;
         };
 
-        using property_value = stdex::variant<
-            i32, f32,
-            v2i, v3i, v4i,
-            v2f, v3f, v4f,
-            m2f, m3f, m4f>;
-
-        template < typename T >
         class property_map final {
+        public:
+            using property_value = stdex::variant<
+                f32,
+                v2f, v3f, v4f,
+                m2f, m3f, m4f>;
         public:
             property_map() = default;
 
@@ -684,11 +682,11 @@ namespace e2d
             property_map(const property_map& other) = default;
             property_map& operator=(const property_map& other) = default;
 
-            T* find(str_hash key) noexcept;
-            const T* find(str_hash key) const noexcept;
+            property_value* find(str_hash key) noexcept;
+            const property_value* find(str_hash key) const noexcept;
 
-            void assign(str_hash key, T&& value);
-            void assign(str_hash key, const T& value);
+            void assign(str_hash key, property_value&& value);
+            void assign(str_hash key, const property_value& value);
 
             void clear() noexcept;
             std::size_t size() const noexcept;
@@ -698,7 +696,7 @@ namespace e2d
             void merge(const property_map& other);
             bool equals(const property_map& other) const noexcept;
         private:
-            flat_map<str_hash, T> values_;
+            flat_map<str_hash, property_value> values_;
         };
         
         class renderpass_desc final {
@@ -795,7 +793,7 @@ namespace e2d
         
         class bind_pipeline_command final {
         public:
-            bind_pipeline_command() = default;
+            bind_pipeline_command() = delete;
             bind_pipeline_command(const shader_ptr& shader);
 
             const shader_ptr& shader() const noexcept;
@@ -805,14 +803,14 @@ namespace e2d
         
         class bind_const_buffer_command final {
         public:
-            bind_const_buffer_command() = default;
-            bind_const_buffer_command(const const_buffer_ptr& cb, const_buffer::scope scope);
+            bind_const_buffer_command() = delete;
+            bind_const_buffer_command(const const_buffer_ptr& cb);
+            bind_const_buffer_command(const_buffer::scope scope); // empty buffer
 
             const const_buffer_ptr& buffer() const noexcept;
             const_buffer::scope scope() const noexcept;
         private:
             const_buffer_ptr buffer_;
-            const_buffer::scope scope_ = const_buffer::scope::last_;
         };
         
         class bind_textures_command final {
@@ -872,11 +870,11 @@ namespace e2d
             draw_indexed_command& indices(const index_buffer_ptr& value) noexcept;
             draw_indexed_command& topo(topology value) noexcept;
 
-            draw_indexed_command& index_range(u32 first, u32 count) noexcept;
-            draw_indexed_command& first_index(u32 value) noexcept;
+            draw_indexed_command& index_range(u32 count, size_t offset) noexcept;
+            draw_indexed_command& index_offset(size_t value) noexcept;
             draw_indexed_command& index_count(u32 value) noexcept;
             
-            u32 first_index() const noexcept;
+            size_t index_offset() const noexcept;
             u32 index_count() const noexcept;
             topology topo() const noexcept;
             const index_buffer_ptr& indices() const noexcept;
@@ -885,7 +883,7 @@ namespace e2d
             const_buffer_ptr cbuffer_;
             index_buffer_ptr index_buffer_;
             topology topology_ = topology::triangles;
-            u32 first_index_ = 0;
+            size_t index_offset_ = 0;
             u32 index_count_ = 0;
         };
 
@@ -957,6 +955,7 @@ namespace e2d
             // framebuffer bind counter
             
             u32 render_pass_count = 0;
+            u32 draw_calls = 0;
         };
     public:
         render(debug& d, window& w);
@@ -1043,7 +1042,8 @@ namespace e2d
 
         render& update_buffer(
             const const_buffer_ptr& cbuffer,
-            const property_map<property_value>& properties);
+            const shader_ptr& shader,
+            const property_map& properties);
 
         render& update_texture(
             const texture_ptr& tex,
