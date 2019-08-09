@@ -70,8 +70,7 @@ namespace
         >& results){
             return the<deferrer>().do_in_main_thread([results](){
                 const shader_ptr content = the<render>().create_shader(
-                    std::get<0>(results)->content(),
-                    std::get<1>(results)->content());
+                    shader_source()); // TODO
                 if ( !content ) {
                     throw shader_asset_loading_exception();
                 }

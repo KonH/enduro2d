@@ -179,7 +179,7 @@ namespace e2d
             material mtr;
             vertex_attribs_ptr attribs;
             topology topo = topology::triangles;
-            u32 idx_offset = 0;
+            size_t idx_offset = 0; // in bytes
             u32 idx_count = 0;
             u8 vb_index = 0xFF;
             u8 ib_index = 0xFF;

@@ -22,17 +22,38 @@ namespace e2d
 
     class shader::internal_state final : private e2d::noncopyable {
     public:
+        using uniform_type = shader_source::value_type;
+        using attribute_type = shader_source::value_type;
+        using sampler_type = shader_source::sampler_type;
+
+        struct uniform_info {
+            str_hash name;
+            u16 offset;
+            uniform_type type;
+            const_buffer::scope scope;
+        };
+        struct attribute_info {
+            str_hash name;
+            u8 index;
+            attribute_type type;
+        };
+        struct sampler_info {
+            str_hash name;
+            u8 unit;
+            sampler_type type;
+            render::sampler_block::scope scope;
+        };
         struct block_info {
             size_t size = 0;
+            u32 index = ~0u; // uniform array location or uniform buffer binding
             bool is_buffer = false;
+            bool exists = false;
         };
     public:
         internal_state(
             debug& debug,
             opengl::gl_program_id id,
-            const vector<opengl::uniform_info>& uniforms,
-            const vector<opengl::attribute_info>& attributes,
-            const vector<opengl::sampler_info>& samplers);
+            const shader_source& source);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
@@ -45,20 +66,20 @@ namespace e2d
         template < typename F >
         void with_sampler_location(str_hash name, F&& f) const;
         block_info get_block_info(const_buffer::scope scope) const noexcept;
-        void bind_buffer(const const_buffer_ptr& cb) const noexcept;
+        void bind_buffer(const_buffer::scope scope, const const_buffer_ptr& cb) const noexcept;
     private:
         debug& debug_;
         opengl::gl_program_id id_;
-        flat_map<str_hash, opengl::uniform_info> uniforms_;
-        flat_map<str_hash, opengl::attribute_info> attributes_;
-        flat_map<str_hash, opengl::sampler_info> samplers_;
+    private:
         struct cbuffer {
             mutable std::weak_ptr<const_buffer> buffer;
             mutable u32 version = 0;
             block_info info;
-            GLint location = -1;
         };
-        std::array<cbuffer, u32(const_buffer::scope::last_)> cbuffers_;
+        std::array<cbuffer, u32(const_buffer::scope::last_)> blocks_;
+        flat_map<str_hash, uniform_info> uniforms_;
+        flat_map<str_hash, attribute_info> attributes_;
+        flat_map<str_hash, sampler_info> samplers_;
     };
 
     template < typename F >
@@ -66,6 +87,8 @@ namespace e2d
         const auto iter = uniforms_.find(name);
         if ( iter != uniforms_.end() ) {
             stdex::invoke(std::forward<F>(f), iter->second);
+        } else {
+            E2D_ASSERT_MSG(false, "uniform is not exists");
         }
     }
 
@@ -82,6 +105,8 @@ namespace e2d
         const auto iter = samplers_.find(name);
         if ( iter != samplers_.end() ) {
             stdex::invoke(std::forward<F>(f), iter->second);
+        } else {
+            E2D_ASSERT_MSG(false, "sampler is not exists");
         }
     }
 
@@ -184,12 +209,14 @@ namespace e2d
             debug& debug,
             opengl::gl_buffer_id id,
             std::size_t size,
+            std::size_t offset,
             scope scope);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
         const opengl::gl_buffer_id& id() const noexcept;
         std::size_t size() const noexcept;
+        std::size_t offset() const noexcept;
         float* data() const noexcept;
         scope binding_scope() const noexcept;
         u32 version() const noexcept;
@@ -199,6 +226,7 @@ namespace e2d
         debug& debug_;
         opengl::gl_buffer_id id_;
         std::size_t size_ = 0;
+        std::size_t offset_ = 0; // of buffer is part of another buffer
         scope binding_scope_ = scope::last_;
         mutable std::unique_ptr<float[]> content_;
         mutable u32 version_ = 0;
@@ -251,15 +279,23 @@ namespace e2d
     public:
         debug& dbg() const noexcept;
         window& wnd() const noexcept;
+
         const device_caps& device_capabilities() const noexcept;
         const opengl::gl_device_caps& device_capabilities_ext() const noexcept;
-        const render_target_ptr& render_target() const noexcept;
+
         statistics& stats() noexcept;
         const statistics& last_stats() const noexcept;
+
         u32 frame_id() const noexcept;
         bool inside_render_pass() const noexcept;
 
+        const str& vertex_shader_header() const noexcept;
+        const str& fragment_shader_header() const noexcept;
+
         void on_present() noexcept;
+
+        vertex_attribs_ptr create_vertex_attribs(
+            const vertex_declaration& decl);
     public:
         internal_state& reset_states() noexcept;
         internal_state& set_states(const state_block& sb) noexcept;
@@ -285,9 +321,8 @@ namespace e2d
 
         void draw(topology topo, u32 first, u32 count) noexcept;
         void draw_indexed(topology topo, u32 count, size_t offset) noexcept;
-        
-        vertex_attribs_ptr create_vertex_attribs(
-            const vertex_declaration& decl);
+
+        void insert_message(str_view msg) noexcept;
     private:
         void set_depth_state_(const depth_state& ds) noexcept;
         void set_stencil_state_(const stencil_state& ss) noexcept;
@@ -365,6 +400,10 @@ namespace e2d
         statistics current_stat_;
         statistics last_frame_stat_;
         u32 frame_id_ = 1;
+
+        // utils
+        str vertex_shader_header_;
+        str fragment_shader_header_;
 
         flat_set<vertex_attribs_ptr> vertex_attrib_cache_;
     };

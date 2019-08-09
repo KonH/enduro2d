@@ -57,8 +57,80 @@ namespace
         auto l = utils::enum_to_underlying(le);
         auto r = utils::enum_to_underlying(re);
         bool res = (l & r) == r;
-        le = static_cast<T>(l & r);
+        le = static_cast<T>(l & ~r);
         return res;
+    }
+
+    const_buffer::scope convert_to_const_buffer_scope(
+        shader_source::scope_type scope) noexcept
+    {
+        #define DEFINE_CASE(x,y) case shader_source::scope_type::x: return const_buffer::scope::y;
+        switch ( scope ) {
+            DEFINE_CASE(render_pass, render_pass);
+            DEFINE_CASE(material, material);
+            DEFINE_CASE(draw_command, draw_command);
+            default:
+                E2D_ASSERT_MSG(false, "unexpected const buffer scope type");
+                return const_buffer::scope::last_;
+        }
+        #undef DEFINE_CASE
+    }
+
+    render::sampler_block::scope convert_to_sampler_block_scope(
+        shader_source::scope_type scope) noexcept
+    {
+        #define DEFINE_CASE(x,y) case shader_source::scope_type::x: return render::sampler_block::scope::y;
+        switch ( scope ) {
+            DEFINE_CASE(render_pass, render_pass);
+            DEFINE_CASE(material, material);
+            default:
+                E2D_ASSERT_MSG(false, "unexpected sampler block scope type");
+                return render::sampler_block::scope::last_;
+        }
+        #undef DEFINE_CASE
+    }
+
+    size_t get_uniform_size(shader_source::value_type type) {
+        switch ( type ) {
+            case shader_source::value_type::f32: return sizeof(float);
+            case shader_source::value_type::v2f: return sizeof(v2f);
+            case shader_source::value_type::v3f: return sizeof(v3f); // or v4f
+            case shader_source::value_type::v4f: return sizeof(v4f);
+            case shader_source::value_type::m2f: return sizeof(v4f) * 2;
+            case shader_source::value_type::m3f: return sizeof(v4f) * 3;
+            case shader_source::value_type::m4f: return sizeof(v4f) * 4;
+            default:
+                E2D_ASSERT_MSG(false, "unexpected uniform value type");
+                return 0;
+        }
+    }
+
+    void get_unifom_block_info(
+        debug& debug,
+        const char* name,
+        const gl_program_id& id,
+        shader::internal_state::block_info& block) noexcept
+    {
+        GLint loc;
+        GL_CHECK_CODE(debug, loc = glGetUniformLocation(*id, name));
+        if ( loc >= 0 ) {
+            block.index = math::numeric_cast<u32>(loc);
+            block.is_buffer = false;
+            block.exists = true;
+            return;
+        }
+        
+        // TODO: check extension
+        GL_CHECK_CODE(debug, loc = glGetUniformBlockIndex(*id, name));
+        if ( loc >= 0 ) {
+            GL_CHECK_CODE(debug, glUniformBlockBinding(*id, loc, loc));
+            block.index = math::numeric_cast<u32>(loc);
+            block.is_buffer = true;
+            block.exists = true;
+            return;
+        }
+
+        block.exists = false;
     }
 }
 
@@ -71,21 +143,50 @@ namespace e2d
     shader::internal_state::internal_state(
         debug& debug,
         gl_program_id id,
-        const vector<opengl::uniform_info>& uniforms,
-        const vector<opengl::attribute_info>& attributes,
-        const vector<opengl::sampler_info>& samplers)
+        const shader_source& source)
     : debug_(debug)
     , id_(std::move(id)){
         E2D_ASSERT(!id_.empty());
 
-        for ( const auto& info : uniforms ) {
-            uniforms_.emplace(info.name, info);
+        // bind vertex attributes
+        for ( auto& attr : source.attributes() ) {
+            GL_CHECK_CODE(debug_, glBindAttribLocation(
+                *id_, attr.index, attr.name.c_str()));
+            attributes_.emplace(attr.name,
+                attribute_info{str_hash(attr.name), attr.index, attr.type});
         }
-        for ( const auto& info : attributes ) {
-            attributes_.emplace(info.name, info);
-        }
-        for ( const auto& info : samplers ) {
-            samplers_.emplace(info.name, info);
+
+        // apply new attribute indices
+        GL_CHECK_CODE(debug_, glLinkProgram(*id_));
+
+        // bind uniforms
+        with_gl_use_program(debug_, *id_, [this, &source]() noexcept{
+            for ( auto& samp : source.samplers() ) {
+                GLint loc;
+                GL_CHECK_CODE(debug_, loc = glGetUniformLocation(*id_, samp.name.c_str()));
+                E2D_ASSERT(loc >= 0); // TODO: log
+                GL_CHECK_CODE(debug_, glUniform1i(loc, samp.unit));
+                samplers_.emplace(samp.name, sampler_info{
+                    str_hash(samp.name),
+                    samp.unit,
+                    samp.type,
+                    convert_to_sampler_block_scope(samp.scope)});
+            }
+        });
+
+        get_unifom_block_info(debug_, "ub_pass", id_, blocks_[u32(const_buffer::scope::render_pass)].info);
+        get_unifom_block_info(debug_, "ub_material", id_, blocks_[u32(const_buffer::scope::material)].info);
+        get_unifom_block_info(debug_, "ub_command", id_, blocks_[u32(const_buffer::scope::draw_command)].info);
+
+        for ( auto& un : source.uniforms() ) {
+            auto& block = blocks_[u32(un.scope)];
+            const size_t size = get_uniform_size(un.type);
+            block.info.size = math::max(block.info.size, un.offset + size);
+            uniforms_.emplace(un.name, uniform_info{
+                str_hash(un.name),
+                un.offset,
+                un.type,
+                convert_to_const_buffer_scope(un.scope)});
         }
     }
 
@@ -99,22 +200,43 @@ namespace e2d
 
     shader::internal_state::block_info
     shader::internal_state::get_block_info(const_buffer::scope scope) const noexcept {
-        return cbuffers_[size_t(scope)].info;
+        return blocks_[size_t(scope)].info;
     }
 
-    void shader::internal_state::bind_buffer(const const_buffer_ptr& cb) const noexcept {
-        E2D_ASSERT(cb);
-        auto& curr = cbuffers_[u32(cb->binding_scope())];
-        if ( curr.buffer.lock() != cb ||
-             curr.version != cb->state().version() )
-        {
-            GL_CHECK_CODE(debug_, glUniform4fv(
-                curr.location,
-                GLsizei(cb->state().size() / sizeof(v4f)),
-                cb->state().data()));
-
-            curr.buffer = cb;
-            curr.version = cb->state().version();
+    void shader::internal_state::bind_buffer(
+        const_buffer::scope scope,
+        const const_buffer_ptr& cbuffer) const noexcept
+    {
+        auto& curr = blocks_[u32(scope)];
+        if ( !curr.info.exists ) {
+            return;
+        }
+        if ( !cbuffer ) {
+            E2D_ASSERT_MSG(false, "const_buffer is null, will be used the last uniform values");
+            return;
+        }
+        auto& cb = cbuffer->state();
+        if ( curr.info.is_buffer ) {
+            // TODO: uniform buffer shared across all shaders, move this code somewhere
+            GL_CHECK_CODE(debug_, glBindBufferRange(
+                GL_UNIFORM_BUFFER,
+                curr.info.index,
+                *cb.id(),
+                math::numeric_cast<GLintptr>(cb.offset()),
+                math::numeric_cast<GLsizeiptr>(cb.size())));
+                curr.buffer = cbuffer;
+        } else {
+            // emulate uniform buffer
+            if ( curr.buffer.lock() != cbuffer ||
+                 curr.version != cb.version() )
+            {
+                GL_CHECK_CODE(debug_, glUniform4fv(
+                    curr.info.index,
+                    GLsizei(cb.size() / sizeof(v4f)),
+                    cb.data()));
+                curr.buffer = cbuffer;
+                curr.version = cb.version();
+            }
         }
     }
 
@@ -240,15 +362,14 @@ namespace e2d
         debug& debug,
         gl_buffer_id id,
         std::size_t size,
+        std::size_t offset,
         scope scope)
     : debug_(debug)
     , id_(std::move(id))
     , size_(size)
-    , binding_scope_(scope) {
-        if ( id_.empty() ) {
-            content_.reset(new float[size_]);
-        }
-    }
+    , offset_(offset)
+    , binding_scope_(scope)
+    , content_(new float[math::align_ceil(size_, sizeof(v4f))]) {}
 
     debug& const_buffer::internal_state::dbg() const noexcept {
         return debug_;
@@ -262,11 +383,16 @@ namespace e2d
         return size_;
     }
     
+    std::size_t const_buffer::internal_state::offset() const noexcept {
+        return offset_;
+    }
+    
     const_buffer::scope const_buffer::internal_state::binding_scope() const noexcept {
         return binding_scope_;
     }
 
     bool const_buffer::internal_state::is_compatible_with(const shader_ptr& shader) const noexcept {
+        E2D_ASSERT(false);
         return false; // TODO
     }
 
@@ -359,6 +485,10 @@ namespace e2d
         gl_trace_limits(debug_);
         gl_fill_device_caps(debug_, device_caps_, device_caps_ext_);
 
+        gl_build_shader_headers(
+            device_caps_, device_caps_ext_,
+            vertex_shader_header_, fragment_shader_header_);
+
         GL_CHECK_CODE(debug_, glPixelStorei(GL_PACK_ALIGNMENT, 1));
         GL_CHECK_CODE(debug_, glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 
@@ -381,10 +511,6 @@ namespace e2d
     const opengl::gl_device_caps& render::internal_state::device_capabilities_ext() const noexcept {
         return device_caps_ext_;
     }
-
-    const render_target_ptr& render::internal_state::render_target() const noexcept {
-        return render_target_;
-    }
     
     render::statistics& render::internal_state::stats() noexcept {
         return current_stat_;
@@ -400,6 +526,14 @@ namespace e2d
     
     bool render::internal_state::inside_render_pass() const noexcept {
         return inside_render_pass_;
+    }
+    
+    const str& render::internal_state::vertex_shader_header() const noexcept {
+        return vertex_shader_header_;
+    }
+
+    const str& render::internal_state::fragment_shader_header() const noexcept {
+        return fragment_shader_header_;
     }
 
     void render::internal_state::on_present() noexcept {
@@ -536,10 +670,10 @@ namespace e2d
         for ( size_t i = 0; i < max_attribute_count; ++i ) {
             GL_CHECK_CODE(debug_, glDisableVertexAttribArray(GLuint(i)));
         }
-        GL_CHECK_CODE(debug_, glBindBuffer(
-            GL_ARRAY_BUFFER, 0));
-        GL_CHECK_CODE(debug_, glBindBuffer(
-            GL_ELEMENT_ARRAY_BUFFER, 0));
+        //GL_CHECK_CODE(debug_, glBindBuffer(
+        //    GL_ARRAY_BUFFER, 0));
+        //GL_CHECK_CODE(debug_, glBindBuffer(
+        //    GL_ELEMENT_ARRAY_BUFFER, 0));
 
         index_buffer_ = nullptr;
         vertex_buffers_ = {};
@@ -589,6 +723,10 @@ namespace e2d
     void render::internal_state::bind_const_buffer(
         const const_buffer_ptr& cbuffer) noexcept
     {
+        if ( !cbuffer ) {
+            return;
+        }
+
         switch ( cbuffer->binding_scope() ) {
             case const_buffer::scope::render_pass:
                 if ( cbuffers_[0] != cbuffer ) {
@@ -650,10 +788,10 @@ namespace e2d
                 const auto& vai = decl.attribute(i);
                 const size_t off = vb.offset + vai.stride;
                 shader_program_->state().with_attribute_location(vai.name,
-                    [this, &vai, off, &decl, &new_attribs](const attribute_info& ai) noexcept{
+                    [this, &vai, off, &decl, &new_attribs](const auto& ai) noexcept{
                         const GLuint rows = math::numeric_cast<GLuint>(vai.rows);
                         for ( GLuint row = 0; row < rows; ++row ) {
-                            GLuint index = math::numeric_cast<GLuint>(ai.location) + row;
+                            GLuint index = math::numeric_cast<GLuint>(ai.index) + row;
                             new_attribs[index] = true;
                             GL_CHECK_CODE(debug_, glVertexAttribPointer(
                                 index,
@@ -667,7 +805,10 @@ namespace e2d
             }
         }
         for ( size_t i = 0; i < enabled_attribs_.size(); ++i ) {
-            if ( enabled_attribs_[i] != new_attribs[i] ) {
+            if ( enabled_attribs_[i] == new_attribs[i] ) {
+                continue;
+            }
+            if ( new_attribs[i] ) {
                 GL_CHECK_CODE(debug_, glEnableVertexAttribArray(GLuint(i)));
             } else {
                 GL_CHECK_CODE(debug_, glDisableVertexAttribArray(GLuint(i)));
@@ -675,18 +816,18 @@ namespace e2d
         }
         enabled_attribs_ = new_attribs;
         
-        GL_CHECK_CODE(debug_, glBindBuffer(GL_ARRAY_BUFFER, 0));
+        //GL_CHECK_CODE(debug_, glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
 
     void render::internal_state::bind_cbuffers_() noexcept {
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_cbuffer) ) {
-            shader_program_->state().bind_buffer(cbuffers_[0]);
+            shader_program_->state().bind_buffer(const_buffer::scope::render_pass, cbuffers_[0]);
         }
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_cbuffer) ) {
-            shader_program_->state().bind_buffer(cbuffers_[1]);
+            shader_program_->state().bind_buffer(const_buffer::scope::material, cbuffers_[1]);
         }
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::draw_cbuffer) ) {
-            shader_program_->state().bind_buffer(cbuffers_[2]);
+            shader_program_->state().bind_buffer(const_buffer::scope::draw_command, cbuffers_[2]);
         }
     }
 
@@ -703,10 +844,10 @@ namespace e2d
         for ( size_t i = 0; i < block.count(); ++i ) {
             const sampler_state& state = block.sampler(i);
             shader_program_->state().with_sampler_location(block.name(i),
-                [this, &state](const opengl::sampler_info& info) noexcept{
+                [this, &state](const auto& info) noexcept{
                     auto& id = state.texture()->state().id();
-                    E2D_ASSERT(id.target() == convert_uniform_type_to_texture_target(info.type));
-
+                    //E2D_ASSERT(id.target() == convert_uniform_type_to_texture_target(info.type));
+                    // TODO
 
                 });
         }
@@ -752,6 +893,19 @@ namespace e2d
             reinterpret_cast<void*>(offset)));
 
         stats().draw_calls++;
+    }
+    
+    void render::internal_state::insert_message(str_view msg) noexcept {
+        if ( !device_caps_ext_.debug_output_supported || msg.empty() ) {
+            return;
+        }
+        GL_CHECK_CODE(debug_, glDebugMessageInsert(
+            GL_DEBUG_SOURCE_APPLICATION,
+            GL_DEBUG_TYPE_OTHER,
+            0,
+            GL_DEBUG_SEVERITY_LOW,
+            math::numeric_cast<GLsizei>(msg.length()),
+            msg.data()));
     }
 
     void render::internal_state::set_depth_state_(const depth_state& ds) noexcept {

@@ -16,65 +16,6 @@ namespace
     using namespace e2d;
     using namespace e2d::opengl;
 
-    const char* vertex_shader_header_cstr(render::api_profile profile) noexcept {
-        switch ( profile ) {
-        case e2d::render::api_profile::unknown:
-            return "";
-        case e2d::render::api_profile::opengles2:
-        case e2d::render::api_profile::opengles3:
-            return R"glsl(
-                precision highp int;
-                precision highp float;
-            )glsl";
-        case e2d::render::api_profile::opengl2_compat:
-            return R"glsl(
-                #version 120
-                #define highp
-                #define mediump
-                #define lowp
-            )glsl";
-        case e2d::render::api_profile::opengl4_compat:
-            return R"glsl(
-                #version 410 core
-                #define texture2D texture
-                #define varying out
-                #define attribute in
-            )glsl";
-        default:
-            E2D_ASSERT_MSG(false, "unexpected render API profile");
-            return "";
-        }
-    }
-
-    const char* fragment_shader_header_cstr(render::api_profile profile) noexcept {
-        switch ( profile ) {
-        case e2d::render::api_profile::unknown:
-            return "";
-        case e2d::render::api_profile::opengles2:
-        case e2d::render::api_profile::opengles3:
-            return R"glsl(
-                precision mediump int;
-                precision mediump float;
-            )glsl";
-        case e2d::render::api_profile::opengl2_compat:
-            return R"glsl(
-                #version 120
-                #define highp
-                #define mediump
-                #define lowp
-            )glsl";
-        case e2d::render::api_profile::opengl4_compat:
-            return R"glsl(
-                #version 410 core
-                #define texture2D texture
-                #define varying in
-            )glsl";
-        default:
-            E2D_ASSERT_MSG(false, "unexpected render API profile");
-            return "";
-        }
-    }
-    
     struct property_block_visitor {
         property_block_visitor(
             float* dst,
@@ -305,7 +246,7 @@ namespace e2d
 
         gl_shader_id vs = gl_compile_shader(
             state_->dbg(),
-            vertex_shader_header_cstr(device_capabilities().profile),
+            state_->vertex_shader_header(),
             source.vertex_shader(),
             GL_VERTEX_SHADER);
 
@@ -315,15 +256,15 @@ namespace e2d
 
         gl_shader_id fs = gl_compile_shader(
             state_->dbg(),
-            fragment_shader_header_cstr(device_capabilities().profile),
+            state_->fragment_shader_header(),
             source.fragment_shader(),
             GL_FRAGMENT_SHADER);
 
         if ( fs.empty() ) {
             return nullptr;
         }
-        
-        gl_program_id ps = gl_create_program(
+
+        gl_program_id ps = gl_link_program(
             state_->dbg(),
             std::move(vs),
             std::move(fs));
@@ -332,26 +273,11 @@ namespace e2d
             return nullptr;
         }
 
-        for ( auto& attr : source.attributes() ) {
-            GL_CHECK_CODE(state_->dbg(), glBindAttribLocation(
-                *ps, attr.index, attr.name.c_str()));
-        }
-
-        if ( !gl_link_program(state_->dbg(), ps) ) {
-            return nullptr;
-        }
-        
-        vector<opengl::uniform_info> uniforms;
-        vector<opengl::attribute_info> attributes;
-        vector<opengl::sampler_info> samplers; // TODO
-
         return std::make_shared<shader>(
             std::make_unique<shader::internal_state>(
                 state_->dbg(),
                 std::move(ps),
-                uniforms,
-                attributes,
-                samplers));
+                source));
     }
 
     texture_ptr render::create_texture(
@@ -667,7 +593,6 @@ namespace e2d
                 "--> Info: unsupported vertex declaration");
             return nullptr;
         }
-
         return state_->create_vertex_attribs(decl);
     }
         
@@ -678,8 +603,8 @@ namespace e2d
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(shader);
 
-        auto block_info = shader->state().get_block_info(scope);
-        if ( !block_info.size ) {
+        const auto block_info = shader->state().get_block_info(scope);
+        if ( !block_info.exists ) {
             // shader does not contains const buffer for current scope
             return nullptr;
         }
@@ -695,6 +620,16 @@ namespace e2d
                     "--> Info: failed to create uniform buffer id");
                 return nullptr;
             }
+
+            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, &block_info, scope]() {
+                GL_CHECK_CODE(state_->dbg(), glBufferData(
+                    buf_id.target(),
+                    math::numeric_cast<GLsizeiptr>(block_info.size),
+                    nullptr,
+                    scope == const_buffer::scope::draw_command
+                        ? GL_STREAM_DRAW
+                        : GL_DYNAMIC_DRAW));
+            });
         } else {
             E2D_ASSERT(!block_info.is_buffer); // TODO: exception
             E2D_ASSERT(block_info.size % 16 == 0);
@@ -705,6 +640,7 @@ namespace e2d
                 state_->dbg(),
                 std::move(buf_id),
                 block_info.size,
+                0,
                 scope));
     }
 
@@ -879,7 +815,6 @@ namespace e2d
 
     render& render::execute(const material_command& command) {
         E2D_ASSERT(is_in_main_thread());
-        E2D_ASSERT(command.constants());
         state_->set_shader_program(command.shader());
         state_->bind_textures(sampler_block::scope::material, command.samplers());
         state_->bind_const_buffer(command.constants());
@@ -969,21 +904,27 @@ namespace e2d
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(cbuffer);
         E2D_ASSERT(shader);
+        auto& cb = cbuffer->state();
+        properties.foreach([&shader, &cb, &cbuffer](str_hash name, const auto& value) noexcept{
+            shader->state().with_uniform_location(name, [&cb, &cbuffer, &value](auto& info) noexcept{
+                E2D_ASSERT(info.scope == cbuffer->binding_scope());
+                property_block_visitor visitor(
+                    cb.data(),
+                    cb.size(),
+                    info.offset);
+                stdex::visit(visitor, value);
+            });
+        });
         if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
-            // TODO
-            E2D_ASSERT(false);
-        } else {
-            properties.foreach([&shader, &cbuffer](str_hash name, const auto& value) noexcept{
-                shader->state().with_uniform_location(name, [&cbuffer, &value](auto& info) noexcept{
-                    E2D_ASSERT(info.scope == cbuffer->binding_scope());
-                    property_block_visitor visitor(
-                        cbuffer->state().data(),
-                        cbuffer->state().size(),
-                        info.offset);
-                    stdex::visit(visitor, value);
-                });
+            with_gl_bind_buffer(state_->dbg(), cb.id(), [&cb]() noexcept{
+                GL_CHECK_CODE(cb.dbg(), glBufferSubData(
+                    cb.id().target(),
+                    0,
+                    math::numeric_cast<GLsizei>(cb.size()),
+                    cb.data()));
             });
         }
+        cb.on_content_update(state_->frame_id());
         return *this;
     }
 

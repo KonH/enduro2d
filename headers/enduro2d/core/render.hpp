@@ -342,7 +342,6 @@ namespace e2d
             draw_command,
             last_
         };
-        // TODO: update frequency ?
     public:
         explicit const_buffer(internal_state_uptr);
         ~const_buffer() noexcept;
@@ -787,7 +786,7 @@ namespace e2d
         private:
             std::array<vertex_buffer_ptr, max_vertex_buffer_count> buffers_;
             std::array<vertex_attribs_ptr, max_vertex_buffer_count> attribs_;
-            std::array<std::size_t, max_vertex_buffer_count> offsets_;
+            std::array<std::size_t, max_vertex_buffer_count> offsets_; // in bytes
             std::size_t count_ = 0;
         };
         
@@ -870,7 +869,7 @@ namespace e2d
             const_buffer_ptr cbuffer_;
             index_buffer_ptr index_buffer_;
             topology topology_ = topology::triangles;
-            size_t index_offset_ = 0;
+            size_t index_offset_ = 0; // in bytes
             u32 index_count_ = 0;
         };
 

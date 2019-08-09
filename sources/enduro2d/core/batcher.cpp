@@ -88,7 +88,7 @@ namespace e2d
         result.topo = topo;
         result.vb_index = u32(vertex_buffers_.size()-1);
         result.ib_index = u32(index_buffers_.size()-1);
-        result.idx_offset = u32(index_buffers_.back().offset / index_stride_);
+        result.idx_offset = index_buffers_.back().offset;
 
         return result;
     }
@@ -140,7 +140,7 @@ namespace e2d
             // TODO: render states
 
             render_.execute(render::draw_indexed_command()
-                .index_range(batch.idx_offset, batch.idx_count)
+                .index_range(batch.idx_count, batch.idx_offset)
                 .indices(index_buffers[batch.ib_index])
                 .topo(batch.topo));
         }

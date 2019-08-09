@@ -196,6 +196,65 @@ namespace
         }
     #endif
     }
+
+    const char* vertex_shader_header_cstr(render::api_profile profile) noexcept {
+        switch ( profile ) {
+        case e2d::render::api_profile::unknown:
+            return "";
+        case e2d::render::api_profile::opengles2:
+        case e2d::render::api_profile::opengles3:
+            return R"glsl(
+                precision highp int;
+                precision highp float;
+            )glsl";
+        case e2d::render::api_profile::opengl2_compat:
+            return R"glsl(
+                #version 120
+                #define highp
+                #define mediump
+                #define lowp
+            )glsl";
+        case e2d::render::api_profile::opengl4_compat:
+            return R"glsl(
+                #version 410 core
+                #define texture2D texture
+                #define varying out
+                #define attribute in
+            )glsl";
+        default:
+            E2D_ASSERT_MSG(false, "unexpected render API profile");
+            return "";
+        }
+    }
+
+    const char* fragment_shader_header_cstr(render::api_profile profile) noexcept {
+        switch ( profile ) {
+        case e2d::render::api_profile::unknown:
+            return "";
+        case e2d::render::api_profile::opengles2:
+        case e2d::render::api_profile::opengles3:
+            return R"glsl(
+                precision mediump int;
+                precision mediump float;
+            )glsl";
+        case e2d::render::api_profile::opengl2_compat:
+            return R"glsl(
+                #version 120
+                #define highp
+                #define mediump
+                #define lowp
+            )glsl";
+        case e2d::render::api_profile::opengl4_compat:
+            return R"glsl(
+                #version 410 core
+                #define texture2D texture
+                #define varying in
+            )glsl";
+        default:
+            E2D_ASSERT_MSG(false, "unexpected render API profile");
+            return "";
+        }
+    }
 }
 
 namespace e2d::opengl
@@ -745,51 +804,6 @@ namespace e2d::opengl
 
 namespace e2d::opengl
 {
-    const char* uniform_type_to_cstr(uniform_type ut) noexcept {
-        #define DEFINE_CASE(x) case uniform_type::x: return #x
-        switch ( ut ) {
-            DEFINE_CASE(signed_integer);
-            DEFINE_CASE(floating_point);
-            DEFINE_CASE(v2i);
-            DEFINE_CASE(v3i);
-            DEFINE_CASE(v4i);
-            DEFINE_CASE(v2f);
-            DEFINE_CASE(v3f);
-            DEFINE_CASE(v4f);
-            DEFINE_CASE(m2f);
-            DEFINE_CASE(m3f);
-            DEFINE_CASE(m4f);
-            DEFINE_CASE(sampler_2d);
-            DEFINE_CASE(sampler_cube);
-            DEFINE_CASE(unknown);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected uniform type");
-                return "";
-        }
-        #undef DEFINE_CASE
-    }
-
-    const char* attribute_type_to_cstr(attribute_type at) noexcept {
-        #define DEFINE_CASE(x) case attribute_type::x: return #x
-        switch ( at ) {
-            DEFINE_CASE(floating_point);
-            DEFINE_CASE(v2f);
-            DEFINE_CASE(v3f);
-            DEFINE_CASE(v4f);
-            DEFINE_CASE(m2f);
-            DEFINE_CASE(m3f);
-            DEFINE_CASE(m4f);
-            DEFINE_CASE(unknown);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected attribute type");
-                return "";
-        }
-        #undef DEFINE_CASE
-    }
-}
-
-namespace e2d::opengl
-{
     GLenum convert_image_data_format_to_external_format(image_data_format f) noexcept {
         #define DEFINE_CASE(x,y) case image_data_format::x: return y
         switch ( f ) {
@@ -927,7 +941,7 @@ namespace e2d::opengl
         }
         #undef DEFINE_CASE
     }
-
+    
     GLenum convert_attribute_type(vertex_declaration::attribute_type at) noexcept {
         #define DEFINE_CASE(x,y) case vertex_declaration::attribute_type::x: return y;
         switch ( at ) {
@@ -943,63 +957,17 @@ namespace e2d::opengl
         #undef DEFINE_CASE
     }
 
-    GLenum convert_uniform_type(uniform_type ut) noexcept {
-        #define DEFINE_CASE(x,y) case uniform_type::x: return y;
+    /*GLenum convert_uniform_type_to_texture_target(sampler_type ut) noexcept {
+        #define DEFINE_CASE(x,y) case sampler_type::x: return y;
         switch ( ut ) {
-            DEFINE_CASE(signed_integer, GL_INT);
-            DEFINE_CASE(floating_point, GL_FLOAT);
-
-            DEFINE_CASE(v2i, GL_INT_VEC2);
-            DEFINE_CASE(v3i, GL_INT_VEC3);
-            DEFINE_CASE(v4i, GL_INT_VEC4);
-
-            DEFINE_CASE(v2f, GL_FLOAT_VEC2);
-            DEFINE_CASE(v3f, GL_FLOAT_VEC3);
-            DEFINE_CASE(v4f, GL_FLOAT_VEC4);
-
-            DEFINE_CASE(m2f, GL_FLOAT_MAT2);
-            DEFINE_CASE(m3f, GL_FLOAT_MAT3);
-            DEFINE_CASE(m4f, GL_FLOAT_MAT4);
-
-            DEFINE_CASE(sampler_2d, GL_SAMPLER_2D);
-            DEFINE_CASE(sampler_cube, GL_SAMPLER_CUBE);
+            DEFINE_CASE(_2d, GL_TEXTURE_2D);
+            DEFINE_CASE(cube_map, GL_TEXTURE_CUBE_MAP);
             default:
-                E2D_ASSERT_MSG(false, "unexpected uniform type");
+                E2D_ASSERT_MSG(false, "unexpected sampler type");
                 return 0;
         }
         #undef DEFINE_CASE
-    }
-
-    GLenum convert_uniform_type_to_texture_target(uniform_type ut) noexcept {
-        #define DEFINE_CASE(x,y) case uniform_type::x: return y;
-        switch ( ut ) {
-            DEFINE_CASE(sampler_2d, GL_TEXTURE_2D);
-            DEFINE_CASE(sampler_cube, GL_TEXTURE_CUBE_MAP);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected uniform type for sampler");
-                return 0;
-        }
-        #undef DEFINE_CASE
-    }
-
-    GLenum convert_attribute_type(attribute_type at) noexcept {
-        #define DEFINE_CASE(x,y) case attribute_type::x: return y;
-        switch ( at ) {
-            DEFINE_CASE(floating_point, GL_FLOAT);
-
-            DEFINE_CASE(v2f, GL_FLOAT_VEC2);
-            DEFINE_CASE(v3f, GL_FLOAT_VEC3);
-            DEFINE_CASE(v4f, GL_FLOAT_VEC4);
-
-            DEFINE_CASE(m2f, GL_FLOAT_MAT2);
-            DEFINE_CASE(m3f, GL_FLOAT_MAT3);
-            DEFINE_CASE(m4f, GL_FLOAT_MAT4);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected attribute type");
-                return 0;
-        }
-        #undef DEFINE_CASE
-    }
+    }*/
 
     GLint convert_sampler_wrap(render::sampler_wrap w) noexcept {
         #define DEFINE_CASE(x,y) case render::sampler_wrap::x: return y;
@@ -1163,50 +1131,6 @@ namespace e2d::opengl
         #undef DEFINE_CASE
     }
 
-    uniform_type glsl_type_to_uniform_type(GLenum t) noexcept {
-        #define DEFINE_CASE(x,y) case x: return uniform_type::y
-        switch ( t ) {
-            DEFINE_CASE(GL_INT, signed_integer);
-            DEFINE_CASE(GL_FLOAT, floating_point);
-
-            DEFINE_CASE(GL_INT_VEC2, v2i);
-            DEFINE_CASE(GL_INT_VEC3, v3i);
-            DEFINE_CASE(GL_INT_VEC4, v4i);
-
-            DEFINE_CASE(GL_FLOAT_VEC2, v2f);
-            DEFINE_CASE(GL_FLOAT_VEC3, v3f);
-            DEFINE_CASE(GL_FLOAT_VEC4, v4f);
-
-            DEFINE_CASE(GL_FLOAT_MAT2, m2f);
-            DEFINE_CASE(GL_FLOAT_MAT3, m3f);
-            DEFINE_CASE(GL_FLOAT_MAT4, m4f);
-
-            DEFINE_CASE(GL_SAMPLER_2D, sampler_2d);
-            DEFINE_CASE(GL_SAMPLER_CUBE, sampler_cube);
-            default:
-                return uniform_type::unknown;
-        }
-        #undef DEFINE_CASE
-    }
-
-    attribute_type glsl_type_to_attribute_type(GLenum t) noexcept {
-        #define DEFINE_CASE(x,y) case x: return attribute_type::y
-        switch ( t ) {
-            DEFINE_CASE(GL_FLOAT, floating_point);
-
-            DEFINE_CASE(GL_FLOAT_VEC2, v2f);
-            DEFINE_CASE(GL_FLOAT_VEC3, v3f);
-            DEFINE_CASE(GL_FLOAT_VEC4, v4f);
-
-            DEFINE_CASE(GL_FLOAT_MAT2, m2f);
-            DEFINE_CASE(GL_FLOAT_MAT3, m3f);
-            DEFINE_CASE(GL_FLOAT_MAT4, m4f);
-            default:
-                return attribute_type::unknown;
-        }
-        #undef DEFINE_CASE
-    }
-
     const char* glsl_type_to_cstr(GLenum t) noexcept {
         #define DEFINE_CASE(x) case x: return #x
         switch ( t ) {
@@ -1265,6 +1189,7 @@ namespace e2d::opengl
         switch ( t ) {
             DEFINE_CASE(GL_ARRAY_BUFFER, GL_ARRAY_BUFFER_BINDING);
             DEFINE_CASE(GL_ELEMENT_ARRAY_BUFFER, GL_ELEMENT_ARRAY_BUFFER_BINDING);
+            DEFINE_CASE(GL_UNIFORM_BUFFER, GL_UNIFORM_BUFFER_BINDING);
             DEFINE_CASE(GL_TEXTURE_2D, GL_TEXTURE_BINDING_2D);
             DEFINE_CASE(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_BINDING_CUBE_MAP);
             DEFINE_CASE(GL_FRAMEBUFFER, GL_FRAMEBUFFER_BINDING);
@@ -1494,6 +1419,12 @@ namespace e2d::opengl
             gl_has_any_extension(debug,
                 "GL_ARB_uniform_buffer_object");
 
+        if ( caps_ext.uniform_buffer_supported ) {
+            GLint value;
+            glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &value);
+            caps_ext.max_uniform_buffer_bindings = math::numeric_cast<u32>(value);
+        }
+
         caps_ext.debug_output_supported =
             version >= gl_version::gles_320 ||
             version >= gl_version::gl_430 ||
@@ -1503,6 +1434,16 @@ namespace e2d::opengl
         gl_use_implementation_from_extensions(debug, version);
     }
     
+    void gl_build_shader_headers(render::device_caps& caps, gl_device_caps& ext, str& vs, str& fs) noexcept {
+        vs = vertex_shader_header_cstr(caps.profile);
+        fs = fragment_shader_header_cstr(caps.profile);
+
+        if ( ext.uniform_buffer_supported ) {
+            vs += "#define E2D_SUPPORTS_UBO 1\n";
+            fs += "#define E2D_SUPPORTS_UBO 1\n";
+        }
+    }
+
     void gl_depth_range(debug& debug, float near, float far) noexcept {
     #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
         GL_CHECK_CODE(debug, glDepthRange(
@@ -1548,11 +1489,8 @@ namespace e2d::opengl
             : gl_shader_id(debug);
     }
     
-    gl_program_id gl_create_program(
-        debug& debug,
-        gl_shader_id vs,
-        gl_shader_id fs) noexcept
-    {
+    gl_program_id gl_link_program(debug& debug, gl_shader_id vs, gl_shader_id fs) noexcept {
+        E2D_ASSERT(!vs.empty() && !fs.empty());
         gl_program_id id = gl_program_id::create(debug);
         if ( id.empty() ) {
             return id;
@@ -1560,13 +1498,11 @@ namespace e2d::opengl
 
         GL_CHECK_CODE(debug, glAttachShader(*id, *vs));
         GL_CHECK_CODE(debug, glAttachShader(*id, *fs));
-        return id;
-    }
-
-    bool gl_link_program(debug& debug, const gl_program_id& id) noexcept {
-        E2D_ASSERT(!id.empty());
         GL_CHECK_CODE(debug, glLinkProgram(*id));
-        return process_program_linking_result(debug, *id);
+
+        return process_program_linking_result(debug, *id)
+            ? std::move(id)
+            : gl_program_id(debug);
     }
 
     bool gl_check_framebuffer(
@@ -1637,85 +1573,6 @@ namespace e2d::opengl
                 math::numeric_cast<GLsizei>(size.y)));
         });
         return id;
-    }
-}
-
-namespace e2d::opengl
-{
-    /*void grab_program_uniforms(
-        debug& debug,
-        GLuint program,
-        vector<uniform_info>& uniforms)
-    {
-        E2D_ASSERT(program && glIsProgram(program));
-
-        GLint uniform_count = 0;
-        GL_CHECK_CODE(debug, glGetProgramiv(
-            program, GL_ACTIVE_UNIFORMS, &uniform_count));
-
-        GLint uniform_max_len = 0;
-        GL_CHECK_CODE(debug, glGetProgramiv(
-            program, GL_ACTIVE_UNIFORM_MAX_LENGTH, &uniform_max_len));
-
-        GLchar* name_buffer = static_cast<GLchar*>(E2D_ALLOCA(
-            sizeof(GLchar) * math::numeric_cast<std::size_t>(uniform_max_len)));
-
-        uniforms.reserve(uniforms.size() +
-            math::numeric_cast<std::size_t>(uniform_count));
-
-        for ( GLuint i = 0, e = math::numeric_cast<GLuint>(uniform_count); i < e; ++i ) {
-            GLint size = 0;
-            GLenum type = 0;
-            GL_CHECK_CODE(debug, glGetActiveUniform(
-                program, i, uniform_max_len,
-                nullptr, &size, &type, name_buffer));
-            GLint location = 0;
-            GL_CHECK_CODE(debug, gl_get_uniform_location(
-                program, name_buffer, &location));
-            uniforms.emplace_back(
-                name_buffer,
-                size,
-                location,
-                glsl_type_to_uniform_type(type));
-        }
-    }*/
-
-    void grab_program_attributes(
-        debug& debug,
-        GLuint program,
-        vector<attribute_info>& attributes)
-    {
-        E2D_ASSERT(program && glIsProgram(program));
-
-        GLint attribute_count = 0;
-        GL_CHECK_CODE(debug, glGetProgramiv(
-            program, GL_ACTIVE_ATTRIBUTES, &attribute_count));
-
-        GLint attribute_max_len = 0;
-        GL_CHECK_CODE(debug, glGetProgramiv(
-            program, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &attribute_max_len));
-
-        GLchar* name_buffer = static_cast<GLchar*>(E2D_ALLOCA(
-            sizeof(GLchar) * math::numeric_cast<std::size_t>(attribute_max_len)));
-
-        attributes.reserve(attributes.size() +
-            math::numeric_cast<std::size_t>(attribute_count));
-
-        for ( GLuint i = 0, e = math::numeric_cast<GLuint>(attribute_count); i < e; ++i ) {
-            GLint size = 0;
-            GLenum type = 0;
-            GL_CHECK_CODE(debug, glGetActiveAttrib(
-                program, i, attribute_max_len,
-                nullptr, &size, &type, name_buffer));
-            GLint location = 0;
-            GL_CHECK_CODE(debug, gl_get_attribute_location(
-                program, name_buffer, &location));
-            attributes.emplace_back(
-                name_buffer,
-                size,
-                location,
-                glsl_type_to_attribute_type(type));
-        }
     }
 }
 

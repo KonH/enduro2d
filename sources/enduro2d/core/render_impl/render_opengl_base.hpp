@@ -80,6 +80,7 @@ namespace e2d::opengl
         bool framebuffer_invalidate_supported = false; // GLES3 or GL4
 
         bool uniform_buffer_supported = false;
+        u32 max_uniform_buffer_bindings = 0;
 
         bool debug_output_supported = false;
     };
@@ -230,48 +231,6 @@ namespace e2d::opengl
 
 namespace e2d::opengl
 {
-    enum class uniform_type : u8 {
-        signed_integer,
-        floating_point,
-
-        v2i,
-        v3i,
-        v4i,
-
-        v2f,
-        v3f,
-        v4f,
-
-        m2f,
-        m3f,
-        m4f,
-
-        sampler_2d,
-        sampler_cube,
-
-        unknown
-    };
-
-    enum class attribute_type : u8 {
-        floating_point,
-
-        v2f,
-        v3f,
-        v4f,
-
-        m2f,
-        m3f,
-        m4f,
-
-        unknown
-    };
-
-    const char* uniform_type_to_cstr(uniform_type ut) noexcept;
-    const char* attribute_type_to_cstr(attribute_type at) noexcept;
-}
-
-namespace e2d::opengl
-{
     GLenum convert_image_data_format_to_external_format(image_data_format f) noexcept;
     GLenum convert_image_data_format_to_external_data_type(image_data_format f) noexcept;
 
@@ -284,10 +243,6 @@ namespace e2d::opengl
 
     GLenum convert_index_type(index_declaration::index_type it) noexcept;
     GLenum convert_attribute_type(vertex_declaration::attribute_type at) noexcept;
-    
-    GLenum convert_uniform_type_to_texture_target(uniform_type ut) noexcept;
-    GLenum convert_uniform_type(uniform_type ut) noexcept;
-    GLenum convert_attribute_type(attribute_type at) noexcept;
 
     GLint convert_sampler_wrap(render::sampler_wrap w) noexcept;
     GLint convert_sampler_filter(render::sampler_min_filter f) noexcept;
@@ -302,9 +257,6 @@ namespace e2d::opengl
     GLenum convert_blending_equation(render::blending_equation be) noexcept;
     GLenum convert_culling_mode(render::culling_mode cm) noexcept;
 
-    uniform_type glsl_type_to_uniform_type(GLenum t) noexcept;
-    attribute_type glsl_type_to_attribute_type(GLenum t) noexcept;
-
     const char* glsl_type_to_cstr(GLenum t) noexcept;
     const char* gl_error_code_to_cstr(GLenum e) noexcept;
     const char* gl_framebuffer_status_to_cstr(GLenum s) noexcept;
@@ -316,6 +268,7 @@ namespace e2d::opengl
     void gl_trace_info(debug& debug) noexcept;
     void gl_trace_limits(debug& debug) noexcept;
     void gl_fill_device_caps(debug& debug, render::device_caps& caps, gl_device_caps& ext) noexcept;
+    void gl_build_shader_headers(render::device_caps& caps, gl_device_caps& ext, str& vs, str& fs) noexcept;
 
     void gl_depth_range(debug& debug, float near, float far) noexcept;
 
@@ -324,15 +277,11 @@ namespace e2d::opengl
         str_view header,
         str_view source,
         GLenum type) noexcept;
-
-    gl_program_id gl_create_program(
+    
+    gl_program_id gl_link_program(
         debug& debug,
         gl_shader_id vs,
         gl_shader_id fs) noexcept;
-
-    bool gl_link_program(
-        debug& debug,
-        const gl_program_id& id) noexcept;
 
     bool gl_check_framebuffer(
         debug& debug,
@@ -355,73 +304,6 @@ namespace e2d::opengl
         debug& debug,
         const v2u& size,
         GLenum format);
-}
-
-namespace e2d::opengl
-{
-    struct uniform_info {
-        str_hash name;
-        u16 size = 0;
-        u16 offset = 0;
-        uniform_type type = uniform_type::floating_point;
-        const_buffer::scope scope = const_buffer::scope::last_;
-    public:
-        uniform_info(
-            str_hash nname,
-            u16 nsize,
-            u16 noffset,
-            uniform_type ntype,
-            const_buffer::scope nscope) noexcept
-        : name(std::move(nname))
-        , size(nsize)
-        , offset(noffset)
-        , type(ntype)
-        , scope(nscope) {}
-    };
-
-    struct attribute_info {
-        str_hash name;
-        GLint size = 0;
-        GLint location = -1;
-        attribute_type type = attribute_type::floating_point;
-    public:
-        attribute_info(
-            str_hash nname,
-            GLint nsize,
-            GLint nlocation,
-            attribute_type ntype) noexcept
-        : name(std::move(nname))
-        , size(nsize)
-        , location(nlocation)
-        , type(ntype) {}
-    };
-
-    struct sampler_info {
-        str_hash name;
-        u16 unit = 0;
-        uniform_type type = uniform_type::sampler_2d;
-        const_buffer::scope scope = const_buffer::scope::last_;
-    public:
-        sampler_info(
-            str_hash nname,
-            u16 nunit,
-            uniform_type ntype,
-            const_buffer::scope nscope) noexcept
-        : name(nname)
-        , unit(nunit)
-        , type(ntype)
-        , scope(nscope) {}
-    };
-
-    void grab_program_uniforms(
-        debug& debug,
-        GLuint program,
-        vector<uniform_info>& uniforms);
-
-    void grab_program_attributes(
-        debug& debug,
-        GLuint program,
-        vector<attribute_info>& attributes);
 }
 
 namespace e2d::opengl

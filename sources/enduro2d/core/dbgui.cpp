@@ -94,7 +94,7 @@ namespace e2d
         }
 
         void frame_tick() {
-            ImGuiIO& io = bind_context();
+            /*ImGuiIO& io = bind_context();
             const mouse& m = input_.mouse();
             const keyboard& k = input_.keyboard();
 
@@ -137,7 +137,7 @@ namespace e2d
                 ImGui::EndFrame();
             }
 
-            ImGui::NewFrame();
+            ImGui::NewFrame();*/
         }
 
         void frame_render() {

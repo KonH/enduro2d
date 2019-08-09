@@ -79,14 +79,12 @@ namespace e2d
     shader_source& shader_source::add_uniform(
         str name,
         size_t offset,
-        size_t size,
         value_type type,
-        scope_typr scope)
+        scope_type scope)
     {
         uniforms_.push_back({
             std::move(name),
             math::numeric_cast<u16>(offset),
-            math::numeric_cast<u16>(size),
             type,
             scope});
         return *this;
@@ -96,7 +94,7 @@ namespace e2d
         str name,
         u32 unit,
         sampler_type type,
-        scope_typr scope)
+        scope_type scope)
     {
         samplers_.push_back({
             std::move(name),

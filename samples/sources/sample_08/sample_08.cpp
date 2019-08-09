@@ -14,14 +14,13 @@ namespace
         attribute vec2 a_uv;
         attribute vec4 a_color;
 
-    #if UNIFORM_BUFFER
-        uniform PerPass {
-            mat4 view_proj;
-        } u_pass;
-        #define u_pass_view_proj u_pass.view_proj
+    #ifdef E2D_SUPPORTS_UBO
+        layout(std140) uniform ub_pass {
+            mat4 u_matrix_vp;
+        };
     #else
-        uniform vec4 u_pass_block[4];
-        #define u_pass_view_proj mat4(u_pass_block[0], u_pass_block[1], u_pass_block[2], u_pass_block[3]);
+        uniform vec4 ub_pass[4];
+        #define u_matrix_vp mat4(ub_pass[0], ub_pass[1], ub_pass[2], ub_pass[3]);
     #endif
 
         varying vec4 v_color;
@@ -30,17 +29,17 @@ namespace
         void main(){
           v_color = a_color;
           v_uv = a_uv;
-          gl_Position = vec4(a_position, 0.0, 1.0) * u_pass_view_proj;
+          gl_Position = vec4(a_position, 0.0, 1.0) * u_matrix_vp;
         }
     )glsl";
 
     const char* fs1_source_cstr = R"glsl(
-        uniform sampler2D u_mtr_texture;
+        uniform sampler2D u_texture;
         varying vec4 v_color;
         varying vec2 v_uv;
 
         void main(){
-            gl_FragColor = v_color * texture2D(u_mtr_texture, v_uv);
+            gl_FragColor = v_color * texture2D(u_texture, v_uv);
         }
     )glsl";
     
@@ -48,21 +47,20 @@ namespace
         attribute vec3 a_position;
         attribute vec4 a_color;
 
-    #if UNIFORM_BUFFER
-        uniform PerPass {
-            mat4 view_proj;
-        } u_pass;
-        #define u_pass_view_proj u_pass.view_proj
+    #ifdef E2D_SUPPORTS_UBO
+        layout(std140) uniform ub_pass {
+            mat4 u_matrix_vp;
+        };
     #else
-        uniform vec4 u_pass_block[4];
-        #define u_pass_view_proj mat4(u_pass_block[0], u_pass_block[1], u_pass_block[2], u_pass_block[3]);
+        uniform vec4 ub_pass[4];
+        #define u_matrix_vp mat4(ub_pass[0], ub_pass[1], ub_pass[2], ub_pass[3]);
     #endif
 
         varying vec4 v_color;
 
         void main(){
           v_color = a_color;
-          gl_Position = vec4(a_position, 1.0) * u_pass_view_proj;
+          gl_Position = vec4(a_position, 1.0) * u_matrix_vp;
         }
     )glsl";
 
@@ -143,10 +141,22 @@ namespace
     class game final : public engine::application {
     public:
         bool initialize() final {
-            shader1_ = the<render>().create_shader(
-                vs1_source_cstr, fs1_source_cstr);
-            shader2_ = the<render>().create_shader(
-                vs2_source_cstr, fs2_source_cstr);
+            shader1_ = the<render>().create_shader(shader_source()
+                .vertex_shader(vs1_source_cstr)
+                .fragment_shader(fs1_source_cstr)
+                .add_attribute("a_position", 0, shader_source::value_type::v2f)
+                .add_attribute("a_uv", 1, shader_source::value_type::v2f)
+                .add_attribute("a_color", 2, shader_source::value_type::v4f)
+                .add_uniform("u_matrix_vp", 0, shader_source::value_type::m4f, shader_source::scope_type::render_pass)
+                .add_sampler("u_texture", 0, shader_source::sampler_type::_2d, shader_source::scope_type::material));
+
+            shader2_ = the<render>().create_shader(shader_source()
+                .vertex_shader(vs2_source_cstr)
+                .fragment_shader(fs2_source_cstr)
+                .add_attribute("a_position", 0, shader_source::value_type::v3f)
+                .add_attribute("a_color", 1, shader_source::value_type::v4f)
+                .add_uniform("u_matrix_vp", 0, shader_source::value_type::m4f, shader_source::scope_type::render_pass));
+
             texture1_ = the<render>().create_texture(
                 the<vfs>().read(url("resources://bin/library/cube_0.png")));
             texture2_ = the<render>().create_texture(
@@ -191,7 +201,7 @@ namespace
                 framebuffer_size, 0.f, 1.f);
             
             render::property_map props;
-            props.assign("view_proj", projection);
+            props.assign("u_matrix_vp", projection);
             the<render>().update_buffer(rpass_cbuffer_, shader1_, props);
 
             the<render>().begin_pass(
