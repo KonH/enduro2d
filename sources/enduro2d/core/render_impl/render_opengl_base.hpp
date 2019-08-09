@@ -284,9 +284,10 @@ namespace e2d::opengl
 
     GLenum convert_index_type(index_declaration::index_type it) noexcept;
     GLenum convert_attribute_type(vertex_declaration::attribute_type at) noexcept;
-
-    GLint convert_uniform_type(uniform_type ut) noexcept;
-    GLint convert_attribute_type(attribute_type at) noexcept;
+    
+    GLenum convert_uniform_type_to_texture_target(uniform_type ut) noexcept;
+    GLenum convert_uniform_type(uniform_type ut) noexcept;
+    GLenum convert_attribute_type(attribute_type at) noexcept;
 
     GLint convert_sampler_wrap(render::sampler_wrap w) noexcept;
     GLint convert_sampler_filter(render::sampler_min_filter f) noexcept;
@@ -324,10 +325,14 @@ namespace e2d::opengl
         str_view source,
         GLenum type) noexcept;
 
-    gl_program_id gl_link_program(
+    gl_program_id gl_create_program(
         debug& debug,
         gl_shader_id vs,
         gl_shader_id fs) noexcept;
+
+    bool gl_link_program(
+        debug& debug,
+        const gl_program_id& id) noexcept;
 
     bool gl_check_framebuffer(
         debug& debug,
@@ -389,6 +394,23 @@ namespace e2d::opengl
         , size(nsize)
         , location(nlocation)
         , type(ntype) {}
+    };
+
+    struct sampler_info {
+        str_hash name;
+        u16 unit = 0;
+        uniform_type type = uniform_type::sampler_2d;
+        const_buffer::scope scope = const_buffer::scope::last_;
+    public:
+        sampler_info(
+            str_hash nname,
+            u16 nunit,
+            uniform_type ntype,
+            const_buffer::scope nscope) noexcept
+        : name(nname)
+        , unit(nunit)
+        , type(ntype)
+        , scope(nscope) {}
     };
 
     void grab_program_uniforms(

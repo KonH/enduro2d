@@ -14,6 +14,7 @@
 namespace
 {
     using namespace e2d;
+    using namespace e2d::opengl;
 
     const char* vertex_shader_header_cstr(render::api_profile profile) noexcept {
         switch ( profile ) {
@@ -73,13 +74,65 @@ namespace
             return "";
         }
     }
-}
+    
+    struct property_block_visitor {
+        property_block_visitor(
+            float* dst,
+            size_t size,
+            size_t offset)
+        : dst_(dst)
+        , f32count_(size / sizeof(float))
+        , offset_(offset / sizeof(float)) {}
 
-namespace
-{
-    using namespace e2d;
-    using namespace e2d::opengl;
+        void operator ()(f32 v) noexcept {
+            E2D_ASSERT(offset_ + 1 <= f32count_);
+            std::memcpy(dst_ + offset_, &v, sizeof(v));
+        }
 
+        void operator ()(const v2f& v) noexcept {
+            E2D_ASSERT(offset_ % 2 == 0);
+            E2D_ASSERT(offset_ + 2 <= f32count_);
+            std::memcpy(dst_ + offset_, v.data(), sizeof(float)*2);
+        }
+
+        void operator ()(const v3f& v) noexcept {
+            E2D_ASSERT(offset_ % 4 == 0);
+            E2D_ASSERT(offset_ + 3 <= f32count_);
+            std::memcpy(dst_ + offset_, v.data(), sizeof(float)*3);
+        }
+
+        void operator ()(const v4f& v) noexcept {
+            E2D_ASSERT(offset_ % 4 == 0);
+            E2D_ASSERT(offset_ + 4 <= f32count_);
+            std::memcpy(dst_ + offset_, v.data(), sizeof(float)*4);
+        }
+
+        void operator ()(const m2f& v) noexcept {
+            E2D_ASSERT(offset_ % 4 == 0);
+            E2D_ASSERT(offset_ + 2*4 <= f32count_);
+            std::memcpy(dst_ + offset_ + 0, v.data() + 0, sizeof(float)*2);
+            std::memcpy(dst_ + offset_ + 4, v.data() + 2, sizeof(float)*2);
+        }
+
+        void operator ()(const m3f& v) noexcept {
+            E2D_ASSERT(offset_ % 4 == 0);
+            E2D_ASSERT(offset_ + 3*4 <= f32count_);
+            std::memcpy(dst_ + offset_ + 0, v.data() + 0, sizeof(float)*3);
+            std::memcpy(dst_ + offset_ + 4, v.data() + 3, sizeof(float)*3);
+            std::memcpy(dst_ + offset_ + 8, v.data() + 6, sizeof(float)*3);
+        }
+
+        void operator ()(const m4f& v) noexcept {
+            E2D_ASSERT(offset_ % 4 == 0);
+            E2D_ASSERT(offset_ + 4*4 <= f32count_);
+            std::memcpy(dst_ + offset_, v.data(), sizeof(float)*4*4);
+        }
+
+    private:
+        float* dst_;
+        size_t f32count_; // number of floats in buffer
+        size_t offset_; // with 4 bytes step
+    };
 }
 
 namespace e2d
@@ -244,17 +297,16 @@ namespace e2d
         E2D_ASSERT(main_thread() == nwindow.main_thread());
     }
     render::~render() noexcept = default;
-
+    
     shader_ptr render::create_shader(
-        str_view vertex_source,
-        str_view fragment_source)
+        const shader_source& source)
     {
         E2D_ASSERT(is_in_main_thread());
 
         gl_shader_id vs = gl_compile_shader(
             state_->dbg(),
             vertex_shader_header_cstr(device_capabilities().profile),
-            vertex_source,
+            source.vertex_shader(),
             GL_VERTEX_SHADER);
 
         if ( vs.empty() ) {
@@ -264,14 +316,14 @@ namespace e2d
         gl_shader_id fs = gl_compile_shader(
             state_->dbg(),
             fragment_shader_header_cstr(device_capabilities().profile),
-            fragment_source,
+            source.fragment_shader(),
             GL_FRAGMENT_SHADER);
 
         if ( fs.empty() ) {
             return nullptr;
         }
-
-        gl_program_id ps = gl_link_program(
+        
+        gl_program_id ps = gl_create_program(
             state_->dbg(),
             std::move(vs),
             std::move(fs));
@@ -280,22 +332,26 @@ namespace e2d
             return nullptr;
         }
 
+        for ( auto& attr : source.attributes() ) {
+            GL_CHECK_CODE(state_->dbg(), glBindAttribLocation(
+                *ps, attr.index, attr.name.c_str()));
+        }
+
+        if ( !gl_link_program(state_->dbg(), ps) ) {
+            return nullptr;
+        }
+        
+        vector<opengl::uniform_info> uniforms;
+        vector<opengl::attribute_info> attributes;
+        vector<opengl::sampler_info> samplers; // TODO
+
         return std::make_shared<shader>(
             std::make_unique<shader::internal_state>(
-                state_->dbg(), std::move(ps)));
-    }
-
-    shader_ptr render::create_shader(
-        const input_stream_uptr& vertex,
-        const input_stream_uptr& fragment)
-    {
-        E2D_ASSERT(is_in_main_thread());
-
-        str vertex_source, fragment_source;
-        return streams::try_read_tail(vertex_source, vertex)
-            && streams::try_read_tail(fragment_source, fragment)
-            ? create_shader(vertex_source, fragment_source)
-            : nullptr;
+                state_->dbg(),
+                std::move(ps),
+                uniforms,
+                attributes,
+                samplers));
     }
 
     texture_ptr render::create_texture(
@@ -620,9 +676,36 @@ namespace e2d
         const_buffer::scope scope)
     {
         E2D_ASSERT(is_in_main_thread());
-        
-        // TODO
-        return nullptr;
+        E2D_ASSERT(shader);
+
+        auto block_info = shader->state().get_block_info(scope);
+        if ( !block_info.size ) {
+            // shader does not contains const buffer for current scope
+            return nullptr;
+        }
+
+        gl_buffer_id buf_id(state_->dbg());
+
+        if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
+            E2D_ASSERT(block_info.is_buffer); // TODO: exception
+
+            buf_id = gl_buffer_id::create(state_->dbg(), GL_UNIFORM_BUFFER);
+            if ( buf_id.empty() ) {
+                state_->dbg().error("RENDER: Failed to create uniform buffer:\n"
+                    "--> Info: failed to create uniform buffer id");
+                return nullptr;
+            }
+        } else {
+            E2D_ASSERT(!block_info.is_buffer); // TODO: exception
+            E2D_ASSERT(block_info.size % 16 == 0);
+        }
+
+        return std::make_shared<const_buffer>(
+            std::make_unique<const_buffer::internal_state>(
+                state_->dbg(),
+                std::move(buf_id),
+                block_info.size,
+                scope));
     }
 
     render_target_ptr render::create_render_target(
@@ -752,14 +835,14 @@ namespace e2d
     
     render& render::begin_pass(
         const renderpass_desc& desc,
-        const const_buffer_ptr& cbuffer,
+        const const_buffer_ptr& constants,
         const sampler_block& samplers)
     {
         E2D_ASSERT(is_in_main_thread());
-        E2D_ASSERT(!cbuffer || cbuffer->binding_scope() == const_buffer::scope::render_pass);
+        E2D_ASSERT(!constants || constants->binding_scope() == const_buffer::scope::render_pass);
 
         state_->begin_render_pass(desc);
-        state_->bind_const_buffer(cbuffer);
+        state_->bind_const_buffer(constants);
         state_->bind_textures(sampler_block::scope::render_pass, samplers);
         return *this;
     }
@@ -794,24 +877,12 @@ namespace e2d
         return *this;
     }
 
-    render& render::execute(const bind_pipeline_command& command) {
+    render& render::execute(const material_command& command) {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(command.constants());
         state_->set_shader_program(command.shader());
-        return *this;
-    }
-
-    render& render::execute(const bind_const_buffer_command& command) {
-        E2D_ASSERT(is_in_main_thread());
-        E2D_ASSERT(command.buffer());
-        E2D_ASSERT(command.buffer()->binding_scope() != const_buffer::scope::render_pass);
-
-        state_->bind_const_buffer(command.buffer());
-        return *this;
-    }
-
-    render& render::execute(const bind_textures_command& command) {
-        E2D_ASSERT(is_in_main_thread());
         state_->bind_textures(sampler_block::scope::material, command.samplers());
+        state_->bind_const_buffer(command.constants());
         return *this;
     }
 
@@ -827,7 +898,7 @@ namespace e2d
         E2D_ASSERT(command.vertex_count() > 0);
         E2D_ASSERT(state_->inside_render_pass());
 
-        state_->bind_const_buffer(command.cbuffer());
+        state_->bind_const_buffer(command.constants());
         state_->draw(
             command.topo(),
             command.first_vertex(),
@@ -842,7 +913,7 @@ namespace e2d
         E2D_ASSERT(state_->inside_render_pass());
         
         state_->bind_index_buffer(command.indices());
-        state_->bind_const_buffer(command.cbuffer());
+        state_->bind_const_buffer(command.constants());
         state_->draw_indexed(
             command.topo(),
             command.index_count(),
@@ -902,38 +973,14 @@ namespace e2d
             // TODO
             E2D_ASSERT(false);
         } else {
-
             properties.foreach([&shader, &cbuffer](str_hash name, const auto& value) noexcept{
-                using T = std::remove_const_t<std::remove_reference_t<decltype(value)>>;
-
                 shader->state().with_uniform_location(name, [&cbuffer, &value](auto& info) noexcept{
-                    /*
-                    float* dst = cbuffer->state().data();
-                    size_t buffer_size = cbuffer->state().size();
-                    const size_t off = info.offset / sizeof(float);
-                    
                     E2D_ASSERT(info.scope == cbuffer->binding_scope());
-                    E2D_ASSERT(off + sizeof(value) <= buffer_size);
-
-                    if constexpr( std::is_same_v<T, f32> ) {
-                        std::memcpy(dst + off, &value, sizeof(value));
-                    } else if constexpr( std::is_same_v<T, v2f> ) {
-                        std::memcpy(dst + off, value.data(), sizeof(value));
-                    } else if constexpr( std::is_same_v<T, v3f> || std::is_same_v<T, v4f> || std::is_same_v<T, m4f> ) {
-                        E2D_ASSERT(off % 4 == 0);
-                        std::memcpy(dst + off, value.data(), sizeof(value));
-                    } else if constexpr( std::is_same_v<T, m2f> ) {
-                        E2D_ASSERT(off % 4 == 0);
-                        std::memcpy(dst + off, value.data(), sizeof(value));
-                        std::memcpy(dst + off, value.data(), sizeof(value));
-                    } else if constexpr( std::is_same_v<T, m3f> ) {
-                        E2D_ASSERT(off % 4 == 0);
-                        std::memcpy(dst + off, value.data(), sizeof(value));
-                        std::memcpy(dst + off + 4, value.data(), sizeof(value));
-                        std::memcpy(dst + off + 8, value.data(), sizeof(value));
-                    } else {
-                        static_assert(false, "unexpected property type");
-                    }*/
+                    property_block_visitor visitor(
+                        cbuffer->state().data(),
+                        cbuffer->state().size(),
+                        info.offset);
+                    stdex::visit(visitor, value);
                 });
             });
         }

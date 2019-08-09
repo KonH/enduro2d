@@ -206,18 +206,9 @@ namespace e2d
     render::~render() noexcept = default;
 
     shader_ptr render::create_shader(
-        str_view vertex_source,
-        str_view fragment_source)
+        const shader_source& source)
     {
-        E2D_UNUSED(vertex_source, fragment_source);
-        return nullptr;
-    }
-
-    shader_ptr render::create_shader(
-        const input_stream_uptr& vertex_stream,
-        const input_stream_uptr& fragment_stream)
-    {
-        E2D_UNUSED(vertex_stream, fragment_stream);
+        E2D_UNUSED(source);
         return nullptr;
     }
 
@@ -297,10 +288,10 @@ namespace e2d
     
     render& render::begin_pass(
         const renderpass_desc& desc,
-        const const_buffer_ptr& cbuffer,
+        const const_buffer_ptr& constants,
         const sampler_block& samplers)
     {
-        E2D_UNUSED(desc, cbuffer, samplers);
+        E2D_UNUSED(desc, constants, samplers);
         return *this;
     }
 

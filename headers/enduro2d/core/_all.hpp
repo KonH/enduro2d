@@ -17,7 +17,6 @@
 #include "network.hpp"
 #include "platform.hpp"
 #include "render.hpp"
-#include "render.inl"
 #include "vfs.hpp"
 #include "window.hpp"
 #include "batcher.hpp"

@@ -153,14 +153,14 @@ namespace e2d
         public:
             material() = default;
 
-            material& cbuffer(const const_buffer_ptr& value) noexcept;
+            material& constants(const const_buffer_ptr& value) noexcept;
             material& shader(const shader_ptr& value) noexcept;
             material& sampler(str_view name, const sampler_state& value) noexcept;
             material& blend(const blend_mode& value) noexcept;
 
             [[nodiscard]] const shader_ptr& shader() const noexcept;
             [[nodiscard]] const sampler_block& samplers() const noexcept;
-            [[nodiscard]] const const_buffer_ptr& cbuffer() const noexcept;
+            [[nodiscard]] const const_buffer_ptr& constants() const noexcept;
             [[nodiscard]] const blend_mode& blend() const noexcept;
 
             [[nodiscard]] bool operator == (const material& r) const noexcept;
@@ -502,7 +502,7 @@ namespace e2d
         return *this;
     }
     
-    inline batcher::material& batcher::material::cbuffer(const const_buffer_ptr& cb) noexcept {
+    inline batcher::material& batcher::material::constants(const const_buffer_ptr& cb) noexcept {
         cbuffer_ = cb;
         return *this;
     }
@@ -520,7 +520,7 @@ namespace e2d
         return samplers_;
     }
 
-    inline const const_buffer_ptr& batcher::material::cbuffer() const noexcept {
+    inline const const_buffer_ptr& batcher::material::constants() const noexcept {
         return cbuffer_;
     }
 

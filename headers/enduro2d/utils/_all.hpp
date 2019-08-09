@@ -22,6 +22,7 @@
 #include "module.hpp"
 #include "path.hpp"
 #include "shape.hpp"
+#include "shader_source.hpp"
 #include "streams.hpp"
 #include "streams.inl"
 #include "strfmts.hpp"

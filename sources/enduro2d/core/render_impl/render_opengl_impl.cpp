@@ -70,23 +70,22 @@ namespace e2d
 
     shader::internal_state::internal_state(
         debug& debug,
-        gl_program_id id)
+        gl_program_id id,
+        const vector<opengl::uniform_info>& uniforms,
+        const vector<opengl::attribute_info>& attributes,
+        const vector<opengl::sampler_info>& samplers)
     : debug_(debug)
     , id_(std::move(id)){
         E2D_ASSERT(!id_.empty());
 
-        vector<uniform_info> uniforms;
-        grab_program_uniforms(debug_, *id_, uniforms);
-
-        vector<attribute_info> attributes;
-        grab_program_attributes(debug_, *id_, attributes);
-
         for ( const auto& info : uniforms ) {
             uniforms_.emplace(info.name, info);
         }
-
         for ( const auto& info : attributes ) {
             attributes_.emplace(info.name, info);
+        }
+        for ( const auto& info : samplers ) {
+            samplers_.emplace(info.name, info);
         }
     }
 
@@ -98,8 +97,9 @@ namespace e2d
         return id_;
     }
 
-    size_t shader::internal_state::get_buffer_size(const_buffer::scope scope) const noexcept {
-        return cbuffers_[u32(scope)].block_size;
+    shader::internal_state::block_info
+    shader::internal_state::get_block_info(const_buffer::scope scope) const noexcept {
+        return cbuffers_[size_t(scope)].info;
     }
 
     void shader::internal_state::bind_buffer(const const_buffer_ptr& cb) const noexcept {
@@ -245,7 +245,6 @@ namespace e2d
     , id_(std::move(id))
     , size_(size)
     , binding_scope_(scope) {
-        E2D_ASSERT(size % sizeof(v4f) == 0);
         if ( id_.empty() ) {
             content_.reset(new float[size_]);
         }
@@ -348,6 +347,8 @@ namespace e2d
     , default_sp_(gl_program_id::current(debug))
     , default_fb_(gl_framebuffer_id::current(debug, GL_FRAMEBUFFER))
     {
+        //textures_.fill({0, 0});
+
     #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
         if ( glewInit() != GLEW_OK ) {
             throw bad_render_operation();
@@ -620,7 +621,16 @@ namespace e2d
         sampler_block::scope scope,
         const sampler_block& samplers) noexcept
     {
-        // TODO
+        switch ( scope ) {
+            case sampler_block::scope::render_pass:
+                samplers_[0] = samplers;
+                set_flag_inplace(dirty_flags_, dirty_flag_bits::pass_textures);
+                break;
+            case sampler_block::scope::material:
+                samplers_[1] = samplers;
+                set_flag_inplace(dirty_flags_, dirty_flag_bits::mtr_textures);
+                break;
+        }
     }
     
     void render::internal_state::bind_vertex_attributes_() noexcept {
@@ -682,10 +692,23 @@ namespace e2d
 
     void render::internal_state::bind_textures_() noexcept {
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_textures) ) {
-            // TODO
+            bind_sampler_block(samplers_[0]);
         }
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_textures) ) {
-            // TODO
+            bind_sampler_block(samplers_[1]);
+        }
+    }
+    
+    void render::internal_state::bind_sampler_block(const sampler_block& block) noexcept {
+        for ( size_t i = 0; i < block.count(); ++i ) {
+            const sampler_state& state = block.sampler(i);
+            shader_program_->state().with_sampler_location(block.name(i),
+                [this, &state](const opengl::sampler_info& info) noexcept{
+                    auto& id = state.texture()->state().id();
+                    E2D_ASSERT(id.target() == convert_uniform_type_to_texture_target(info.type));
+
+
+                });
         }
     }
 
@@ -700,7 +723,7 @@ namespace e2d
         bind_cbuffers_();
         bind_textures_();
 
-        dirty_flags_ = dirty_flag_bits::none;
+        E2D_ASSERT(dirty_flags_ == dirty_flag_bits::none);
     }
 
     void render::internal_state::draw(topology topo, u32 first, u32 count) noexcept {

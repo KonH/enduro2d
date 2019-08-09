@@ -791,37 +791,24 @@ namespace e2d
             std::size_t count_ = 0;
         };
         
-        class bind_pipeline_command final {
+        class material_command final {
         public:
-            bind_pipeline_command() = delete;
-            bind_pipeline_command(const shader_ptr& shader);
+            material_command() = default;
+            material_command(
+                const shader_ptr& shader,
+                const sampler_block& block,
+                const const_buffer_ptr& constants);
 
-            const shader_ptr& shader() const noexcept;
-        private:
-            shader_ptr shader_;
-        };
-        
-        class bind_const_buffer_command final {
-        public:
-            bind_const_buffer_command() = delete;
-            bind_const_buffer_command(const const_buffer_ptr& cb);
-            bind_const_buffer_command(const_buffer::scope scope); // empty buffer
-
-            const const_buffer_ptr& buffer() const noexcept;
-            const_buffer::scope scope() const noexcept;
-        private:
-            const_buffer_ptr buffer_;
-        };
-        
-        class bind_textures_command final {
-        public:
-            bind_textures_command() = default;
-            bind_textures_command(const sampler_block& block);
-
-            bind_textures_command& bind(str_hash name, const sampler_state& sampler) noexcept;
+            material_command& sampler(str_hash name, const sampler_state& sampler) noexcept;
+            material_command& shader(const shader_ptr& value) noexcept;
+            material_command& constants(const const_buffer_ptr& value) noexcept;
             
             const sampler_block& samplers() const noexcept;
+            const shader_ptr& shader() const noexcept;
+            const const_buffer_ptr& constants() const noexcept;
         private:
+            shader_ptr shader_;
+            const_buffer_ptr cbuffer_;
             sampler_block sampler_block_;
         };
         
@@ -844,7 +831,7 @@ namespace e2d
         public:
             draw_command() = default;
 
-            draw_command& cbuffer(const const_buffer_ptr& value) noexcept;
+            draw_command& constants(const const_buffer_ptr& value) noexcept;
 
             draw_command& topo(topology value) noexcept;
             draw_command& vertex_range(u32 first, u32 count) noexcept;
@@ -854,7 +841,7 @@ namespace e2d
             u32 first_vertex() const noexcept;
             u32 vertex_count() const noexcept;
             topology topo() const noexcept;
-            const const_buffer_ptr& cbuffer() const noexcept;
+            const const_buffer_ptr& constants() const noexcept;
         private:
             const_buffer_ptr cbuffer_;
             topology topology_ = topology::triangles;
@@ -866,7 +853,7 @@ namespace e2d
         public:
             draw_indexed_command() = default;
 
-            draw_indexed_command& cbuffer(const const_buffer_ptr& value) noexcept;
+            draw_indexed_command& constants(const const_buffer_ptr& value) noexcept;
             draw_indexed_command& indices(const index_buffer_ptr& value) noexcept;
             draw_indexed_command& topo(topology value) noexcept;
 
@@ -878,7 +865,7 @@ namespace e2d
             u32 index_count() const noexcept;
             topology topo() const noexcept;
             const index_buffer_ptr& indices() const noexcept;
-            const const_buffer_ptr& cbuffer() const noexcept;
+            const const_buffer_ptr& constants() const noexcept;
         private:
             const_buffer_ptr cbuffer_;
             index_buffer_ptr index_buffer_;
@@ -890,9 +877,7 @@ namespace e2d
         using command_value = stdex::variant<
             zero_command,
             bind_vertex_buffers_command,
-            bind_pipeline_command,
-            bind_const_buffer_command,
-            bind_textures_command,
+            material_command,
             scissor_command,
             draw_command,
             draw_indexed_command>;
@@ -962,12 +947,7 @@ namespace e2d
         ~render() noexcept final;
 
         shader_ptr create_shader(
-            str_view vertex_source,
-            str_view fragment_source);
-
-        shader_ptr create_shader(
-            const input_stream_uptr& vertex_stream,
-            const input_stream_uptr& fragment_stream);
+            const shader_source& source);
 
         texture_ptr create_texture(
             const image& image);
@@ -1012,7 +992,7 @@ namespace e2d
 
         render& begin_pass(
             const renderpass_desc& desc,
-            const const_buffer_ptr& cbuffer,
+            const const_buffer_ptr& constants,
             const sampler_block& samplers);
         render& end_pass();
         render& present();
@@ -1022,9 +1002,7 @@ namespace e2d
         render& execute(const command_value& command);
 
         render& execute(const bind_vertex_buffers_command& command);
-        render& execute(const bind_pipeline_command& command);
-        render& execute(const bind_const_buffer_command& command);
-        render& execute(const bind_textures_command& command);
+        render& execute(const material_command& command);
         render& execute(const scissor_command& command);
         render& execute(const draw_command& command);
         render& execute(const draw_indexed_command& command);

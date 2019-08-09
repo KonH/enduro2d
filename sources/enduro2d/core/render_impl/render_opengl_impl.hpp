@@ -22,9 +22,17 @@ namespace e2d
 
     class shader::internal_state final : private e2d::noncopyable {
     public:
+        struct block_info {
+            size_t size = 0;
+            bool is_buffer = false;
+        };
+    public:
         internal_state(
             debug& debug,
-            opengl::gl_program_id id);
+            opengl::gl_program_id id,
+            const vector<opengl::uniform_info>& uniforms,
+            const vector<opengl::attribute_info>& attributes,
+            const vector<opengl::sampler_info>& samplers);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
@@ -34,20 +42,23 @@ namespace e2d
         void with_uniform_location(str_hash name, F&& f) const;
         template < typename F >
         void with_attribute_location(str_hash name, F&& f) const;
-        size_t get_buffer_size(const_buffer::scope scope) const noexcept;
+        template < typename F >
+        void with_sampler_location(str_hash name, F&& f) const;
+        block_info get_block_info(const_buffer::scope scope) const noexcept;
         void bind_buffer(const const_buffer_ptr& cb) const noexcept;
     private:
         debug& debug_;
         opengl::gl_program_id id_;
         flat_map<str_hash, opengl::uniform_info> uniforms_;
         flat_map<str_hash, opengl::attribute_info> attributes_;
+        flat_map<str_hash, opengl::sampler_info> samplers_;
         struct cbuffer {
-            std::weak_ptr<const_buffer> buffer;
-            u32 block_size = 0;
-            u32 version = 0;
+            mutable std::weak_ptr<const_buffer> buffer;
+            mutable u32 version = 0;
+            block_info info;
             GLint location = -1;
         };
-        mutable std::array<cbuffer, u32(const_buffer::scope::last_)> cbuffers_;
+        std::array<cbuffer, u32(const_buffer::scope::last_)> cbuffers_;
     };
 
     template < typename F >
@@ -62,6 +73,14 @@ namespace e2d
     void shader::internal_state::with_attribute_location(str_hash name, F&& f) const {
         const auto iter = attributes_.find(name);
         if ( iter != attributes_.end() ) {
+            stdex::invoke(std::forward<F>(f), iter->second);
+        }
+    }
+
+    template < typename F >
+    void shader::internal_state::with_sampler_location(str_hash name, F&& f) const {
+        const auto iter = samplers_.find(name);
+        if ( iter != samplers_.end() ) {
             stdex::invoke(std::forward<F>(f), iter->second);
         }
     }
@@ -280,6 +299,7 @@ namespace e2d
         void bind_vertex_attributes_() noexcept;
         void bind_cbuffers_() noexcept;
         void bind_textures_() noexcept;
+        void bind_sampler_block(const sampler_block& block) noexcept;
         void create_debug_output_() noexcept;
         static void GLAPIENTRY debug_output_callback_(
             GLenum source,
@@ -335,6 +355,8 @@ namespace e2d
         };
         std::array<vb_binding, max_vertex_buffer_count> vertex_buffers_;
         std::array<const_buffer_ptr, u32(const_buffer::scope::last_)> cbuffers_;
+        std::array<sampler_block, u32(sampler_block::scope::last_)> samplers_;
+        //std::array<std::pair<GLuint, GLenum>, 16> textures_;
         index_buffer_ptr index_buffer_;
         enabled_attribs_t enabled_attribs_;
         dirty_flag_bits dirty_flags_ = dirty_flag_bits::none;

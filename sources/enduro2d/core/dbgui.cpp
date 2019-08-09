@@ -248,7 +248,7 @@ namespace e2d
         }
 
         void setup_internal_resources_(ImGuiIO& io) {
-            {
+            /*{
                 shader_ = render_.create_shader(
                     dbgui_shaders::vertex_source_cstr(),
                     dbgui_shaders::fragment_source_cstr());
@@ -275,7 +275,7 @@ namespace e2d
 
                 io.Fonts->TexID = &texture_;
             }
-            /*{
+            {
                 material_ = render::material()
                     .add_pass(render::pass_state()
                         .states(render::state_block()
@@ -364,7 +364,7 @@ namespace e2d
         ImGuiContext* context_{nullptr};
         window::event_listener& listener_;
     private:
-        shader_ptr shader_;
+        //shader_ptr shader_;
         texture_ptr texture_;
         //render::material material_;
         //render::property_block mprops_;

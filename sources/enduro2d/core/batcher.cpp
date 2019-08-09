@@ -130,11 +130,12 @@ namespace e2d
 
                 render_.execute(render::bind_vertex_buffers_command()
                     .bind(0, vert_buffers[curr_vb_index], curr_attribs));
-                render_.execute(render::bind_pipeline_command(batch.mtr.shader()));
             }
-
-            render_.execute(render::bind_textures_command(batch.mtr.samplers()));
-            render_.execute(render::bind_const_buffer_command(batch.mtr.cbuffer()));
+            
+            render_.execute(render::material_command(
+                batch.mtr.shader(),
+                batch.mtr.samplers(),
+                batch.mtr.constants()));
 
             // TODO: render states
 

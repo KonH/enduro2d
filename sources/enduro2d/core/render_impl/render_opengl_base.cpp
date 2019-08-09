@@ -215,7 +215,8 @@ namespace e2d::opengl
     gl_buffer_id gl_buffer_id::create(debug& debug, GLenum target) noexcept {
         E2D_ASSERT(
             target == GL_ARRAY_BUFFER ||
-            target == GL_ELEMENT_ARRAY_BUFFER);
+            target == GL_ELEMENT_ARRAY_BUFFER ||
+            target == GL_UNIFORM_BUFFER);
         GLuint id = 0;
         GL_CHECK_CODE(debug, glGenBuffers(1, &id));
         if ( !id ) {
@@ -942,7 +943,7 @@ namespace e2d::opengl
         #undef DEFINE_CASE
     }
 
-    GLint convert_uniform_type(uniform_type ut) noexcept {
+    GLenum convert_uniform_type(uniform_type ut) noexcept {
         #define DEFINE_CASE(x,y) case uniform_type::x: return y;
         switch ( ut ) {
             DEFINE_CASE(signed_integer, GL_INT);
@@ -969,7 +970,19 @@ namespace e2d::opengl
         #undef DEFINE_CASE
     }
 
-    GLint convert_attribute_type(attribute_type at) noexcept {
+    GLenum convert_uniform_type_to_texture_target(uniform_type ut) noexcept {
+        #define DEFINE_CASE(x,y) case uniform_type::x: return y;
+        switch ( ut ) {
+            DEFINE_CASE(sampler_2d, GL_TEXTURE_2D);
+            DEFINE_CASE(sampler_cube, GL_TEXTURE_CUBE_MAP);
+            default:
+                E2D_ASSERT_MSG(false, "unexpected uniform type for sampler");
+                return 0;
+        }
+        #undef DEFINE_CASE
+    }
+
+    GLenum convert_attribute_type(attribute_type at) noexcept {
         #define DEFINE_CASE(x,y) case attribute_type::x: return y;
         switch ( at ) {
             DEFINE_CASE(floating_point, GL_FLOAT);
@@ -1497,8 +1510,8 @@ namespace e2d::opengl
             math::numeric_cast<GLclampd>(math::saturate(far))));
     #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
         GL_CHECK_CODE(debug, glDepthRangef(
-            math::numeric_cast<GLclampf>(math::saturate(near)),
-            math::numeric_cast<GLclampf>(math::saturate(far))));
+            math::saturate(near),
+            math::saturate(far)));
     #else
     #   error unknown render mode
     #endif
@@ -1534,9 +1547,12 @@ namespace e2d::opengl
             ? std::move(id)
             : gl_shader_id(debug);
     }
-
-    gl_program_id gl_link_program(debug& debug, gl_shader_id vs, gl_shader_id fs) noexcept {
-        E2D_ASSERT(!vs.empty() && !fs.empty());
+    
+    gl_program_id gl_create_program(
+        debug& debug,
+        gl_shader_id vs,
+        gl_shader_id fs) noexcept
+    {
         gl_program_id id = gl_program_id::create(debug);
         if ( id.empty() ) {
             return id;
@@ -1544,12 +1560,13 @@ namespace e2d::opengl
 
         GL_CHECK_CODE(debug, glAttachShader(*id, *vs));
         GL_CHECK_CODE(debug, glAttachShader(*id, *fs));
-        GL_CHECK_CODE(debug, glLinkProgram(*id));
+        return id;
+    }
 
-        return process_program_linking_result(debug, *id)
-            && process_program_validation_result(debug, *id)
-            ? std::move(id)
-            : gl_program_id(debug);
+    bool gl_link_program(debug& debug, const gl_program_id& id) noexcept {
+        E2D_ASSERT(!id.empty());
+        GL_CHECK_CODE(debug, glLinkProgram(*id));
+        return process_program_linking_result(debug, *id);
     }
 
     bool gl_check_framebuffer(
@@ -1625,7 +1642,7 @@ namespace e2d::opengl
 
 namespace e2d::opengl
 {
-    void grab_program_uniforms(
+    /*void grab_program_uniforms(
         debug& debug,
         GLuint program,
         vector<uniform_info>& uniforms)
@@ -1661,7 +1678,7 @@ namespace e2d::opengl
                 location,
                 glsl_type_to_uniform_type(type));
         }
-    }
+    }*/
 
     void grab_program_attributes(
         debug& debug,

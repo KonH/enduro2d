@@ -111,15 +111,7 @@ namespace
             render_.execute(command);
         }
 
-        void operator()(const render::bind_pipeline_command& command) const {
-            render_.execute(command);
-        }
-
-        void operator()(const render::bind_const_buffer_command& command) const {
-            render_.execute(command);
-        }
-
-        void operator()(const render::bind_textures_command& command) const {
+        void operator()(const render::material_command& command) const {
             render_.execute(command);
         }
 
@@ -931,41 +923,32 @@ namespace e2d
     }
 
     //
-    // render::bind_pipeline_command
+    // render::material_command
     //
         
-    render::bind_pipeline_command::bind_pipeline_command(const shader_ptr& shader)
-    : shader_(shader) {}
-
-    const shader_ptr& render::bind_pipeline_command::shader() const noexcept {
-        return shader_;
-    }
-        
-    //
-    // render::bind_const_buffer_command
-    //
-
-    render::bind_const_buffer_command::bind_const_buffer_command(const const_buffer_ptr& cb)
-    : buffer_(cb) {}
-
-    const const_buffer_ptr& render::bind_const_buffer_command::buffer() const noexcept {
-        return buffer_;
-    }
-
-    //
-    // render::bind_textures_command
-    //
-
-    render::bind_textures_command::bind_textures_command(const sampler_block& block)
-    : sampler_block_(block) {}
-
-    render::bind_textures_command& render::bind_textures_command::bind(str_hash name, const sampler_state& sampler) noexcept {
+    render::material_command::material_command(
+        const shader_ptr& shader,
+        const sampler_block& block,
+        const const_buffer_ptr& constants)
+    : shader_(shader)
+    , cbuffer_(constants)
+    , sampler_block_(block) {}
+            
+    render::material_command& render::material_command::sampler(str_hash name, const sampler_state& sampler) noexcept {
         sampler_block_.bind(name, sampler);
         return *this;
     }
 
-    const render::sampler_block& render::bind_textures_command::samplers() const noexcept {
+    const render::sampler_block& render::material_command::samplers() const noexcept {
         return sampler_block_;
+    }
+
+    const shader_ptr& render::material_command::shader() const noexcept {
+        return shader_;
+    }
+
+    const const_buffer_ptr& render::material_command::constants() const noexcept {
+        return cbuffer_;
     }
 
     //
@@ -999,7 +982,7 @@ namespace e2d
     // render::draw_command
     //
     
-    render::draw_command& render::draw_command::cbuffer(const const_buffer_ptr& value) noexcept {
+    render::draw_command& render::draw_command::constants(const const_buffer_ptr& value) noexcept {
         cbuffer_ = value;
         return *this;
     }
@@ -1037,7 +1020,7 @@ namespace e2d
         return topology_;
     }
     
-    const const_buffer_ptr& render::draw_command::cbuffer() const noexcept {
+    const const_buffer_ptr& render::draw_command::constants() const noexcept {
         return cbuffer_;
     }
 
@@ -1045,7 +1028,7 @@ namespace e2d
     // render::draw_indexed_command
     //
     
-    render::draw_indexed_command& render::draw_indexed_command::cbuffer(const const_buffer_ptr& value) noexcept {
+    render::draw_indexed_command& render::draw_indexed_command::constants(const const_buffer_ptr& value) noexcept {
         cbuffer_ = value;
         return *this;
     }
@@ -1092,7 +1075,7 @@ namespace e2d
         return index_buffer_;
     }
     
-    const const_buffer_ptr& render::draw_indexed_command::cbuffer() const noexcept {
+    const const_buffer_ptr& render::draw_indexed_command::constants() const noexcept {
         return cbuffer_;
     }
 
