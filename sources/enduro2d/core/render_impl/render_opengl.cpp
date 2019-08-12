@@ -277,7 +277,8 @@ namespace e2d
             std::make_unique<shader::internal_state>(
                 state_->dbg(),
                 std::move(ps),
-                source));
+                source,
+                state_->device_capabilities_ext().uniform_buffer_supported));
     }
 
     texture_ptr render::create_texture(
@@ -604,12 +605,13 @@ namespace e2d
         E2D_ASSERT(shader);
 
         const auto block_info = shader->state().get_block_info(scope);
-        if ( !block_info.exists ) {
+        if ( !block_info.templ ) {
             // shader does not contains const buffer for current scope
             return nullptr;
         }
 
         gl_buffer_id buf_id(state_->dbg());
+        const size_t block_size = block_info.templ->block_size();
 
         if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
             E2D_ASSERT(block_info.is_buffer); // TODO: exception
@@ -621,10 +623,10 @@ namespace e2d
                 return nullptr;
             }
 
-            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, &block_info, scope]() {
+            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size, scope]() {
                 GL_CHECK_CODE(state_->dbg(), glBufferData(
                     buf_id.target(),
-                    math::numeric_cast<GLsizeiptr>(block_info.size),
+                    math::numeric_cast<GLsizeiptr>(block_size),
                     nullptr,
                     scope == const_buffer::scope::draw_command
                         ? GL_STREAM_DRAW
@@ -632,16 +634,16 @@ namespace e2d
             });
         } else {
             E2D_ASSERT(!block_info.is_buffer); // TODO: exception
-            E2D_ASSERT(block_info.size % 16 == 0);
+            E2D_ASSERT(block_size % 16 == 0);
         }
 
         return std::make_shared<const_buffer>(
             std::make_unique<const_buffer::internal_state>(
                 state_->dbg(),
                 std::move(buf_id),
-                block_info.size,
                 0,
-                scope));
+                scope,
+                block_info.templ));
     }
 
     render_target_ptr render::create_render_target(
@@ -818,6 +820,7 @@ namespace e2d
         state_->set_shader_program(command.shader());
         state_->bind_textures(sampler_block::scope::material, command.samplers());
         state_->bind_const_buffer(command.constants());
+        state_->set_blending(command.blending());
         return *this;
     }
 
@@ -898,23 +901,22 @@ namespace e2d
     
     render& render::update_buffer(
         const const_buffer_ptr& cbuffer,
-        const shader_ptr& shader,
         const property_map& properties)
     {
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(cbuffer);
-        E2D_ASSERT(shader);
         auto& cb = cbuffer->state();
-        properties.foreach([&shader, &cb, &cbuffer](str_hash name, const auto& value) noexcept{
-            shader->state().with_uniform_location(name, [&cb, &cbuffer, &value](auto& info) noexcept{
-                E2D_ASSERT(info.scope == cbuffer->binding_scope());
+
+        for ( auto& un : cb.block_template()->uniforms() ) {
+            auto* value = properties.find(un.name_hash);
+            if ( value ) {
                 property_block_visitor visitor(
                     cb.data(),
                     cb.size(),
-                    info.offset);
-                stdex::visit(visitor, value);
-            });
-        });
+                    un.offset);
+                stdex::visit(visitor, *value);
+            }
+        }
         if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
             with_gl_bind_buffer(state_->dbg(), cb.id(), [&cb]() noexcept{
                 GL_CHECK_CODE(cb.dbg(), glBufferSubData(

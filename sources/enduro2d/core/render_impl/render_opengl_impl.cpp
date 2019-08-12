@@ -15,6 +15,10 @@ namespace
 {
     using namespace e2d;
     using namespace e2d::opengl;
+
+    constexpr u32 cb_pass_index = u32(const_buffer::scope::render_pass);
+    constexpr u32 cb_material_index = u32(const_buffer::scope::material);
+    constexpr u32 cb_command_index = u32(const_buffer::scope::draw_command);
     
     template < typename T >
     size_t hash_of(const T& x) noexcept {
@@ -90,47 +94,38 @@ namespace
         #undef DEFINE_CASE
     }
 
-    size_t get_uniform_size(shader_source::value_type type) {
-        switch ( type ) {
-            case shader_source::value_type::f32: return sizeof(float);
-            case shader_source::value_type::v2f: return sizeof(v2f);
-            case shader_source::value_type::v3f: return sizeof(v3f); // or v4f
-            case shader_source::value_type::v4f: return sizeof(v4f);
-            case shader_source::value_type::m2f: return sizeof(v4f) * 2;
-            case shader_source::value_type::m3f: return sizeof(v4f) * 3;
-            case shader_source::value_type::m4f: return sizeof(v4f) * 4;
-            default:
-                E2D_ASSERT_MSG(false, "unexpected uniform value type");
-                return 0;
-        }
-    }
-
     void get_unifom_block_info(
         debug& debug,
         const char* name,
         const gl_program_id& id,
-        shader::internal_state::block_info& block) noexcept
+        shader::internal_state::block_info& block,
+        u32 binding_index,
+        const cbuffer_template_cptr& templ,
+        bool uniform_buffer_supported) noexcept
     {
         GLint loc;
         GL_CHECK_CODE(debug, loc = glGetUniformLocation(*id, name));
         if ( loc >= 0 ) {
+            E2D_ASSERT(templ);
+            block.templ = templ;
             block.index = math::numeric_cast<u32>(loc);
             block.is_buffer = false;
-            block.exists = true;
             return;
         }
         
-        // TODO: check extension
-        GL_CHECK_CODE(debug, loc = glGetUniformBlockIndex(*id, name));
-        if ( loc >= 0 ) {
-            GL_CHECK_CODE(debug, glUniformBlockBinding(*id, loc, loc));
-            block.index = math::numeric_cast<u32>(loc);
-            block.is_buffer = true;
-            block.exists = true;
-            return;
+        if ( uniform_buffer_supported ) {
+            GL_CHECK_CODE(debug, loc = glGetUniformBlockIndex(*id, name));
+            if ( loc >= 0 ) {
+                GL_CHECK_CODE(debug, glUniformBlockBinding(*id, loc, binding_index));
+                E2D_ASSERT(templ);
+                block.templ = templ;
+                block.index = binding_index;
+                block.is_buffer = true;
+                return;
+            }
         }
-
-        block.exists = false;
+        
+        E2D_ASSERT(!templ);
     }
 }
 
@@ -143,7 +138,8 @@ namespace e2d
     shader::internal_state::internal_state(
         debug& debug,
         gl_program_id id,
-        const shader_source& source)
+        const shader_source& source,
+        bool uniform_buffer_supported)
     : debug_(debug)
     , id_(std::move(id)){
         E2D_ASSERT(!id_.empty());
@@ -174,20 +170,27 @@ namespace e2d
             }
         });
 
-        get_unifom_block_info(debug_, "ub_pass", id_, blocks_[u32(const_buffer::scope::render_pass)].info);
-        get_unifom_block_info(debug_, "ub_material", id_, blocks_[u32(const_buffer::scope::material)].info);
-        get_unifom_block_info(debug_, "ub_command", id_, blocks_[u32(const_buffer::scope::draw_command)].info);
-
-        for ( auto& un : source.uniforms() ) {
-            auto& block = blocks_[u32(un.scope)];
-            const size_t size = get_uniform_size(un.type);
-            block.info.size = math::max(block.info.size, un.offset + size);
-            uniforms_.emplace(un.name, uniform_info{
-                str_hash(un.name),
-                un.offset,
-                un.type,
-                convert_to_const_buffer_scope(un.scope)});
-        }
+        get_unifom_block_info(debug_,
+            shader_source::cb_pass_name,
+            id_,
+            blocks_[cb_pass_index].info,
+            cb_pass_index,
+            source.block(shader_source::scope_type::render_pass),
+            uniform_buffer_supported);
+        get_unifom_block_info(debug_,
+            shader_source::cb_material_name,
+            id_,
+            blocks_[cb_material_index].info,
+            cb_material_index,
+            source.block(shader_source::scope_type::material),
+            uniform_buffer_supported);
+        get_unifom_block_info(debug_,
+            shader_source::cb_command_name,
+            id_,
+            blocks_[cb_command_index].info,
+            cb_command_index,
+            source.block(shader_source::scope_type::draw_command),
+            uniform_buffer_supported);
     }
 
     debug& shader::internal_state::dbg() const noexcept {
@@ -203,30 +206,21 @@ namespace e2d
         return blocks_[size_t(scope)].info;
     }
 
-    void shader::internal_state::bind_buffer(
+    void shader::internal_state::set_constants(
         const_buffer::scope scope,
         const const_buffer_ptr& cbuffer) const noexcept
     {
-        auto& curr = blocks_[u32(scope)];
-        if ( !curr.info.exists ) {
+        auto& curr = blocks_[size_t(scope)];
+        if ( !curr.info.templ ) {
             return;
         }
         if ( !cbuffer ) {
             E2D_ASSERT_MSG(false, "const_buffer is null, will be used the last uniform values");
             return;
         }
-        auto& cb = cbuffer->state();
-        if ( curr.info.is_buffer ) {
-            // TODO: uniform buffer shared across all shaders, move this code somewhere
-            GL_CHECK_CODE(debug_, glBindBufferRange(
-                GL_UNIFORM_BUFFER,
-                curr.info.index,
-                *cb.id(),
-                math::numeric_cast<GLintptr>(cb.offset()),
-                math::numeric_cast<GLsizeiptr>(cb.size())));
-                curr.buffer = cbuffer;
-        } else {
+        if ( !curr.info.is_buffer ) {
             // emulate uniform buffer
+            auto& cb = cbuffer->state();
             if ( curr.buffer.lock() != cbuffer ||
                  curr.version != cb.version() )
             {
@@ -349,9 +343,12 @@ namespace e2d
         return decl_;
     }
     
-    bool vertex_attribs::internal_state::operator==(const internal_state& r) const noexcept {
-        return hash_ == r.hash_
-            && decl_ == r.decl_;
+    std::size_t vertex_attribs::internal_state::hash() const noexcept {
+        return hash_;
+    }
+
+    bool render::internal_state::vert_attrib_less::operator()(const vertex_attribs_ptr& l, const vertex_attribs_ptr& r) const noexcept {
+        return l->state().hash() < r->state().hash();
     }
 
     //
@@ -361,15 +358,18 @@ namespace e2d
     const_buffer::internal_state::internal_state(
         debug& debug,
         gl_buffer_id id,
-        std::size_t size,
         std::size_t offset,
-        scope scope)
+        scope scope,
+        const cbuffer_template_cptr& templ)
     : debug_(debug)
     , id_(std::move(id))
-    , size_(size)
     , offset_(offset)
     , binding_scope_(scope)
-    , content_(new float[math::align_ceil(size_, sizeof(v4f))]) {}
+    , content_(new float[math::align_ceil(templ->block_size(), sizeof(v4f))])
+    , templ_(templ)
+    {
+        E2D_ASSERT(templ_);
+    }
 
     debug& const_buffer::internal_state::dbg() const noexcept {
         return debug_;
@@ -380,7 +380,7 @@ namespace e2d
     }
 
     std::size_t const_buffer::internal_state::size() const noexcept {
-        return size_;
+        return templ_ ? templ_->block_size() : 0;
     }
     
     std::size_t const_buffer::internal_state::offset() const noexcept {
@@ -392,14 +392,20 @@ namespace e2d
     }
 
     bool const_buffer::internal_state::is_compatible_with(const shader_ptr& shader) const noexcept {
-        E2D_ASSERT(false);
-        return false; // TODO
+        if ( !shader ) {
+            return false;
+        }
+        return shader->state().get_block_info(binding_scope_).templ == templ_;
     }
 
     u32 const_buffer::internal_state::version() const noexcept {
         return version_;
     }
     
+    const cbuffer_template_cptr& const_buffer::internal_state::block_template() const noexcept {
+        return templ_;
+    }
+
     float* const_buffer::internal_state::data() const noexcept {
         return content_.get();
     }
@@ -565,6 +571,11 @@ namespace e2d
             state_block_.blending(sb.blending());
         }
 
+        if ( sb.rasterization() != state_block_.rasterization() ) {
+            set_rasterization_state_(sb.rasterization());
+            state_block_.rasterization(sb.rasterization());
+        }
+
         return *this;
     }
 
@@ -597,6 +608,31 @@ namespace e2d
         }
         inside_render_pass_ = true;
         set_render_target_(rp.target());
+
+        GLenum clear_bits = 0;
+        const render_target_ptr& rt = render_target_;
+        bool has_color = !rt || rt->state().color() || !rt->state().color_rb().empty();
+        bool has_depth = !rt || rt->state().depth() || !rt->state().depth_rb().empty();
+
+        if ( has_color && rp.color_load_op() == attachment_load_op::clear ) {
+            GL_CHECK_CODE(debug_, glClearColor(
+                rp.color_clear_value().r,
+                rp.color_clear_value().g,
+                rp.color_clear_value().b,
+                rp.color_clear_value().a));
+            clear_bits |= GL_COLOR_BUFFER_BIT;
+        }
+        if ( has_depth && rp.depth_load_op() == attachment_load_op::clear ) {
+            gl_clear_depth(debug_, rp.depth_clear_value());
+            clear_bits |= GL_DEPTH_BUFFER_BIT;
+        }
+        if ( has_depth && rp.stencil_load_op() == attachment_load_op::clear ) {
+            GL_CHECK_CODE(debug_, glClearStencil(rp.stencil_clear_value()));
+            clear_bits |= GL_STENCIL_BUFFER_BIT;
+        }
+        if ( clear_bits ) {
+            GL_CHECK_CODE(debug_, glClear(clear_bits));
+        }
         
         render_area_ = rp.viewport();
         color_store_op_ = rp.color_store_op();
@@ -611,6 +647,7 @@ namespace e2d
             math::numeric_cast<GLsizei>(rp.viewport().size.y)));
 
         set_states(rp.states());
+        render_pass_state_block_ = rp.states();
 
         stats().render_pass_count++;
     }
@@ -619,7 +656,7 @@ namespace e2d
         E2D_ASSERT(inside_render_pass_);
         inside_render_pass_ = false;
         
-        const bool is_default_fb = !!render_target_;
+        const bool is_default_fb = !render_target_;
         GLenum attachments[8];
         GLsizei count = 0;
 
@@ -729,20 +766,20 @@ namespace e2d
 
         switch ( cbuffer->binding_scope() ) {
             case const_buffer::scope::render_pass:
-                if ( cbuffers_[0] != cbuffer ) {
-                    cbuffers_[0] = cbuffer;
+                if ( cbuffers_[cb_pass_index] != cbuffer ) {
+                    cbuffers_[cb_pass_index] = cbuffer;
                     set_flag_inplace(dirty_flags_, dirty_flag_bits::pass_cbuffer);
                 }
                 break;
             case const_buffer::scope::material:
-                if ( cbuffers_[1] != cbuffer ) {
-                    cbuffers_[1] = cbuffer;
+                if ( cbuffers_[cb_material_index] != cbuffer ) {
+                    cbuffers_[cb_material_index] = cbuffer;
                     set_flag_inplace(dirty_flags_, dirty_flag_bits::mtr_cbuffer);
                 }
                 break;
             case const_buffer::scope::draw_command:
-                if ( cbuffers_[2] != cbuffer ) {
-                    cbuffers_[2] = cbuffer;
+                if ( cbuffers_[cb_command_index] != cbuffer ) {
+                    cbuffers_[cb_command_index] = cbuffer;
                     set_flag_inplace(dirty_flags_, dirty_flag_bits::draw_cbuffer);
                 }
                 break;
@@ -761,11 +798,11 @@ namespace e2d
     {
         switch ( scope ) {
             case sampler_block::scope::render_pass:
-                samplers_[0] = samplers;
+                samplers_[cb_pass_index] = samplers;
                 set_flag_inplace(dirty_flags_, dirty_flag_bits::pass_textures);
                 break;
             case sampler_block::scope::material:
-                samplers_[1] = samplers;
+                samplers_[cb_material_index] = samplers;
                 set_flag_inplace(dirty_flags_, dirty_flag_bits::mtr_textures);
                 break;
         }
@@ -820,35 +857,76 @@ namespace e2d
     }
 
     void render::internal_state::bind_cbuffers_() noexcept {
+        auto& prog = shader_program_->state();
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_cbuffer) ) {
-            shader_program_->state().bind_buffer(const_buffer::scope::render_pass, cbuffers_[0]);
+            prog.set_constants(const_buffer::scope::render_pass, cbuffers_[cb_pass_index]);
         }
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_cbuffer) ) {
-            shader_program_->state().bind_buffer(const_buffer::scope::material, cbuffers_[1]);
+            prog.set_constants(const_buffer::scope::material, cbuffers_[cb_material_index]);
         }
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::draw_cbuffer) ) {
-            shader_program_->state().bind_buffer(const_buffer::scope::draw_command, cbuffers_[2]);
+            prog.set_constants(const_buffer::scope::draw_command, cbuffers_[cb_command_index]);
+        }
+        if ( device_caps_ext_.uniform_buffer_supported ) {
+            bind_cbuffer_(cb_pass_index, cbuffers_[cb_pass_index]);
+            bind_cbuffer_(cb_material_index, cbuffers_[cb_material_index]);
+            bind_cbuffer_(cb_command_index, cbuffers_[cb_command_index]);
+        }
+    }
+    
+    void render::internal_state::bind_cbuffer_(u32 index, const const_buffer_ptr& cbuffer) noexcept {
+        if ( cbuffer ) {
+            auto& cb = cbuffer->state();
+            GL_CHECK_CODE(debug_, glBindBufferRange(
+                GL_UNIFORM_BUFFER,
+                index,
+                *cb.id(),
+                math::numeric_cast<GLintptr>(cb.offset()),
+                math::numeric_cast<GLsizeiptr>(cb.size())));
         }
     }
 
     void render::internal_state::bind_textures_() noexcept {
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_textures) ) {
-            bind_sampler_block(samplers_[0]);
+            bind_sampler_block_(samplers_[cb_pass_index]);
         }
         if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_textures) ) {
-            bind_sampler_block(samplers_[1]);
+            bind_sampler_block_(samplers_[cb_material_index]);
         }
     }
     
-    void render::internal_state::bind_sampler_block(const sampler_block& block) noexcept {
+    void render::internal_state::bind_sampler_block_(const sampler_block& block) noexcept {
         for ( size_t i = 0; i < block.count(); ++i ) {
-            const sampler_state& state = block.sampler(i);
+            const sampler_state& sampler = block.sampler(i);
             shader_program_->state().with_sampler_location(block.name(i),
-                [this, &state](const auto& info) noexcept{
-                    auto& id = state.texture()->state().id();
-                    //E2D_ASSERT(id.target() == convert_uniform_type_to_texture_target(info.type));
-                    // TODO
-
+                [this, &sampler](const auto& info) noexcept{
+                    GL_CHECK_CODE(debug_, glActiveTexture(
+                        GL_TEXTURE0 + info.unit));
+                    if ( sampler.texture() ) {
+                        const gl_texture_id& texture_id = sampler.texture()->state().id();
+                        E2D_ASSERT(texture_id.target() == convert_uniform_type_to_texture_target(info.type));
+                        GL_CHECK_CODE(debug_, glBindTexture(
+                            texture_id.target(), *texture_id));
+                        GL_CHECK_CODE(debug_, glTexParameteri(
+                            texture_id.target(),
+                            GL_TEXTURE_WRAP_S,
+                            convert_sampler_wrap(sampler.s_wrap())));
+                        GL_CHECK_CODE(debug_, glTexParameteri(
+                            texture_id.target(),
+                            GL_TEXTURE_WRAP_T,
+                            convert_sampler_wrap(sampler.t_wrap())));
+                        GL_CHECK_CODE(debug_, glTexParameteri(
+                            texture_id.target(),
+                            GL_TEXTURE_MIN_FILTER,
+                            convert_sampler_filter(sampler.min_filter())));
+                        GL_CHECK_CODE(debug_, glTexParameteri(
+                            texture_id.target(),
+                            GL_TEXTURE_MAG_FILTER,
+                            convert_sampler_filter(sampler.mag_filter())));
+                    } else {
+                        E2D_ASSERT_MSG(false, "TODO: error?");
+                        GL_CHECK_CODE(debug_, glBindTexture(GL_TEXTURE_2D, 0));
+                    }
                 });
         }
     }
@@ -895,6 +973,16 @@ namespace e2d
         stats().draw_calls++;
     }
     
+    void render::internal_state::set_blending(const blending_state* bs) noexcept {
+        if ( !bs ) {
+            bs = &render_pass_state_block_.blending();
+        }
+        if ( *bs != state_block_.blending() ) {
+            set_blending_state_(*bs);
+            state_block_.blending(*bs);
+        }
+    }
+
     void render::internal_state::insert_message(str_view msg) noexcept {
         if ( !device_caps_ext_.debug_output_supported || msg.empty() ) {
             return;
@@ -939,7 +1027,7 @@ namespace e2d
         }
     }
 
-    void render::internal_state::set_rasterization_state(const rasterization_state& rs) noexcept {
+    void render::internal_state::set_rasterization_state_(const rasterization_state& rs) noexcept {
         if ( rs.culling() != culling_mode::none ) {
             GL_CHECK_CODE(debug_, glEnable(GL_CULL_FACE));
             GL_CHECK_CODE(debug_, glCullFace(
@@ -984,10 +1072,10 @@ namespace e2d
             return;
         }
 
-		GL_CHECK_CODE(debug_, glDebugMessageCallback(debug_output_callback_, this));
+        GL_CHECK_CODE(debug_, glDebugMessageCallback(debug_output_callback_, this));
 
-		// disable notifications
-		GL_CHECK_CODE(debug_, glDebugMessageControl(
+        // disable notifications
+        GL_CHECK_CODE(debug_, glDebugMessageControl(
             GL_DONT_CARE,
             GL_DONT_CARE,
             GL_DEBUG_SEVERITY_NOTIFICATION,
@@ -1011,34 +1099,34 @@ namespace e2d
 
         str msg;
         switch ( severity ) {
-			case GL_DEBUG_SEVERITY_HIGH : msg += "[High]"; break;
-			case GL_DEBUG_SEVERITY_MEDIUM : msg += "[Medium]"; break;
-			case GL_DEBUG_SEVERITY_LOW : msg += "[Low]"; break;
-			case GL_DEBUG_SEVERITY_NOTIFICATION : msg += "[Notification]"; break;
+            case GL_DEBUG_SEVERITY_HIGH : msg += "[High]"; break;
+            case GL_DEBUG_SEVERITY_MEDIUM : msg += "[Medium]"; break;
+            case GL_DEBUG_SEVERITY_LOW : msg += "[Low]"; break;
+            case GL_DEBUG_SEVERITY_NOTIFICATION : msg += "[Notification]"; break;
         }
 
         msg += " src: ";
         switch ( source ) {
-			case GL_DEBUG_SOURCE_API : msg += "OpenGL"; break;
-			case GL_DEBUG_SOURCE_WINDOW_SYSTEM : msg += "OS"; break;
-			case GL_DEBUG_SOURCE_SHADER_COMPILER : msg += "GL_Compiler"; break;
-			case GL_DEBUG_SOURCE_THIRD_PARTY : msg += "Third_Party"; break;
-			case GL_DEBUG_SOURCE_APPLICATION : msg += "Application"; break;
-			case GL_DEBUG_SOURCE_OTHER :
+            case GL_DEBUG_SOURCE_API : msg += "OpenGL"; break;
+            case GL_DEBUG_SOURCE_WINDOW_SYSTEM : msg += "OS"; break;
+            case GL_DEBUG_SOURCE_SHADER_COMPILER : msg += "GL_Compiler"; break;
+            case GL_DEBUG_SOURCE_THIRD_PARTY : msg += "Third_Party"; break;
+            case GL_DEBUG_SOURCE_APPLICATION : msg += "Application"; break;
+            case GL_DEBUG_SOURCE_OTHER :
             default : msg += "Other"; break;
         }
 
         msg += ", type: ";
         switch ( type ) {
-			case GL_DEBUG_TYPE_ERROR : msg += "Error"; break;
-			case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR : msg += "Deprecated"; break;
-			case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR : msg += "Undefined_Behavior"; break;
-			case GL_DEBUG_TYPE_PORTABILITY : msg += "Portability"; break;
-			case GL_DEBUG_TYPE_PERFORMANCE : msg += "Performance"; break;
-			case GL_DEBUG_TYPE_MARKER : msg += "Marker"; break;
-			case GL_DEBUG_TYPE_PUSH_GROUP : msg += "Push_Group"; break;
-			case GL_DEBUG_TYPE_POP_GROUP : msg += "Pop_Group"; break;
-			case GL_DEBUG_TYPE_OTHER :
+            case GL_DEBUG_TYPE_ERROR : msg += "Error"; break;
+            case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR : msg += "Deprecated"; break;
+            case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR : msg += "Undefined_Behavior"; break;
+            case GL_DEBUG_TYPE_PORTABILITY : msg += "Portability"; break;
+            case GL_DEBUG_TYPE_PERFORMANCE : msg += "Performance"; break;
+            case GL_DEBUG_TYPE_MARKER : msg += "Marker"; break;
+            case GL_DEBUG_TYPE_PUSH_GROUP : msg += "Push_Group"; break;
+            case GL_DEBUG_TYPE_POP_GROUP : msg += "Pop_Group"; break;
+            case GL_DEBUG_TYPE_OTHER :
             default : msg += "Other"; break;
         }
 

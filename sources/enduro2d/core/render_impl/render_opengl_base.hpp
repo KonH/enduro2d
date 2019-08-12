@@ -243,6 +243,7 @@ namespace e2d::opengl
 
     GLenum convert_index_type(index_declaration::index_type it) noexcept;
     GLenum convert_attribute_type(vertex_declaration::attribute_type at) noexcept;
+    GLenum convert_uniform_type_to_texture_target(shader_source::sampler_type ut) noexcept;
 
     GLint convert_sampler_wrap(render::sampler_wrap w) noexcept;
     GLint convert_sampler_filter(render::sampler_min_filter f) noexcept;
@@ -271,6 +272,7 @@ namespace e2d::opengl
     void gl_build_shader_headers(render::device_caps& caps, gl_device_caps& ext, str& vs, str& fs) noexcept;
 
     void gl_depth_range(debug& debug, float near, float far) noexcept;
+    void gl_clear_depth(debug& debug, float value) noexcept;
 
     gl_shader_id gl_compile_shader(
         debug& debug,

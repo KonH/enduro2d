@@ -18,6 +18,9 @@ namespace e2d
         using blending_color_mask = render::blending_color_mask;
         using blending_factor = render::blending_factor;
         using blending_equation = render::blending_equation;
+        using blending_state = render::blending_state;
+        using sampler_state = render::sampler_state;
+        using sampler_block = render::sampler_block;
 
         template < typename T >
         class vertex_iterator final {
@@ -102,53 +105,6 @@ namespace e2d
         };
 
     public:
-        class blend_mode final {
-        public:
-            blend_mode() = default;
-
-            blend_mode& factor(blending_factor src, blending_factor dst) noexcept;
-            blend_mode& src_factor(blending_factor src) noexcept;
-            blend_mode& dst_factor(blending_factor dst) noexcept;
-
-            blend_mode& rgb_factor(blending_factor src, blending_factor dst) noexcept;
-            blend_mode& src_rgb_factor(blending_factor src) noexcept;
-            blend_mode& dst_rgb_factor(blending_factor dst) noexcept;
-
-            blend_mode& alpha_factor(blending_factor src, blending_factor dst) noexcept;
-            blend_mode& src_alpha_factor(blending_factor src) noexcept;
-            blend_mode& dst_alpha_factor(blending_factor dst) noexcept;
-
-            blend_mode& equation(blending_equation equation) noexcept;
-            blend_mode& rgb_equation(blending_equation equation) noexcept;
-            blend_mode& alpha_equation(blending_equation equation) noexcept;
-
-            blend_mode& enable(bool value) noexcept;
-
-            [[nodiscard]] blending_factor src_rgb_factor() const noexcept;
-            [[nodiscard]] blending_factor dst_rgb_factor() const noexcept;
-
-            [[nodiscard]] blending_factor src_alpha_factor() const noexcept;
-            [[nodiscard]] blending_factor dst_alpha_factor() const noexcept;
-
-            [[nodiscard]] blending_equation rgb_equation() const noexcept;
-            [[nodiscard]] blending_equation alpha_equation() const noexcept;
-
-            [[nodiscard]] bool enabled() const noexcept;
-
-            [[nodiscard]] bool operator == (const blend_mode& r) const noexcept;
-        private:
-            blending_factor src_rgb_factor_ = blending_factor::one;
-            blending_factor dst_rgb_factor_ = blending_factor::zero;
-            blending_equation rgb_equation_ = blending_equation::add;
-            blending_factor src_alpha_factor_ = blending_factor::one;
-            blending_factor dst_alpha_factor_ = blending_factor::zero;
-            blending_equation alpha_equation_ = blending_equation::add;
-            bool enabled_ = false;
-        };
-        
-        using sampler_state = render::sampler_state;
-        using sampler_block = render::sampler_block;
-
         class material final {
         public:
             material() = default;
@@ -156,18 +112,18 @@ namespace e2d
             material& constants(const const_buffer_ptr& value) noexcept;
             material& shader(const shader_ptr& value) noexcept;
             material& sampler(str_view name, const sampler_state& value) noexcept;
-            material& blend(const blend_mode& value) noexcept;
+            material& blending(const blending_state& value) noexcept;
 
             [[nodiscard]] const shader_ptr& shader() const noexcept;
             [[nodiscard]] const sampler_block& samplers() const noexcept;
             [[nodiscard]] const const_buffer_ptr& constants() const noexcept;
-            [[nodiscard]] const blend_mode& blend() const noexcept;
+            [[nodiscard]] const blending_state& blending() const noexcept;
 
             [[nodiscard]] bool operator == (const material& r) const noexcept;
         private:
             shader_ptr shader_;
             sampler_block samplers_;
-            blend_mode blend_;
+            blending_state blending_;
             const_buffer_ptr cbuffer_;
         };
 
@@ -240,6 +196,8 @@ namespace e2d
             size_t vert_stride,
             size_t min_vb_size,
             size_t min_ib_size);
+
+        vertex_attribs_ptr create_vertex_attribs_(vertex_declaration decl) const;
 
     private:
         debug& debug_;
@@ -377,115 +335,6 @@ namespace e2d
     }
 
     //
-    // batcher::blend_mode
-    //
-
-    inline batcher::blend_mode& batcher::blend_mode::factor(blending_factor src, blending_factor dst) noexcept {
-        rgb_factor(src, dst);
-        alpha_factor(src, dst);
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::src_factor(blending_factor src) noexcept {
-        src_rgb_factor(src);
-        src_alpha_factor(src);
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::dst_factor(blending_factor dst) noexcept {
-        dst_rgb_factor(dst);
-        dst_alpha_factor(dst);
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::rgb_factor(blending_factor src, blending_factor dst) noexcept {
-        src_rgb_factor(src);
-        dst_rgb_factor(dst);
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::src_rgb_factor(blending_factor src) noexcept {
-        src_rgb_factor_ = src;
-        enabled_ = true;
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::dst_rgb_factor(blending_factor dst) noexcept {
-        dst_rgb_factor_ = dst;
-        enabled_ = true;
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::alpha_factor(blending_factor src, blending_factor dst) noexcept {
-        src_alpha_factor(src);
-        dst_alpha_factor(dst);
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::src_alpha_factor(blending_factor src) noexcept {
-        src_alpha_factor_ = src;
-        enabled_ = true;
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::dst_alpha_factor(blending_factor dst) noexcept {
-        dst_alpha_factor_ = dst;
-        enabled_ = true;
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::equation(blending_equation equation) noexcept {
-        rgb_equation(equation);
-        alpha_equation(equation);
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::rgb_equation(blending_equation equation) noexcept {
-        rgb_equation_ = equation;
-        enabled_ = true;
-        return *this;
-    }
-
-    inline batcher::blend_mode& batcher::blend_mode::alpha_equation(blending_equation equation) noexcept {
-        alpha_equation_ = equation;
-        enabled_ = true;
-        return *this;
-    }
-    
-    inline batcher::blend_mode& batcher::blend_mode::enable(bool value) noexcept {
-        enabled_ = value;
-        return *this;
-    }
-
-    inline batcher::blending_factor batcher::blend_mode::src_rgb_factor() const noexcept {
-        return src_rgb_factor_;
-    }
-
-    inline batcher::blending_factor batcher::blend_mode::dst_rgb_factor() const noexcept {
-        return dst_rgb_factor_;
-    }
-
-    inline batcher::blending_factor batcher::blend_mode::src_alpha_factor() const noexcept {
-        return src_alpha_factor_;
-    }
-
-    inline batcher::blending_factor batcher::blend_mode::dst_alpha_factor() const noexcept {
-        return dst_alpha_factor_;
-    }
-
-    inline batcher::blending_equation batcher::blend_mode::rgb_equation() const noexcept {
-        return rgb_equation_;
-    }
-
-    inline batcher::blending_equation batcher::blend_mode::alpha_equation() const noexcept {
-        return alpha_equation_;
-    }
-    
-    inline bool batcher::blend_mode::enabled() const noexcept {
-        return enabled_;
-    }
-
-    //
     // batcher::material
     //
     
@@ -507,8 +356,8 @@ namespace e2d
         return *this;
     }
     
-    inline batcher::material& batcher::material::blend(const blend_mode& value) noexcept {
-        blend_ = value;
+    inline batcher::material& batcher::material::blending(const blending_state& value) noexcept {
+        blending_ = value;
         return *this;
     }
     
@@ -524,8 +373,8 @@ namespace e2d
         return cbuffer_;
     }
 
-    inline const batcher::blend_mode& batcher::material::blend() const noexcept {
-        return blend_;
+    inline const batcher::blending_state& batcher::material::blending() const noexcept {
+        return blending_;
     }
 
     //
@@ -538,7 +387,7 @@ namespace e2d
         const size_t vert_stride = math::align_ceil(sizeof(typename BatchType::vertex_type), vertex_stride_);
         const size_t vb_size = src_batch.vertex_count() * vert_stride;
         const size_t ib_size = (src_batch.index_count() + (is_strip ? 2 : 0)) * index_stride_;
-        vertex_attribs_ptr attribs = render_.create_vertex_attribs(BatchType::vertex_type::decl());
+        vertex_attribs_ptr attribs = create_vertex_attribs_(BatchType::vertex_type::decl());
         batch_& dst_batch = append_batch_(mtr, src_batch.topology(), attribs, vert_stride, vb_size, ib_size);
 
         auto& vb = vertex_buffers_[dst_batch.vb_index];
@@ -573,7 +422,7 @@ namespace e2d
         const size_t vert_stride = math::align_ceil(sizeof(VertexType), vertex_stride_);
         const size_t vb_size = vertex_count * vert_stride;
         const size_t ib_size = index_count * index_stride_;
-        vertex_attribs_ptr attribs = render_.create_vertex_attribs(VertexType::decl());
+        vertex_attribs_ptr attribs = create_vertex_attribs_(VertexType::decl());
         batch_& dst_batch = append_batch_(mtr, topo, attribs, vert_stride, vb_size, ib_size);
         
         auto& vb = vertex_buffers_[dst_batch.vb_index];
