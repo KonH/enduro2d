@@ -1,0 +1,6 @@
+{
+    "skeleton" : "raptor/raptor-pro.json-large",
+    "atlas" : "raptor/raptor.atlas",
+    "scale" : 1.0,
+    "premultiplied_alpha" : false
+}

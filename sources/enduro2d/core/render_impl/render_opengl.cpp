@@ -464,6 +464,7 @@ namespace e2d
         index_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(indices.size() > 0);
         E2D_ASSERT(indices.size() % decl.bytes_per_index() == 0);
 
         if ( !is_index_supported(decl) ) {
@@ -500,6 +501,7 @@ namespace e2d
         index_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(size > 0);
         E2D_ASSERT(size % decl.bytes_per_index() == 0);
         E2D_ASSERT(usage != index_buffer::usage::static_draw);
 
@@ -536,6 +538,7 @@ namespace e2d
         vertex_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(vertices.size() > 0);
 
         gl_buffer_id id = gl_buffer_id::create(state_->dbg(), GL_ARRAY_BUFFER);
         if ( id.empty() ) {
@@ -562,6 +565,7 @@ namespace e2d
         vertex_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(size > 0);
         E2D_ASSERT(usage != vertex_buffer::usage::static_draw);
 
         gl_buffer_id id = gl_buffer_id::create(state_->dbg(), GL_ARRAY_BUFFER);

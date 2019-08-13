@@ -9,10 +9,6 @@ using namespace e2d;
 
 namespace
 {
-    struct rotator {
-        v3f axis;
-    };
-
     class game_system final : public ecs::system {
     public:
         void process(ecs::registry& owner) override {
@@ -32,7 +28,7 @@ namespace
             }
         }
     };
-
+    
     class camera_system final : public ecs::system {
     public:
         void process(ecs::registry& owner) override {
@@ -54,21 +50,6 @@ namespace
         }
     };
 
-    class rotator_system final : public ecs::system {
-    public:
-        void process(ecs::registry& owner) override {
-            const f32 time = the<engine>().time();
-            owner.for_joined_components<rotator, actor>(
-                [&time](const ecs::const_entity&, const rotator& rot, actor& act){
-                    const node_iptr node = act.node();
-                    if ( node ) {
-                        const q4f q = math::make_quat_from_axis_angle(make_rad(time), rot.axis);
-                        node->rotation(q);
-                    }
-                });
-        }
-    };
-
     class game final : public starter::application {
     public:
         bool initialize() final {
@@ -78,16 +59,13 @@ namespace
         }
     private:
         bool create_scene() {
-            auto model_res = the<library>().load_asset<model_asset>("gnome_model.json");
-            auto model_mat = the<library>().load_asset<material_asset>("gnome_material.json");
-            auto sprite_res = the<library>().load_asset<sprite_asset>("ship_sprite.json");
-            auto sprite_mat = the<library>().load_asset<material_asset>("sprite_material.json");
-            auto flipbook_res = the<library>().load_asset<flipbook_asset>("cube_flipbook.json");
+            auto spine_res = the<library>().load_asset<spine_model_asset>("spine_raptor.json");
+            auto spine_mat = the<library>().load_asset<material_asset>("spine_material.json");
 
-            if ( !model_res || !model_mat || !sprite_res || !sprite_mat || !flipbook_res ) {
+            if ( !spine_res || !spine_mat ) {
                 return false;
             }
-
+            
             auto scene_i = the<world>().instantiate();
 
             scene_i->entity_filler()
@@ -95,58 +73,40 @@ namespace
                 .component<actor>(node::create(scene_i));
 
             node_iptr scene_r = scene_i->get_component<actor>().get().node();
-
-            {
-                auto model_i = the<world>().instantiate();
-
-                model_i->entity_filler()
-                    .component<rotator>(rotator{v3f::unit_y()})
-                    .component<actor>(node::create(model_i, scene_r))
+            
+        #if 1
+            auto spine_i = the<world>().instantiate();
+            spine_i->entity_filler()
+                .component<actor>(node::create(spine_i, scene_r))
+                .component<renderer>(renderer()
+                    .materials({spine_mat}))
+                .component<spine_renderer>(spine_renderer(spine_res))
+                .component<spine_player>(spine_player(spine_res)
+                    .set_animation(0, "walk", true)
+                    .add_animation(1, "gun-grab", false, secf(2.0f)));
+            
+            node_iptr spine_n = spine_i->get_component<actor>().get().node();
+            spine_n->scale(v3f(0.25f));
+            spine_n->translation(v3f{-40.f, -100.f, 0.0f});
+        #else
+            // performace test
+            for ( std::size_t i = 0; i < 20; ++i )
+            for ( std::size_t j = 0; j < 40; ++j ) {
+                auto spine_i = the<world>().instantiate();
+                spine_i->entity_filler()
+                    .component<actor>(node::create(spine_i, scene_r))
                     .component<renderer>(renderer()
-                        .materials({model_mat}))
-                    .component<model_renderer>(model_res);
-
-                node_iptr model_n = model_i->get_component<actor>().get().node();
-                model_n->scale(v3f{20.f});
-                model_n->translation(v3f{0.f,50.f,0.f});
+                        .materials({spine_mat}))
+                    .component<spine_renderer>(spine_renderer(spine_res))
+                    .component<spine_player>(spine_player(spine_res)
+                        .set_animation(0, "walk", true)
+                        .add_animation(1, "gun-grab", false, secf(2.0f)));
+            
+                node_iptr spine_n = spine_i->get_component<actor>().get().node();
+                spine_n->scale(v3f(0.05f));
+                spine_n->translation(v3f{-400.f, -300.f, 0.0f} + v3f{j * 30.f, i * 30.f, 0});
             }
-
-            {
-                auto sprite_i = the<world>().instantiate();
-
-                sprite_i->entity_filler()
-                    .component<rotator>(rotator{v3f::unit_z()})
-                    .component<actor>(node::create(sprite_i, scene_r))
-                    .component<renderer>(renderer()
-                        .materials({sprite_mat}))
-                    .component<sprite_renderer>(sprite_res);
-
-                node_iptr sprite_n = sprite_i->get_component<actor>().get().node();
-                sprite_n->translation(v3f{0,-50.f,0});
-            }
-
-            {
-                for ( std::size_t i = 0; i < 2; ++i )
-                for ( std::size_t j = 0; j < 5; ++j ) {
-                    auto flipbook_i = the<world>().instantiate();
-
-                    flipbook_i->entity_filler()
-                        .component<actor>(node::create(flipbook_i, scene_r))
-                        .component<renderer>(renderer()
-                            .materials({sprite_mat}))
-                        .component<sprite_renderer>(sprite_renderer()
-                            .filtering(false))
-                        .component<flipbook_source>(flipbook_res)
-                        .component<flipbook_player>(flipbook_player()
-                            .play("idle")
-                            .looped(true));
-
-                    node_iptr flipbook_n = flipbook_i->get_component<actor>().get().node();
-                    flipbook_n->scale(v3f(2.f,2.f,1.f));
-                    flipbook_n->translation(v3f{-80.f + j * 40.f, -200.f + i * 40.f, 0});
-                }
-            }
-
+        #endif
             return true;
         }
 
@@ -162,7 +122,6 @@ namespace
         bool create_systems() {
             ecs::registry_filler(the<world>().registry())
                 .system<game_system>(world::priority_update)
-                .system<rotator_system>(world::priority_pre_update)
                 .system<camera_system>(world::priority_pre_render);
             return true;
         }
@@ -171,7 +130,7 @@ namespace
 
 int e2d_main(int argc, char *argv[]) {
     const auto starter_params = starter::parameters(
-        engine::parameters("sample_03", "enduro2d")
+        engine::parameters("sample_07", "enduro2d")
             .timer_params(engine::timer_parameters()
                 .maximal_framerate(100)));
     modules::initialize<starter>(argc, argv, starter_params).start<game>();

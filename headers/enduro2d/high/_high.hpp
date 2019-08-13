@@ -45,9 +45,16 @@ namespace e2d
     class renderer;
     class scene;
     class sprite_renderer;
+    class spine_renderer;
+    class spine_player;
 
+    class actor_system;
     class flipbook_system;
     class render_system;
+    class model_render_system;
+    class sprite_render_system;
+    class spine_render_system;
+    class spine_player_system;
 
     template < typename Asset, typename Content >
     class content_asset;
