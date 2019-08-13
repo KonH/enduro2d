@@ -171,9 +171,7 @@ namespace
                     "type" : "string",
                     "enum" : [
                         "i32", "f32",
-                        "v2i", "v3i", "v4i",
                         "v2f", "v3f", "v4f",
-                        "m2i", "m3i", "m4i",
                         "m2f", "m3f", "m4f"
                     ]
                 },

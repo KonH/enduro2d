@@ -812,7 +812,12 @@ namespace e2d
         
     render& render::present() {
         E2D_ASSERT(is_in_main_thread());
-        E2D_ASSERT(!state_->inside_render_pass());
+
+        if ( state_->inside_render_pass() ) {
+            state_->end_render_pass();
+        }
+
+        //E2D_ASSERT(!state_->inside_render_pass());
         // TODO: check unpresented changes
 
         state_->on_present();

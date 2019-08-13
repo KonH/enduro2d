@@ -103,13 +103,17 @@ namespace
 
             {
                 auto model_i = the<world>().instantiate();
+                auto cbuffer = the<render>().create_const_buffer(
+                    model_mat->content().shader(),
+                    const_buffer::scope::draw_command);
 
                 model_i->entity_filler()
                     .component<rotator>(rotator{v3f::unit_y()})
                     .component<actor>(node::create(model_i, scene_r))
                     .component<renderer>(renderer()
                         .materials({model_mat}))
-                    .component<model_renderer>(model_res);
+                    .component<model_renderer>(model_renderer(model_res)
+                        .constants(cbuffer));
 
                 node_iptr model_n = model_i->get_component<actor>().get().node();
                 model_n->scale(v3f{20.f});

@@ -44,6 +44,7 @@ namespace
             msh.indices_submesh_count(),
             node_r.materials().size());
 
+        // TODO: use temporary const_buffer
         if ( mdl_r.constants() ) {
             the_render.update_buffer(
                 mdl_r.constants(),
@@ -74,10 +75,8 @@ namespace
         }
     }
     
-    void for_all_components(ecs::registry& owner)
-    {
+    void for_all_components(ecs::registry& owner) {
         render& the_render = the<render>();
-
         owner.for_joined_components<model_renderer, renderer, actor>([&the_render](
             const ecs::const_entity&,
             const model_renderer& mdl_r,
