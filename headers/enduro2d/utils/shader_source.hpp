@@ -8,41 +8,27 @@
 
 #include "_utils.hpp"
 #include "strings.hpp"
+#include "cbuffer_template.hpp"
 
 namespace e2d
 {
     class shader_source final {
     public:
-        enum class value_type : u8 {
-            f32,
-            v2f,
-            v3f,
-            v4f,
-            m2f,
-            m3f,
-            m4f,
+        enum class scope_type : u8 {
+            render_pass,
+            material,
+            draw_command,
+            last_,
             unknown
         };
+
+        using value_type = cbuffer_template::value_type;
+        using blocks_t = std::array<cbuffer_template_cptr, u32(scope_type::last_)>;
 
         enum class sampler_type : u8 {
             _2d,
             cube_map,
             unknown
-        };
-
-        enum class scope_type : u8 {
-            render_pass,
-            material,
-            draw_command,
-            unknown
-        };
-
-        struct uniform {
-            str name;
-            u16 offset = 0;
-            //u16 array_size = 0; // not supported
-            value_type type = value_type::unknown;
-            scope_type scope = scope_type::unknown;
         };
 
         struct sampler {
@@ -57,6 +43,10 @@ namespace e2d
             u8 index = 0;
             value_type type = value_type::unknown;
         };
+        
+        static constexpr char cb_pass_name[] = "cb_pass";
+        static constexpr char cb_material_name[] = "cb_material";
+        static constexpr char cb_command_name[] = "cb_command";
     public:
         shader_source() = default;
 
@@ -75,20 +65,20 @@ namespace e2d
 
         shader_source& vertex_shader(str source);
         shader_source& fragment_shader(str source);
-        shader_source& add_uniform(str name, size_t offset, value_type type, scope_type scope);
         shader_source& add_sampler(str name, u32 unit, sampler_type type, scope_type scope);
         shader_source& add_attribute(str name, u32 index, value_type type);
+        shader_source& set_block(const cbuffer_template_cptr& cb, scope_type scope);
 
         const str& vertex_shader() const noexcept;
         const str& fragment_shader() const noexcept;
-        const vector<uniform>& uniforms() const noexcept;
         const vector<sampler>& samplers() const noexcept;
         const vector<attribute>& attributes() const noexcept;
+        const cbuffer_template_cptr& block(scope_type scope) const noexcept;
     private:
         str vs_;
         str fs_;
-        vector<uniform> uniforms_;
         vector<sampler> samplers_;
         vector<attribute> attributes_;
+        blocks_t blocks_;
     };
 }

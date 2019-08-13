@@ -15,12 +15,12 @@ namespace
         attribute vec4 a_color;
 
     #ifdef E2D_SUPPORTS_UBO
-        layout(std140) uniform ub_pass {
+        layout(std140) uniform cb_pass {
             mat4 u_matrix_vp;
         };
     #else
-        uniform vec4 ub_pass[4];
-        #define u_matrix_vp mat4(ub_pass[0], ub_pass[1], ub_pass[2], ub_pass[3]);
+        uniform vec4 cb_pass[4];
+        #define u_matrix_vp mat4(cb_pass[0], cb_pass[1], cb_pass[2], cb_pass[3]);
     #endif
 
         varying vec4 v_color;
@@ -48,12 +48,12 @@ namespace
         attribute vec4 a_color;
 
     #ifdef E2D_SUPPORTS_UBO
-        layout(std140) uniform ub_pass {
+        layout(std140) uniform cb_pass {
             mat4 u_matrix_vp;
         };
     #else
-        uniform vec4 ub_pass[4];
-        #define u_matrix_vp mat4(ub_pass[0], ub_pass[1], ub_pass[2], ub_pass[3]);
+        uniform vec4 cb_pass[4];
+        #define u_matrix_vp mat4(cb_pass[0], cb_pass[1], cb_pass[2], cb_pass[3]);
     #endif
 
         varying vec4 v_color;
@@ -141,13 +141,16 @@ namespace
     class game final : public engine::application {
     public:
         bool initialize() final {
+            auto per_pass_cb = std::make_shared<cbuffer_template>();
+            per_pass_cb->add_uniform("u_matrix_vp", 0, cbuffer_template::value_type::m4f);
+
             shader1_ = the<render>().create_shader(shader_source()
                 .vertex_shader(vs1_source_cstr)
                 .fragment_shader(fs1_source_cstr)
                 .add_attribute("a_position", 0, shader_source::value_type::v2f)
                 .add_attribute("a_uv", 1, shader_source::value_type::v2f)
                 .add_attribute("a_color", 2, shader_source::value_type::v4f)
-                .add_uniform("u_matrix_vp", 0, shader_source::value_type::m4f, shader_source::scope_type::render_pass)
+                .set_block(per_pass_cb, shader_source::scope_type::render_pass)
                 .add_sampler("u_texture", 0, shader_source::sampler_type::_2d, shader_source::scope_type::material));
 
             shader2_ = the<render>().create_shader(shader_source()
@@ -155,7 +158,7 @@ namespace
                 .fragment_shader(fs2_source_cstr)
                 .add_attribute("a_position", 0, shader_source::value_type::v3f)
                 .add_attribute("a_color", 1, shader_source::value_type::v4f)
-                .add_uniform("u_matrix_vp", 0, shader_source::value_type::m4f, shader_source::scope_type::render_pass));
+                .set_block(per_pass_cb, shader_source::scope_type::render_pass));
 
             texture1_ = the<render>().create_texture(
                 the<vfs>().read(url("resources://bin/library/cube_0.png")));
@@ -202,7 +205,7 @@ namespace
             
             render::property_map props;
             props.assign("u_matrix_vp", projection);
-            the<render>().update_buffer(rpass_cbuffer_, shader1_, props);
+            the<render>().update_buffer(rpass_cbuffer_, props);
 
             the<render>().begin_pass(
                 render::renderpass_desc()
@@ -216,9 +219,10 @@ namespace
 
             batcher::material mtr1 = batcher::material()
                 .shader(shader1_)
-                .blend(batcher::blend_mode()
+                .blending(batcher::blending_state()
                     .src_factor(render::blending_factor::src_alpha)
-                    .dst_factor(render::blending_factor::one_minus_src_alpha))
+                    .dst_factor(render::blending_factor::one_minus_src_alpha)
+                    .enable(true))
                 .sampler("u_texture", render::sampler_state()
                     .texture(texture1_)
                     .min_filter(render::sampler_min_filter::linear)
@@ -226,9 +230,10 @@ namespace
 
             batcher::material mtr2 = batcher::material()
                 .shader(shader1_)
-                .blend(batcher::blend_mode()
+                .blending(batcher::blending_state()
                     .src_factor(render::blending_factor::src_alpha)
-                    .dst_factor(render::blending_factor::one_minus_src_alpha))
+                    .dst_factor(render::blending_factor::one_minus_src_alpha)
+                    .enable(true))
                 .sampler("u_texture", render::sampler_state()
                     .texture(texture2_)
                     .min_filter(render::sampler_min_filter::linear)

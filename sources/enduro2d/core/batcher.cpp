@@ -20,21 +20,9 @@ namespace e2d
 
     bool batcher::material::operator == (const batcher::material& r) const noexcept {
         return shader_ == r.shader_
-            //&& sampler_ == r.sampler_
-            //&& properties_ == r.properties_   // TODO
-            && blend_ == r.blend_;
-    }
-    
-    bool batcher::blend_mode::operator == (const blend_mode& r) const noexcept {
-        if ( !enabled_ ) {
-            return !r.enabled_;
-        }
-        return src_rgb_factor_ == r.src_rgb_factor_
-            && dst_rgb_factor_ == r.dst_rgb_factor_
-            && rgb_equation_ == r.rgb_equation_
-            && src_alpha_factor_ == r.src_alpha_factor_
-            && dst_alpha_factor_ == r.dst_alpha_factor_
-            && alpha_equation_ == r.alpha_equation_;
+            && samplers_ == r.samplers_
+            && cbuffer_ == r.cbuffer_
+            && blending_ == r.blending_;
     }
 
     batcher::batcher(debug& d, render& r)
@@ -42,6 +30,12 @@ namespace e2d
     , render_(r) {}
 
     batcher::~batcher() noexcept = default;
+    
+    vertex_attribs_ptr batcher::create_vertex_attribs_(vertex_declaration decl) const {
+        size_t stride = math::align_ceil(decl.bytes_per_vertex(), vertex_stride_);
+        decl.skip_bytes(stride - decl.bytes_per_vertex());
+        return render_.create_vertex_attribs(decl);
+    }
 
     batcher::batch_& batcher::append_batch_(
         const material& mtr,
@@ -135,9 +129,8 @@ namespace e2d
             render_.execute(render::material_command(
                 batch.mtr.shader(),
                 batch.mtr.samplers(),
-                batch.mtr.constants()));
-
-            // TODO: render states
+                batch.mtr.constants())
+                .blending(batch.mtr.blending()));
 
             render_.execute(render::draw_indexed_command()
                 .index_range(batch.idx_count, batch.idx_offset)

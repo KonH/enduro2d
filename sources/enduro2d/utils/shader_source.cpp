@@ -37,7 +37,7 @@ namespace e2d
             shader_source s;
             s.vs_ = other.vs_;
             s.fs_ = other.fs_;
-            s.uniforms_ = other.uniforms_;
+            s.blocks_ = other.blocks_;
             s.samplers_ = other.samplers_;
             s.attributes_ = other.attributes_;
             swap(s);
@@ -49,7 +49,7 @@ namespace e2d
         using std::swap;
         swap(vs_, other.vs_);
         swap(fs_, other.fs_);
-        swap(uniforms_, other.uniforms_);
+        swap(blocks_, other.blocks_);
         swap(samplers_, other.samplers_);
         swap(attributes_, other.attributes_);
     }
@@ -57,7 +57,7 @@ namespace e2d
     void shader_source::clear() noexcept {
         vs_.clear();
         fs_.clear();
-        uniforms_.clear();
+        blocks_ = {};
         samplers_.clear();
         attributes_.clear();
     }
@@ -73,20 +73,6 @@ namespace e2d
 
     shader_source& shader_source::fragment_shader(str source) {
         fs_ = std::move(source);
-        return *this;
-    }
-
-    shader_source& shader_source::add_uniform(
-        str name,
-        size_t offset,
-        value_type type,
-        scope_type scope)
-    {
-        uniforms_.push_back({
-            std::move(name),
-            math::numeric_cast<u16>(offset),
-            type,
-            scope});
         return *this;
     }
 
@@ -115,6 +101,11 @@ namespace e2d
             type});
         return *this;
     }
+
+    shader_source& shader_source::set_block(const cbuffer_template_cptr& cb, scope_type scope) {
+        blocks_[size_t(scope)] = cb;
+        return *this;
+    }
     
     const str& shader_source::vertex_shader() const noexcept {
         return vs_;
@@ -124,15 +115,15 @@ namespace e2d
         return fs_;
     }
 
-    const vector<shader_source::uniform>& shader_source::uniforms() const noexcept {
-        return uniforms_;
-    }
-
     const vector<shader_source::sampler>& shader_source::samplers() const noexcept {
         return samplers_;
     }
 
     const vector<shader_source::attribute>& shader_source::attributes() const noexcept {
         return attributes_;
+    }
+    
+    const cbuffer_template_cptr& shader_source::block(scope_type scope) const noexcept {
+        return blocks_[size_t(scope)];
     }
 }

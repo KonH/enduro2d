@@ -863,7 +863,7 @@ namespace e2d
         return *this;
     }
 
-    u8 render::renderpass_desc::clear_stencil() const noexcept {
+    u8 render::renderpass_desc::stencil_clear_value() const noexcept {
         E2D_ASSERT(stencil_.load_op == attachment_load_op::clear);
         return stencil_.clear_value;
     }
@@ -938,6 +938,12 @@ namespace e2d
         sampler_block_.bind(name, sampler);
         return *this;
     }
+    
+    render::material_command& render::material_command::blending(const blending_state& value) noexcept {
+        blending_state_ = value;
+        has_blending_state_ = true;
+        return *this;
+    }
 
     const render::sampler_block& render::material_command::samplers() const noexcept {
         return sampler_block_;
@@ -949,6 +955,10 @@ namespace e2d
 
     const const_buffer_ptr& render::material_command::constants() const noexcept {
         return cbuffer_;
+    }
+    
+    const render::blending_state* render::material_command::blending() const noexcept {
+        return has_blending_state_ ? &blending_state_ : nullptr;
     }
 
     //
@@ -1169,6 +1179,22 @@ namespace e2d
     }
 
     bool operator!=(const render::sampler_state& l, const render::sampler_state& r) noexcept {
+        return !(l == r);
+    }
+
+    bool operator==(const render::sampler_block& l, const render::sampler_block& r) noexcept {
+        if ( l.count() != r.count() ) {
+            return false;
+        }
+        for ( size_t i = 0; i < l.count(); ++i ) {
+            if ( l.name(i) != r.name(i) || l.sampler(i) != r.sampler(i) ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(const render::sampler_block& l, const render::sampler_block& r) noexcept {
         return !(l == r);
     }
 }

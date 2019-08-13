@@ -22,16 +22,36 @@ namespace e2d
 
     class shader::internal_state final : private e2d::noncopyable {
     public:
-        using uniform_type = shader_source::value_type;
+        struct block_info {
+            cbuffer_template_cptr templ;
+            u32 index = ~0u; // uniform array location or uniform buffer binding
+            bool is_buffer = false;
+        };
+    public:
+        internal_state(
+            debug& debug,
+            opengl::gl_program_id id,
+            const shader_source& source,
+            bool uniform_buffer_supported);
+        ~internal_state() noexcept = default;
+    public:
+        debug& dbg() const noexcept;
+        const opengl::gl_program_id& id() const noexcept;
+    public:
+        template < typename F >
+        void with_uniform_location(str_hash name, const_buffer::scope scope, F&& f) const;
+        template < typename F >
+        void with_attribute_location(str_hash name, F&& f) const;
+        template < typename F >
+        void with_sampler_location(str_hash name, F&& f) const;
+        block_info get_block_info(const_buffer::scope scope) const noexcept;
+        void set_constants(const_buffer::scope scope, const const_buffer_ptr& cb) const noexcept;
+    private:
+        debug& debug_;
+        opengl::gl_program_id id_;
+    private:
         using attribute_type = shader_source::value_type;
         using sampler_type = shader_source::sampler_type;
-
-        struct uniform_info {
-            str_hash name;
-            u16 offset;
-            uniform_type type;
-            const_buffer::scope scope;
-        };
         struct attribute_info {
             str_hash name;
             u8 index;
@@ -43,53 +63,26 @@ namespace e2d
             sampler_type type;
             render::sampler_block::scope scope;
         };
-        struct block_info {
-            size_t size = 0;
-            u32 index = ~0u; // uniform array location or uniform buffer binding
-            bool is_buffer = false;
-            bool exists = false;
-        };
-    public:
-        internal_state(
-            debug& debug,
-            opengl::gl_program_id id,
-            const shader_source& source);
-        ~internal_state() noexcept = default;
-    public:
-        debug& dbg() const noexcept;
-        const opengl::gl_program_id& id() const noexcept;
-    public:
-        template < typename F >
-        void with_uniform_location(str_hash name, F&& f) const;
-        template < typename F >
-        void with_attribute_location(str_hash name, F&& f) const;
-        template < typename F >
-        void with_sampler_location(str_hash name, F&& f) const;
-        block_info get_block_info(const_buffer::scope scope) const noexcept;
-        void bind_buffer(const_buffer::scope scope, const const_buffer_ptr& cb) const noexcept;
-    private:
-        debug& debug_;
-        opengl::gl_program_id id_;
-    private:
         struct cbuffer {
             mutable std::weak_ptr<const_buffer> buffer;
             mutable u32 version = 0;
             block_info info;
         };
         std::array<cbuffer, u32(const_buffer::scope::last_)> blocks_;
-        flat_map<str_hash, uniform_info> uniforms_;
         flat_map<str_hash, attribute_info> attributes_;
         flat_map<str_hash, sampler_info> samplers_;
     };
 
     template < typename F >
-    void shader::internal_state::with_uniform_location(str_hash name, F&& f) const {
-        const auto iter = uniforms_.find(name);
-        if ( iter != uniforms_.end() ) {
-            stdex::invoke(std::forward<F>(f), iter->second);
-        } else {
-            E2D_ASSERT_MSG(false, "uniform is not exists");
+    void shader::internal_state::with_uniform_location(str_hash name, const_buffer::scope scope, F&& f) const {
+        auto& templ = blocks_[size_t(scope)].templ;
+        if ( templ ) {
+            const auto iter = templ->uniforms().find(name);
+            if ( iter != templ->uniforms().end() ) {
+                stdex::invoke(std::forward<F>(f), iter->second);
+            }
         }
+        E2D_ASSERT_MSG(false, "uniform is not exists");
     }
 
     template < typename F >
@@ -192,7 +185,7 @@ namespace e2d
     public:
         debug& dbg() const noexcept;
         const vertex_declaration& decl() const noexcept;
-        bool operator==(const internal_state& r) const noexcept;
+        std::size_t hash() const noexcept;
     private:
         debug& debug_;
         std::size_t hash_;
@@ -208,9 +201,9 @@ namespace e2d
         internal_state(
             debug& debug,
             opengl::gl_buffer_id id,
-            std::size_t size,
             std::size_t offset,
-            scope scope);
+            scope scope,
+            const cbuffer_template_cptr& templ);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
@@ -220,14 +213,15 @@ namespace e2d
         float* data() const noexcept;
         scope binding_scope() const noexcept;
         u32 version() const noexcept;
+        const cbuffer_template_cptr& block_template() const noexcept;
         bool is_compatible_with(const shader_ptr& shader) const noexcept;
         void on_content_update(u32 frame_id) const noexcept;
     private:
         debug& debug_;
         opengl::gl_buffer_id id_;
-        std::size_t size_ = 0;
         std::size_t offset_ = 0; // of buffer is part of another buffer
         scope binding_scope_ = scope::last_;
+        cbuffer_template_cptr templ_;
         mutable std::unique_ptr<float[]> content_;
         mutable u32 version_ = 0;
         mutable u32 last_update_frame_id_ = 0;
@@ -322,19 +316,22 @@ namespace e2d
         void draw(topology topo, u32 first, u32 count) noexcept;
         void draw_indexed(topology topo, u32 count, size_t offset) noexcept;
 
+        void set_blending(const blending_state* bs) noexcept;
+
         void insert_message(str_view msg) noexcept;
     private:
         void set_depth_state_(const depth_state& ds) noexcept;
         void set_stencil_state_(const stencil_state& ss) noexcept;
-        void set_rasterization_state(const rasterization_state& rs) noexcept;
+        void set_rasterization_state_(const rasterization_state& rs) noexcept;
         void set_blending_state_(const blending_state& bs) noexcept;
         void set_render_target_(const render_target_ptr& rt) noexcept;
         void reset_render_target_() noexcept;
         void commit_changes_() noexcept;
         void bind_vertex_attributes_() noexcept;
         void bind_cbuffers_() noexcept;
+        void bind_cbuffer_(u32 index, const const_buffer_ptr& cb) noexcept;
         void bind_textures_() noexcept;
-        void bind_sampler_block(const sampler_block& block) noexcept;
+        void bind_sampler_block_(const sampler_block& block) noexcept;
         void create_debug_output_() noexcept;
         static void GLAPIENTRY debug_output_callback_(
             GLenum source,
@@ -371,6 +368,7 @@ namespace e2d
         opengl::gl_framebuffer_id default_fb_;
 
         // graphics pipeline states
+        state_block render_pass_state_block_;
         state_block state_block_;
         shader_ptr shader_program_;
         
@@ -405,7 +403,10 @@ namespace e2d
         str vertex_shader_header_;
         str fragment_shader_header_;
 
-        flat_set<vertex_attribs_ptr> vertex_attrib_cache_;
+        struct vert_attrib_less {
+            bool operator()(const vertex_attribs_ptr& l, const vertex_attribs_ptr& r) const noexcept;
+        };
+        flat_set<vertex_attribs_ptr, vert_attrib_less> vertex_attrib_cache_;
     };
 }
 

@@ -1,0 +1,16 @@
+{
+	"attributes" : [
+		{ "name": "a_position", "index": 0, "type": "v3f" },
+		{ "name": "a_color",    "index": 1, "type": "v4f" }
+	],
+	"render_pass_block" : "shaders/block/pass_1.json",
+	
+	"gles2" : {
+		"vertex" : "shaders/gles2/colored_sprite.vert",
+		"fragment" : "shaders/gles2/colored_sprite.frag"
+	},
+	"gles3" : {
+		"vertex" : "shaders/gles3/colored_sprite.vert",
+		"fragment" : "shaders/gles3/colored_sprite.frag"
+	}
+}

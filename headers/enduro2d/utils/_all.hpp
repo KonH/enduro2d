@@ -12,6 +12,7 @@
 #include "buffer_view.hpp"
 #include "color.hpp"
 #include "color32.hpp"
+#include "cbuffer_template.hpp"
 #include "filesystem.hpp"
 #include "filesystem.inl"
 #include "image.hpp"

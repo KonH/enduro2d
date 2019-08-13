@@ -957,8 +957,8 @@ namespace e2d::opengl
         #undef DEFINE_CASE
     }
 
-    /*GLenum convert_uniform_type_to_texture_target(sampler_type ut) noexcept {
-        #define DEFINE_CASE(x,y) case sampler_type::x: return y;
+    GLenum convert_uniform_type_to_texture_target(shader_source::sampler_type ut) noexcept {
+        #define DEFINE_CASE(x,y) case shader_source::sampler_type::x: return y;
         switch ( ut ) {
             DEFINE_CASE(_2d, GL_TEXTURE_2D);
             DEFINE_CASE(cube_map, GL_TEXTURE_CUBE_MAP);
@@ -967,7 +967,7 @@ namespace e2d::opengl
                 return 0;
         }
         #undef DEFINE_CASE
-    }*/
+    }
 
     GLint convert_sampler_wrap(render::sampler_wrap w) noexcept {
         #define DEFINE_CASE(x,y) case render::sampler_wrap::x: return y;
@@ -1451,8 +1451,20 @@ namespace e2d::opengl
             math::numeric_cast<GLclampd>(math::saturate(far))));
     #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
         GL_CHECK_CODE(debug, glDepthRangef(
-            math::saturate(near),
-            math::saturate(far)));
+            math::numeric_cast<GLclampf>(math::saturate(near)),
+            math::numeric_cast<GLclampf>(math::saturate(far))));
+    #else
+    #   error unknown render mode
+    #endif
+    }
+    
+    void gl_clear_depth(debug& debug, float value) noexcept {
+    #if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL
+        GL_CHECK_CODE(debug, glClearDepth(
+            math::numeric_cast<GLclampd>(math::saturate(value))));
+    #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
+        GL_CHECK_CODE(debug, glClearDepthf(
+            math::numeric_cast<GLclampf>(math::saturate(value))));
     #else
     #   error unknown render mode
     #endif

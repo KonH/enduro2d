@@ -485,7 +485,6 @@ namespace e2d
         enum class attachment_load_op : u8 {
             load,
             clear,
-            invalidate,
         };
 
         enum class attachment_store_op : u8 {
@@ -738,7 +737,7 @@ namespace e2d
             //renderpass_desc& stencil_invalidate() noexcept;
             renderpass_desc& stencil_store() noexcept;
             renderpass_desc& stencil_discard() noexcept;
-            [[nodiscard]] u8 clear_stencil() const noexcept;
+            [[nodiscard]] u8 stencil_clear_value() const noexcept;
             [[nodiscard]] attachment_load_op stencil_load_op() const noexcept;
             [[nodiscard]] attachment_store_op stencil_store_op() const noexcept;
         private:
@@ -801,14 +800,18 @@ namespace e2d
             material_command& sampler(str_hash name, const sampler_state& sampler) noexcept;
             material_command& shader(const shader_ptr& value) noexcept;
             material_command& constants(const const_buffer_ptr& value) noexcept;
+            material_command& blending(const blending_state& value) noexcept;
             
             const sampler_block& samplers() const noexcept;
             const shader_ptr& shader() const noexcept;
             const const_buffer_ptr& constants() const noexcept;
+            const blending_state* blending() const noexcept;
         private:
             shader_ptr shader_;
             const_buffer_ptr cbuffer_;
             sampler_block sampler_block_;
+            blending_state blending_state_;
+            bool has_blending_state_ : 1;
         };
         
         class scissor_command final {
@@ -1019,7 +1022,6 @@ namespace e2d
 
         render& update_buffer(
             const const_buffer_ptr& cbuffer,
-            const shader_ptr& shader,
             const property_map& properties);
 
         render& update_texture(
@@ -1074,6 +1076,13 @@ namespace e2d
 
     bool operator==(const render::sampler_state& l, const render::sampler_state& r) noexcept;
     bool operator!=(const render::sampler_state& l, const render::sampler_state& r) noexcept;
+
+    //
+    // render::sampler_block
+    //
+
+    bool operator==(const render::sampler_block& l, const render::sampler_block& r) noexcept;
+    bool operator!=(const render::sampler_block& l, const render::sampler_block& r) noexcept;
 
 }
 

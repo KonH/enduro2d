@@ -8,6 +8,7 @@
 
 #include <enduro2d/high/assets/json_asset.hpp>
 #include <enduro2d/high/assets/text_asset.hpp>
+#include <enduro2d/high/assets/cbuffer_template_asset.hpp>
 
 namespace
 {
@@ -22,11 +23,81 @@ namespace
     const char* shader_asset_schema_source = R"json(
         {
             "type" : "object",
-            "required" : [ "vertex", "fragment" ],
+            "required" : [ "gles2" ],
             "additionalProperties" : false,
             "properties" : {
-                "vertex" : { "$ref": "#/common_definitions/address" },
-                "fragment" : { "$ref": "#/common_definitions/address" }
+                "attributes" : {
+                    "type" : "array",
+                    "items" : { "$ref": "#/definitions/attribute" }
+                },
+                "samplers" : {
+                    "type" : "array",
+                    "items" : { "$ref": "#/definitions/sampler" }
+                },
+                "render_pass_block" : { "$ref": "#/common_definitions/address" },
+                "material_block" : { "$ref": "#/common_definitions/address" },
+                "draw_command_block" : { "$ref": "#/common_definitions/address" },
+                "gles2" : { "$ref": "#/definitions/shader_src" },
+                "gles3" : { "$ref": "#/definitions/shader_src" }
+            },
+            "definitions" : {
+                "shader_src" : {
+                    "type" : "object",
+                    "required" : [ "vertex", "fragment" ],
+                    "additionalProperties" : false,
+                    "properties" : {
+                        "vertex" : { "$ref": "#/common_definitions/address" },
+                        "fragment" : { "$ref": "#/common_definitions/address" }
+                    }
+                },
+                "sampler" : {
+                    "type" : "object",
+                    "required" : [ "name", "unit" ],
+                    "additionalProperties" : false,
+                    "properties" : {
+                        "name" : { "$ref": "#/common_definitions/name" },
+                        "unit" : { "type" : "integer", "minimum" : 0, "maximum" : 8 },
+                        "type" : { "$ref": "#/definitions/sampler_type" },
+                        "scope" : { "$ref": "#/definitions/scope_type" }
+                    }
+                },
+                "attribute" : {
+                    "type" : "object",
+                    "required" : [ "name", "index", "type" ],
+                    "additionalProperties" : false,
+                    "properties" : {
+                        "name" : { "$ref": "#/common_definitions/name" },
+                        "index" : { "type" : "integer", "minimum" : 0, "maximum" : 16 },
+                        "type" : { "$ref": "#/definitions/attribute_type" }
+                    }
+                },
+                "attribute_type" : {
+                    "type" : "string",
+                    "enum" : [
+                        "f32",
+                        "v2f",
+                        "v3f",
+                        "v4f",
+                        "m2f",
+                        "m3f",
+                        "m4f"
+                    ]
+                },
+                "scope_type" : {
+                    "type" : "string",
+                    "enum" : [
+                        "render_pass",
+                        "material",
+                        "draw_command"
+                    ]
+                },
+                "sampler_type" : {
+                    "type" : "string",
+                    "enum" : [
+                        "_2d",
+                        "cube_map"
+                    ]
+                }
             }
         })json";
 
@@ -48,7 +119,94 @@ namespace
         return *schema;
     }
 
-    stdex::promise<shader_ptr> parse_shader(
+    bool parse_attribute_type(str_view str, shader_source::value_type& value) noexcept {
+    #define DEFINE_IF(x) if ( str == #x ) { value = shader_source::value_type::x; return true; }
+        DEFINE_IF(f32);
+        DEFINE_IF(v2f);
+        DEFINE_IF(v3f);
+        DEFINE_IF(v4f);
+        DEFINE_IF(m2f);
+        DEFINE_IF(m3f);
+        DEFINE_IF(m4f);
+    #undef DEFINE_IF
+        return false;
+    }
+
+    bool parse_scope_type(str_view str, shader_source::scope_type& value) noexcept {
+    #define DEFINE_IF(x) if ( str == #x ) { value = shader_source::scope_type::x; return true; }
+        DEFINE_IF(render_pass);
+        DEFINE_IF(material);
+        DEFINE_IF(draw_command);
+    #undef DEFINE_IF
+        return false;
+    }
+
+    bool parse_sampler_type(str_view str, shader_source::sampler_type& value) noexcept {
+    #define DEFINE_IF(x) if ( str == #x ) { value = shader_source::sampler_type::x; return true; }
+        DEFINE_IF(_2d);
+        DEFINE_IF(cube_map);
+    #undef DEFINE_IF
+        return false;
+    }
+
+    bool parse_attribute(const rapidjson::Value& root, shader_source& shader_src) {
+        E2D_ASSERT(root.HasMember("name"));
+        E2D_ASSERT(root.HasMember("index"));
+        E2D_ASSERT(root.HasMember("type"));
+
+        u32 index;
+        if ( !json_utils::try_parse_value(root["index"], index) ) {
+            return false;
+        }
+
+        shader_source::value_type type;
+        if ( !parse_attribute_type(root["type"].GetString(), type) ) {
+            return false;
+        }
+
+        E2D_ASSERT(root["name"].IsString());
+        shader_src.add_attribute(root["name"].GetString(), index, type);
+        return true;
+    }
+
+    bool parse_sampler(const rapidjson::Value& root, shader_source& shader_src) {
+        E2D_ASSERT(root.HasMember("name"));
+        E2D_ASSERT(root.HasMember("unit"));
+
+        u32 unit;
+        if ( !json_utils::try_parse_value(root["unit"], unit) ) {
+            return false;
+        }
+
+        auto scope = shader_source::scope_type::material;
+        if ( root.HasMember("scope") && !parse_scope_type(root["scope"].GetString(), scope) ) {
+            return false;
+        }
+
+        auto type = shader_source::sampler_type::_2d;
+        if ( root.HasMember("type") && !parse_sampler_type(root["type"].GetString(), type) ) {
+            return false;
+        }
+
+        E2D_ASSERT(root["name"].IsString());
+        shader_src.add_sampler(root["name"].GetString(), unit, type, scope);
+        return true;
+    }
+
+    stdex::promise<cbuffer_template_asset::load_result> parse_const_block(
+        const library& library,
+        str_view parent_address,
+        const rapidjson::Value& root,
+        const char* name)
+    {
+        if ( !root.HasMember(name) ) {
+            return stdex::make_resolved_promise<cbuffer_template_asset::load_result>(nullptr);
+        }
+        return library.load_asset_async<cbuffer_template_asset>(
+            path::combine(parent_address, root[name].GetString()));
+    }
+
+    auto parse_shader_src(
         const library& library,
         str_view parent_address,
         const rapidjson::Value& root)
@@ -63,20 +221,90 @@ namespace
 
         return stdex::make_tuple_promise(std::make_tuple(
             std::move(vertex_p),
-            std::move(fragment_p)))
-        .then([](const std::tuple<
-            text_asset::load_result,
-            text_asset::load_result
-        >& results){
-            return the<deferrer>().do_in_main_thread([results](){
-                const shader_ptr content = the<render>().create_shader(
-                    shader_source()); // TODO
-                if ( !content ) {
-                    throw shader_asset_loading_exception();
+            std::move(fragment_p)));
+    }
+
+    auto choose_shader_version(
+        const library& library,
+        str_view parent_address,
+        const rapidjson::Value& root)
+    {
+        // TODO: check is 'gles3' supported
+        if ( root.HasMember("gles3") ) {
+            return parse_shader_src(library, parent_address, root);
+        }
+        if ( root.HasMember("gles2") ) {
+            return parse_shader_src(library, parent_address, root);
+        }
+        return stdex::make_tuple_promise(std::make_tuple(
+            stdex::make_rejected_promise<text_asset::load_result>(shader_asset_loading_exception()),
+            stdex::make_rejected_promise<text_asset::load_result>(shader_asset_loading_exception())));
+    }
+
+    stdex::promise<shader_ptr> parse_shader(
+        const library& library,
+        str_view parent_address,
+        const rapidjson::Value& root)
+    {
+        auto shader_src = std::make_shared<shader_source>();
+
+        if ( root.HasMember("attributes") ) {
+            auto& attributes = root["attributes"];
+            E2D_ASSERT(attributes.IsArray());
+
+            for ( rapidjson::SizeType i = 0; i < attributes.Size(); ++i ) {
+                if ( !parse_attribute(attributes[i], *shader_src) ) {
+                    the<debug>().error("SHADER: Incorrect formatting of 'attributes' property");
+                    return stdex::make_rejected_promise<shader_ptr>(shader_asset_loading_exception());
                 }
-                return content;
+            }
+        }
+        if ( root.HasMember("samplers") ) {
+            auto& samplers = root["samplers"];
+            E2D_ASSERT(samplers.IsArray());
+
+            for ( rapidjson::SizeType i = 0; i < samplers.Size(); ++i ) {
+                if ( !parse_sampler(samplers[i], *shader_src) ) {
+                    the<debug>().error("SHADER: Incorrect formatting of 'samplers' property");
+                    return stdex::make_rejected_promise<shader_ptr>(shader_asset_loading_exception());
+                }
+            }
+        }
+
+        auto pass_block_p = parse_const_block(library, parent_address, root, "render_pass_block");
+        auto mtr_block_p = parse_const_block(library, parent_address, root, "material_block");
+        auto cmd_block_p = parse_const_block(library, parent_address, root, "draw_command_block");
+        auto source = choose_shader_version(library, parent_address, root);
+        
+        return stdex::make_tuple_promise(std::make_tuple(source, pass_block_p, mtr_block_p, cmd_block_p))
+            .then([shader_src](const std::tuple<
+                std::tuple<text_asset::load_result, text_asset::load_result>,
+                cbuffer_template_asset::load_result,
+                cbuffer_template_asset::load_result,
+                cbuffer_template_asset::load_result
+            >& results) {
+                return the<deferrer>().do_in_main_thread([results, shader_src]() {
+                    auto& source = std::get<0>(results);
+                    shader_src->vertex_shader(std::get<0>(source)->content());
+                    shader_src->fragment_shader(std::get<0>(source)->content());
+
+                    if ( auto& pass_block = std::get<1>(results) ) {
+                        shader_src->set_block(pass_block->content(), shader_source::scope_type::render_pass);
+                    }
+                    if ( auto& mtr_block = std::get<2>(results) ) {
+                        shader_src->set_block(mtr_block->content(), shader_source::scope_type::material);
+                    }
+                    if ( auto& cmd_block = std::get<3>(results) ) {
+                        shader_src->set_block(cmd_block->content(), shader_source::scope_type::draw_command);
+                    }
+
+                    const shader_ptr content = the<render>().create_shader(*shader_src);
+                    if ( !content ) {
+                        throw shader_asset_loading_exception();
+                    }
+                    return content;
+                });
             });
-        });
     }
 }
 

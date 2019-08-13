@@ -10,6 +10,7 @@
 
 #include "assets/atlas_asset.hpp"
 #include "assets/binary_asset.hpp"
+#include "assets/cbuffer_template_asset.hpp"
 #include "assets/flipbook_asset.hpp"
 #include "assets/image_asset.hpp"
 #include "assets/json_asset.hpp"
