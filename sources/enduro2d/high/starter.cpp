@@ -130,8 +130,8 @@ namespace e2d
             .register_component<camera>("camera")
             .register_component<flipbook_player>("flipbook_player")
             .register_component<flipbook_source>("flipbook_source")
-            //.register_component<model_renderer>("model_renderer")
-            //.register_component<renderer>("renderer")
+            .register_component<model_renderer>("model_renderer")
+            .register_component<renderer>("renderer")
             .register_component<scene>("scene")
             .register_component<sprite_renderer>("sprite_renderer");
         safe_module_initialize<library>(params.library_root(), the<deferrer>());

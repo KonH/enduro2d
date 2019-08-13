@@ -27,7 +27,7 @@ namespace e2d
     using texture_ptr = std::shared_ptr<texture>;
     using index_buffer_ptr = std::shared_ptr<index_buffer>;
     using vertex_buffer_ptr = std::shared_ptr<vertex_buffer>;
-    using vertex_attribs_ptr = std::shared_ptr<vertex_attribs>;
+    using vertex_attribs_ptr = std::shared_ptr<const vertex_attribs>;
     using const_buffer_ptr = std::shared_ptr<const_buffer>;
     using render_target_ptr = std::shared_ptr<render_target>;
     

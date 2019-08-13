@@ -8,8 +8,6 @@
 
 #include <enduro2d/high/assets/json_asset.hpp>
 
-#if 0
-
 namespace
 {
     using namespace e2d;
@@ -114,5 +112,3 @@ namespace e2d
         });
     }
 }
-
-#endif
