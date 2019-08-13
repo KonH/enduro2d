@@ -344,17 +344,23 @@ namespace e2d::opengl
         GLint prev_buffer = 0;
         GL_CHECK_CODE(debug, glGetIntegerv(
             gl_target_to_get_target(target), &prev_buffer));
-        GL_CHECK_CODE(debug, glBindBuffer(
-            target, buffer));
+        bool is_different = buffer != prev_buffer;
+        if ( is_different ) {
+            GL_CHECK_CODE(debug, glBindBuffer(target, buffer));
+        }
         try {
             stdex::invoke(std::forward<F>(f), std::forward<Args>(args)...);
         } catch (...) {
-            GL_CHECK_CODE(debug, glBindBuffer(
-                target, math::numeric_cast<GLuint>(prev_buffer)));
+            if ( is_different ) {
+                GL_CHECK_CODE(debug, glBindBuffer(
+                    target, math::numeric_cast<GLuint>(prev_buffer)));
+            }
             throw;
         }
-        GL_CHECK_CODE(debug, glBindBuffer(
-            target, math::numeric_cast<GLuint>(prev_buffer)));
+        if ( is_different ) {
+            GL_CHECK_CODE(debug, glBindBuffer(
+                target, math::numeric_cast<GLuint>(prev_buffer)));
+        }
     }
 
     template < typename F, typename... Args >
@@ -371,17 +377,23 @@ namespace e2d::opengl
         GLint prev_texture = 0;
         GL_CHECK_CODE(debug, glGetIntegerv(
             gl_target_to_get_target(target), &prev_texture));
-        GL_CHECK_CODE(debug, glBindTexture(
-            target, texture));
+        bool is_different = prev_texture != texture;
+        if ( is_different ) {
+            GL_CHECK_CODE(debug, glBindTexture(target, texture));
+        }
         try {
             stdex::invoke(std::forward<F>(f), std::forward<Args>(args)...);
         } catch (...) {
-            GL_CHECK_CODE(debug, glBindTexture(
-                target, math::numeric_cast<GLuint>(prev_texture)));
+            if ( is_different ) {
+                GL_CHECK_CODE(debug, glBindTexture(
+                    target, math::numeric_cast<GLuint>(prev_texture)));
+            }
             throw;
         }
-        GL_CHECK_CODE(debug, glBindTexture(
-            target, math::numeric_cast<GLuint>(prev_texture)));
+        if ( is_different ) {
+            GL_CHECK_CODE(debug, glBindTexture(
+                target, math::numeric_cast<GLuint>(prev_texture)));
+        }
     }
 
     template < typename F, typename... Args >
@@ -398,17 +410,23 @@ namespace e2d::opengl
         GLint prev_framebuffer = 0;
         GL_CHECK_CODE(debug, glGetIntegerv(
             gl_target_to_get_target(target), &prev_framebuffer));
-        GL_CHECK_CODE(debug, glBindFramebuffer(
-            target, framebuffer));
+        bool is_different = prev_framebuffer != framebuffer;
+        if ( is_different ) {
+            GL_CHECK_CODE(debug, glBindFramebuffer(target, framebuffer));
+        }
         try {
             stdex::invoke(std::forward<F>(f), std::forward<Args>(args)...);
         } catch (...) {
-            GL_CHECK_CODE(debug, glBindFramebuffer(
-                target, math::numeric_cast<GLuint>(prev_framebuffer)));
+            if ( is_different ) {
+                GL_CHECK_CODE(debug, glBindFramebuffer(
+                    target, math::numeric_cast<GLuint>(prev_framebuffer)));
+            }
             throw;
         }
-        GL_CHECK_CODE(debug, glBindFramebuffer(
-            target, math::numeric_cast<GLuint>(prev_framebuffer)));
+        if ( is_different ) {
+            GL_CHECK_CODE(debug, glBindFramebuffer(
+                target, math::numeric_cast<GLuint>(prev_framebuffer)));
+        }
     }
 
     template < typename F, typename... Args >
