@@ -18,13 +18,6 @@ namespace e2d
              : 0;
     }
 
-    bool batcher::material::operator == (const batcher::material& r) const noexcept {
-        return shader_ == r.shader_
-            && samplers_ == r.samplers_
-            && cbuffer_ == r.cbuffer_
-            && blending_ == r.blending_;
-    }
-
     batcher::batcher(debug& d, render& r)
     : debug_(d)
     , render_(r) {}
@@ -126,11 +119,7 @@ namespace e2d
                     .bind(0, vert_buffers[curr_vb_index], curr_attribs));
             }
             
-            render_.execute(render::material_command(
-                batch.mtr.shader(),
-                batch.mtr.samplers(),
-                batch.mtr.constants())
-                .blending(batch.mtr.blending()));
+            render_.set_material(batch.mtr);
 
             render_.execute(render::draw_indexed_command()
                 .index_range(batch.idx_count, batch.idx_offset)

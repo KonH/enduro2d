@@ -7,6 +7,7 @@
 #pragma once
 
 #include "_core.hpp"
+#include <optional> // TODO
 
 namespace e2d
 {
@@ -30,11 +31,11 @@ namespace e2d
     using const_buffer_ptr = std::shared_ptr<const_buffer>;
     using render_target_ptr = std::shared_ptr<render_target>;
     
-    // TODO: move somewhere
-    constexpr static std::size_t max_attribute_count = 8;
-    constexpr static std::size_t max_vertex_buffer_count = 4;
-    constexpr static std::size_t max_samplers_in_block = 4;
-
+    namespace render_cfg {
+        constexpr static std::size_t max_attribute_count = 8;
+        constexpr static std::size_t max_vertex_buffer_count = 4;
+        constexpr static std::size_t max_samplers_in_block = 4;
+    }
 
     //
     // bad_render_operation
@@ -205,7 +206,7 @@ namespace e2d
         std::size_t attribute_count() const noexcept;
         std::size_t bytes_per_vertex() const noexcept;
     private:
-        std::array<attribute_info, max_attribute_count> attributes_;
+        std::array<attribute_info, render_cfg::max_attribute_count> attributes_;
         std::size_t attribute_count_ = 0;
         std::size_t bytes_per_vertex_ = 0;
     };
@@ -411,9 +412,13 @@ namespace e2d
             notequal,
             always
         };
-
+        
         enum class culling_mode : u8 {
-            none = 0,
+            cw,
+            ccw
+        };
+
+        enum class culling_face : u8 {
             back = (1 << 0),
             front = (1 << 1),
             back_and_front = back | front
@@ -533,22 +538,19 @@ namespace e2d
             compare_func func_ = compare_func::always;
         };
 
-        class rasterization_state final {
+        class culling_state final {
         public:
-            //rasterization_state& polygon_offset(float factor, float units) noexcept;
-            rasterization_state& culling(culling_mode mode) noexcept;
-            rasterization_state& front_face_ccw(bool value) noexcept;
-
-            //float polygon_offset_factor() const noexcept;
-            //float polygon_offset_units() const noexcept;
-
-            culling_mode culling() const noexcept;
-            bool front_face_ccw() const noexcept;
+            culling_state& mode(culling_mode mode) noexcept;
+            culling_state& face(culling_face face) noexcept;
+            culling_state& enable(bool value) noexcept;
+            
+            culling_mode mode() const noexcept;
+            culling_face face() const noexcept;
+            bool enabled() const noexcept;
         private:
-            //float polygon_offset_factor_ = 0.0f;
-            //float polygon_offset_units_ = 0.0f;
-            culling_mode culling_ = culling_mode::none;
-            bool front_face_ccw_ = true;
+            culling_face face_ = culling_face::back;
+            culling_mode mode_ = culling_mode::ccw;
+            bool enabled_ = false;
         };
 
         class blending_state final {
@@ -598,22 +600,22 @@ namespace e2d
         public:
             state_block& depth(const depth_state& state_block) noexcept;
             state_block& stencil(const stencil_state& state_block) noexcept;
-            state_block& rasterization(const rasterization_state& state_block) noexcept;
+            state_block& culling(const culling_state& state_block) noexcept;
             state_block& blending(const blending_state& state_block) noexcept;
 
             depth_state& depth() noexcept;
             stencil_state& stencil() noexcept;
-            rasterization_state& rasterization() noexcept;
+            culling_state& culling() noexcept;
             blending_state& blending() noexcept;
 
             const depth_state& depth() const noexcept;
             const stencil_state& stencil() const noexcept;
-            const rasterization_state& rasterization() const noexcept;
+            const culling_state& culling() const noexcept;
             const blending_state& blending() const noexcept;
         private:
             depth_state depth_;
             stencil_state stencil_;
-            rasterization_state rasterization_;
+            culling_state culling_;
             blending_state blending_;
         };
 
@@ -660,8 +662,8 @@ namespace e2d
             str_hash name(std::size_t index) const noexcept;
             const sampler_state& sampler(std::size_t index) const noexcept;
         private:
-            std::array<str_hash, max_samplers_in_block> names_;
-            std::array<sampler_state, max_samplers_in_block> samplers_;
+            std::array<str_hash, render_cfg::max_samplers_in_block> names_;
+            std::array<sampler_state, render_cfg::max_samplers_in_block> samplers_;
             std::size_t count_ = 0;
         };
 
@@ -683,8 +685,8 @@ namespace e2d
             property_value* find(str_hash key) noexcept;
             const property_value* find(str_hash key) const noexcept;
 
-            void assign(str_hash key, property_value&& value);
-            void assign(str_hash key, const property_value& value);
+            property_map& assign(str_hash key, property_value&& value);
+            property_map& assign(str_hash key, const property_value& value);
 
             void clear() noexcept;
             std::size_t size() const noexcept;
@@ -757,6 +759,35 @@ namespace e2d
             state_block states_; // default/global states for all render pass, some states can be overriden by material
         };
 
+        using blending_state_opt = std::optional<blending_state>;
+        using culling_state_opt = std::optional<culling_state>;
+
+        class material final {
+        public:
+            material() = default;
+
+            material& blending(const blending_state& value) noexcept;
+            material& culling(const culling_state& value) noexcept;
+            material& shader(const shader_ptr& value) noexcept;
+            material& constants(const const_buffer_ptr& value) noexcept;
+            material& sampler(str_hash name, const sampler_state& sampler) noexcept;
+            material& samplers(const sampler_block& value) noexcept;
+
+            const blending_state_opt& blending() const noexcept;
+            const culling_state_opt& culling() const noexcept;
+            const shader_ptr& shader() const noexcept;
+            const const_buffer_ptr& constants() const noexcept;
+            const sampler_block& samplers() const noexcept;
+        private:
+            blending_state_opt blending_;
+            culling_state_opt culling_;
+            shader_ptr shader_;
+            const_buffer_ptr constants_;
+            sampler_block sampler_block_;
+        };
+
+        using material_cptr = std::shared_ptr<const material>;
+
         class zero_command final {
         public:
             zero_command() = default;
@@ -783,35 +814,20 @@ namespace e2d
             std::size_t vertex_offset(std::size_t index) const noexcept;
 
         private:
-            std::array<vertex_buffer_ptr, max_vertex_buffer_count> buffers_;
-            std::array<vertex_attribs_ptr, max_vertex_buffer_count> attribs_;
-            std::array<std::size_t, max_vertex_buffer_count> offsets_; // in bytes
+            std::array<vertex_buffer_ptr, render_cfg::max_vertex_buffer_count> buffers_;
+            std::array<vertex_attribs_ptr, render_cfg::max_vertex_buffer_count> attribs_;
+            std::array<std::size_t, render_cfg::max_vertex_buffer_count> offsets_; // in bytes
             std::size_t count_ = 0;
         };
         
         class material_command final {
         public:
-            material_command() = default;
-            material_command(
-                const shader_ptr& shader,
-                const sampler_block& block,
-                const const_buffer_ptr& constants);
+            material_command() = delete;
+            material_command(const material_cptr& value);
 
-            material_command& sampler(str_hash name, const sampler_state& sampler) noexcept;
-            material_command& shader(const shader_ptr& value) noexcept;
-            material_command& constants(const const_buffer_ptr& value) noexcept;
-            material_command& blending(const blending_state& value) noexcept;
-            
-            const sampler_block& samplers() const noexcept;
-            const shader_ptr& shader() const noexcept;
-            const const_buffer_ptr& constants() const noexcept;
-            const blending_state* blending() const noexcept;
+            const material_cptr& material() const noexcept;
         private:
-            shader_ptr shader_;
-            const_buffer_ptr cbuffer_;
-            sampler_block sampler_block_;
-            blending_state blending_state_;
-            bool has_blending_state_ : 1;
+            material_cptr material_;
         };
         
         class scissor_command final {
@@ -828,6 +844,22 @@ namespace e2d
             b2u scissor_rect_;
             bool scissoring_ = false;
         };
+
+        template < typename T >
+        class change_sate_command_ final {
+        public:
+            change_sate_command_() = default;
+            explicit change_sate_command_(const T& state);
+
+            const std::optional<T>& state() const noexcept;
+        private:
+            std::optional<T> state_;
+        };
+
+        using blending_state_command = change_sate_command_<blending_state>;
+        using culling_state_command = change_sate_command_<culling_state>;
+        using stencil_state_command = change_sate_command_<stencil_state>;
+        using depth_state_command = change_sate_command_<depth_state>;
         
         class draw_command final {
         public:
@@ -881,6 +913,10 @@ namespace e2d
             bind_vertex_buffers_command,
             material_command,
             scissor_command,
+            blending_state_command,
+            culling_state_command,
+            stencil_state_command,
+            depth_state_command,
             draw_command,
             draw_indexed_command>;
 
@@ -981,10 +1017,12 @@ namespace e2d
 
         vertex_attribs_ptr create_vertex_attribs(
             const vertex_declaration& decl);
-
+        
         const_buffer_ptr create_const_buffer(
             const shader_ptr& shader,
             const_buffer::scope scope);
+        //const_buffer_ptr create_const_buffer(
+        //    const cbuffer_template_cptr& templ);
 
         render_target_ptr create_render_target(
             const v2u& size,
@@ -1006,8 +1044,14 @@ namespace e2d
         render& execute(const bind_vertex_buffers_command& command);
         render& execute(const material_command& command);
         render& execute(const scissor_command& command);
+        render& execute(const blending_state_command& command);
+        render& execute(const culling_state_command& command);
+        render& execute(const stencil_state_command& command);
+        render& execute(const depth_state_command& command);
         render& execute(const draw_command& command);
         render& execute(const draw_indexed_command& command);
+
+        render& set_material(const material& mtr);
 
         // in separate command buffer
         render& update_buffer(
@@ -1064,8 +1108,8 @@ namespace e2d
     bool operator==(const render::stencil_state& l, const render::stencil_state& r) noexcept;
     bool operator!=(const render::stencil_state& l, const render::stencil_state& r) noexcept;
 
-    bool operator==(const render::rasterization_state& l, const render::rasterization_state& r) noexcept;
-    bool operator!=(const render::rasterization_state& l, const render::rasterization_state& r) noexcept;
+    bool operator==(const render::culling_state& l, const render::culling_state& r) noexcept;
+    bool operator!=(const render::culling_state& l, const render::culling_state& r) noexcept;
 
     bool operator==(const render::blending_state& l, const render::blending_state& r) noexcept;
     bool operator!=(const render::blending_state& l, const render::blending_state& r) noexcept;
@@ -1083,7 +1127,13 @@ namespace e2d
 
     bool operator==(const render::sampler_block& l, const render::sampler_block& r) noexcept;
     bool operator!=(const render::sampler_block& l, const render::sampler_block& r) noexcept;
+    
+    //
+    // render::material
+    //
 
+    bool operator==(const render::material& l, const render::material& r) noexcept;
+    bool operator!=(const render::material& l, const render::material& r) noexcept;
 }
 
 #include "render.inl"

@@ -646,6 +646,43 @@ namespace e2d
                 block_info.templ));
     }
 
+    /*const_buffer_ptr render::create_const_buffer(
+        const cbuffer_template_cptr& templ)
+    {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(templ);
+
+        gl_buffer_id buf_id(state_->dbg());
+        const size_t block_size = templ->block_size();
+
+        if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
+            buf_id = gl_buffer_id::create(state_->dbg(), GL_UNIFORM_BUFFER);
+            if ( buf_id.empty() ) {
+                state_->dbg().error("RENDER: Failed to create uniform buffer:\n"
+                    "--> Info: failed to create uniform buffer id");
+                return nullptr;
+            }
+
+            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size]() {
+                GL_CHECK_CODE(state_->dbg(), glBufferData(
+                    buf_id.target(),
+                    math::numeric_cast<GLsizeiptr>(block_size),
+                    nullptr,
+                    GL_STREAM_DRAW));
+            });
+        } else {
+            E2D_ASSERT(block_size % 16 == 0);
+        }
+
+        return std::make_shared<const_buffer>(
+            std::make_unique<const_buffer::internal_state>(
+                state_->dbg(),
+                std::move(buf_id),
+                0,
+                const_buffer::scope::draw_command, // TODO
+                templ));
+    }*/
+
     render_target_ptr render::create_render_target(
         const v2u& size,
         const pixel_declaration& color_decl,
@@ -816,18 +853,52 @@ namespace e2d
     }
 
     render& render::execute(const material_command& command) {
+        E2D_ASSERT(command.material());
+        return set_material(*command.material());
+    }
+    
+    render& render::set_material(const material& mtr) {
         E2D_ASSERT(is_in_main_thread());
-        state_->set_shader_program(command.shader());
-        state_->bind_textures(sampler_block::scope::material, command.samplers());
-        state_->bind_const_buffer(command.constants());
-        state_->set_blending(command.blending());
+        state_->set_shader_program(mtr.shader());
+        state_->bind_textures(sampler_block::scope::material, mtr.samplers());
+        state_->bind_const_buffer(mtr.constants());
+        state_->set_blending_state(mtr.blending());
+        state_->set_culling_state(mtr.culling());
         return *this;
     }
 
     render& render::execute(const scissor_command& command) {
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(state_->inside_render_pass());
-        // TODO
+        state_->set_scissor(command.scissoring(), command.scissor_rect());
+        return *this;
+    }
+    
+    render& render::execute(const blending_state_command& command) {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
+        state_->set_blending_state(command.state());
+        return *this;
+    }
+
+    render& render::execute(const culling_state_command& command) {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
+        state_->set_culling_state(command.state());
+        return *this;
+    }
+
+    render& render::execute(const stencil_state_command& command) {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
+        state_->set_stencil_state(command.state());
+        return *this;
+    }
+
+    render& render::execute(const depth_state_command& command) {
+        E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
+        state_->set_depth_state(command.state());
         return *this;
     }
 

@@ -15,12 +15,7 @@ namespace e2d
     public:
         using batch_index_t = u16;
         using topology = render::topology;
-        using blending_color_mask = render::blending_color_mask;
-        using blending_factor = render::blending_factor;
-        using blending_equation = render::blending_equation;
-        using blending_state = render::blending_state;
-        using sampler_state = render::sampler_state;
-        using sampler_block = render::sampler_block;
+        using material = render::material;
 
         template < typename T >
         class vertex_iterator final {
@@ -102,29 +97,6 @@ namespace e2d
             b2f uv;
             u32 segment_count = 8;
             color32 col;
-        };
-
-    public:
-        class material final {
-        public:
-            material() = default;
-
-            material& constants(const const_buffer_ptr& value) noexcept;
-            material& shader(const shader_ptr& value) noexcept;
-            material& sampler(str_view name, const sampler_state& value) noexcept;
-            material& blending(const blending_state& value) noexcept;
-
-            [[nodiscard]] const shader_ptr& shader() const noexcept;
-            [[nodiscard]] const sampler_block& samplers() const noexcept;
-            [[nodiscard]] const const_buffer_ptr& constants() const noexcept;
-            [[nodiscard]] const blending_state& blending() const noexcept;
-
-            [[nodiscard]] bool operator == (const material& r) const noexcept;
-        private:
-            shader_ptr shader_;
-            sampler_block samplers_;
-            blending_state blending_;
-            const_buffer_ptr cbuffer_;
         };
 
     private:
@@ -332,49 +304,6 @@ namespace e2d
     template < typename VertexType >
     u32 batcher::rectangle_batch<VertexType>::vertex_count() noexcept {
         return 4;
-    }
-
-    //
-    // batcher::material
-    //
-    
-    inline batcher::material& batcher::material::shader(const shader_ptr& value) noexcept {
-        shader_ = value;
-        return *this;
-    }
-    
-    inline batcher::material& batcher::material::sampler(
-        str_view name,
-        const sampler_state& value) noexcept
-    {
-        samplers_.bind(name, value);
-        return *this;
-    }
-    
-    inline batcher::material& batcher::material::constants(const const_buffer_ptr& cb) noexcept {
-        cbuffer_ = cb;
-        return *this;
-    }
-    
-    inline batcher::material& batcher::material::blending(const blending_state& value) noexcept {
-        blending_ = value;
-        return *this;
-    }
-    
-    inline const shader_ptr& batcher::material::shader() const noexcept {
-        return shader_;
-    }
-
-    inline const batcher::sampler_block& batcher::material::samplers() const noexcept {
-        return samplers_;
-    }
-
-    inline const const_buffer_ptr& batcher::material::constants() const noexcept {
-        return cbuffer_;
-    }
-
-    inline const batcher::blending_state& batcher::material::blending() const noexcept {
-        return blending_;
     }
 
     //

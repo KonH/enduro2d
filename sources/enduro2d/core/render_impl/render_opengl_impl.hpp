@@ -316,13 +316,17 @@ namespace e2d
         void draw(topology topo, u32 first, u32 count) noexcept;
         void draw_indexed(topology topo, u32 count, size_t offset) noexcept;
 
-        void set_blending(const blending_state* bs) noexcept;
+        void set_blending_state(const std::optional<blending_state>& state) noexcept;
+        void set_culling_state(const std::optional<culling_state>& state) noexcept;
+        void set_depth_state(const std::optional<depth_state>& state) noexcept;
+        void set_stencil_state(const std::optional<stencil_state>& state) noexcept;
+        void set_scissor(bool enable, const b2u& rect = b2u()) noexcept;
 
         void insert_message(str_view msg) noexcept;
     private:
         void set_depth_state_(const depth_state& ds) noexcept;
         void set_stencil_state_(const stencil_state& ss) noexcept;
-        void set_rasterization_state_(const rasterization_state& rs) noexcept;
+        void set_culling_state_(const culling_state& rs) noexcept;
         void set_blending_state_(const blending_state& bs) noexcept;
         void set_render_target_(const render_target_ptr& rt) noexcept;
         void reset_render_target_() noexcept;
@@ -357,7 +361,7 @@ namespace e2d
 
             pipeline = vertex_attribs | cbuffers | textures,
         };
-        using enabled_attribs_t = std::bitset<max_attribute_count>;
+        using enabled_attribs_t = std::bitset<render_cfg::max_attribute_count>;
     private:
         debug& debug_;
         window& window_;
@@ -386,7 +390,7 @@ namespace e2d
             vertex_attribs_ptr attribs;
             std::size_t offset;
         };
-        std::array<vb_binding, max_vertex_buffer_count> vertex_buffers_;
+        std::array<vb_binding, render_cfg::max_vertex_buffer_count> vertex_buffers_;
         std::array<const_buffer_ptr, u32(const_buffer::scope::last_)> cbuffers_;
         std::array<sampler_block, u32(sampler_block::scope::last_)> samplers_;
         //std::array<std::pair<GLuint, GLenum>, 16> textures_;

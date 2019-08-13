@@ -1121,6 +1121,18 @@ namespace e2d::opengl
     GLenum convert_culling_mode(render::culling_mode cm) noexcept {
         #define DEFINE_CASE(x,y) case render::culling_mode::x: return y;
         switch ( cm ) {
+            DEFINE_CASE(cw, GL_CW);
+            DEFINE_CASE(ccw, GL_CCW);
+            default:
+                E2D_ASSERT_MSG(false, "unexpected render culling mode");
+                return 0;
+        }
+        #undef DEFINE_CASE
+    }
+
+    GLenum convert_culling_face(render::culling_face cm) noexcept {
+        #define DEFINE_CASE(x,y) case render::culling_face::x: return y;
+        switch ( cm ) {
             DEFINE_CASE(back, GL_BACK);
             DEFINE_CASE(front, GL_FRONT);
             DEFINE_CASE(back_and_front, GL_FRONT_AND_BACK);

@@ -9,12 +9,16 @@
 	],
 	"render_pass_block" : "shaders/block/pass_1.json",
 	
-	"gles2" : {
-		"vertex" : "shaders/gles2/textured_sprite.vert",
-		"fragment" : "shaders/gles2/textured_sprite.frag"
-	},
-	"gles3" : {
-		"vertex" : "shaders/gles3/textured_sprite.vert",
-		"fragment" : "shaders/gles3/textured_sprite.frag"
-	}
+	"opengl" : [
+        {
+            "vertex" : "shaders/gles3/textured_sprite.vert",
+            "fragment" : "shaders/gles3/textured_sprite.frag",
+            "requires" : [ "uniform_buffer" ]
+        },
+        {
+            "vertex" : "shaders/gles2/textured_sprite.vert",
+            "fragment" : "shaders/gles2/textured_sprite.frag",
+            "requires" : []
+        }
+    ]
 }

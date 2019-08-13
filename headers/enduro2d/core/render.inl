@@ -94,12 +94,14 @@ namespace e2d
             : nullptr;
     }
 
-    inline void render::property_map::assign(str_hash key, property_value&& value) {
+    inline render::property_map& render::property_map::assign(str_hash key, property_value&& value) {
         values_[key] = std::move(value);
+        return *this;
     }
 
-    inline void render::property_map::assign(str_hash key, const property_value& value) {
+    inline render::property_map& render::property_map::assign(str_hash key, const property_value& value) {
         values_[key] = value;
+        return *this;
     }
 
     inline void render::property_map::clear() noexcept {
@@ -160,6 +162,21 @@ namespace e2d
     template < std::size_t N >
     std::size_t render::command_block<N>::command_count() const noexcept {
         return command_count_;
+    }
+
+    //
+    // render::change_sate_command_
+    //
+    
+    template < typename T >
+    render::change_sate_command_<T>::change_sate_command_(const T& state) {
+        state_ = state;
+        return *this;
+    }
+
+    template < typename T >
+    const std::optional<T>& render::change_sate_command_<T>::state() const noexcept {
+        return state_;
     }
 
     //

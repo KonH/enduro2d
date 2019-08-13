@@ -327,6 +327,26 @@ namespace e2d
         E2D_UNUSED(command);
         return *this;
     }
+    
+    render& render::execute(const blending_state_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const culling_state_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const stencil_state_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
+
+    render& render::execute(const depth_state_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
 
     render& render::execute(const draw_command& command) {
         E2D_UNUSED(command);

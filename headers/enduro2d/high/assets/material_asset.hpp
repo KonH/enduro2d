@@ -10,8 +10,6 @@
 
 #include "../library.hpp"
 
-#if 0
-
 namespace e2d
 {
     class material_asset final : public content_asset<material_asset, render::material> {
@@ -20,5 +18,3 @@ namespace e2d
         static load_async_result load_async(const library& library, str_view address);
     };
 }
-
-#endif

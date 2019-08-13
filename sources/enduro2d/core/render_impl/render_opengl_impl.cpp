@@ -571,9 +571,9 @@ namespace e2d
             state_block_.blending(sb.blending());
         }
 
-        if ( sb.rasterization() != state_block_.rasterization() ) {
-            set_rasterization_state_(sb.rasterization());
-            state_block_.rasterization(sb.rasterization());
+        if ( sb.culling() != state_block_.culling() ) {
+            set_culling_state_(sb.culling());
+            state_block_.culling(sb.culling());
         }
 
         return *this;
@@ -704,7 +704,7 @@ namespace e2d
         set_render_target_(nullptr);
 
         // reset vertex attribs
-        for ( size_t i = 0; i < max_attribute_count; ++i ) {
+        for ( size_t i = 0; i < render_cfg::max_attribute_count; ++i ) {
             GL_CHECK_CODE(debug_, glDisableVertexAttribArray(GLuint(i)));
         }
         //GL_CHECK_CODE(debug_, glBindBuffer(
@@ -973,13 +973,48 @@ namespace e2d
         stats().draw_calls++;
     }
     
-    void render::internal_state::set_blending(const blending_state* bs) noexcept {
-        if ( !bs ) {
-            bs = &render_pass_state_block_.blending();
+    void render::internal_state::set_blending_state(const std::optional<blending_state>& state) noexcept {
+        const auto& new_state = state.has_value() ? *state : render_pass_state_block_.blending();
+        if ( new_state != state_block_.blending() ) {
+            set_blending_state_(new_state);
+            state_block_.blending(new_state);
         }
-        if ( *bs != state_block_.blending() ) {
-            set_blending_state_(*bs);
-            state_block_.blending(*bs);
+    }
+
+    void render::internal_state::set_culling_state(const std::optional<culling_state>& state) noexcept {
+        const auto& new_state = state.has_value() ? *state : render_pass_state_block_.culling();
+        if ( new_state != state_block_.culling() ) {
+            set_culling_state_(new_state);
+            state_block_.culling(new_state);
+        }
+    }
+
+    void render::internal_state::set_depth_state(const std::optional<depth_state>& state) noexcept {
+        const auto& new_state = state.has_value() ? *state : render_pass_state_block_.depth();
+        if ( new_state != state_block_.depth() ) {
+            set_depth_state_(new_state);
+            state_block_.depth(new_state);
+        }
+    }
+
+    void render::internal_state::set_stencil_state(const std::optional<stencil_state>& state) noexcept {
+        const auto& new_state = state.has_value() ? *state : render_pass_state_block_.stencil();
+        if ( new_state != state_block_.stencil() ) {
+            set_stencil_state_(new_state);
+            state_block_.stencil(new_state);
+        }
+    }
+    
+    void render::internal_state::set_scissor(bool enable, const b2u& rect) noexcept {
+        if ( enable ) {
+            GL_CHECK_CODE(debug_, glScissor(
+                math::numeric_cast<GLint>(rect.position.x),
+                math::numeric_cast<GLint>(rect.position.y),
+                math::numeric_cast<GLint>(rect.size.x),
+                math::numeric_cast<GLint>(rect.size.y)));
+            GL_CHECK_CODE(debug_, glEnable(GL_SCISSOR_TEST));
+        } else {
+            GL_CHECK_CODE(debug_, glDisable(GL_SCISSOR_TEST));
         }
     }
 
@@ -1027,15 +1062,16 @@ namespace e2d
         }
     }
 
-    void render::internal_state::set_rasterization_state_(const rasterization_state& rs) noexcept {
-        if ( rs.culling() != culling_mode::none ) {
+    void render::internal_state::set_culling_state_(const culling_state& cs) noexcept {
+        if ( cs.enabled() ) {
             GL_CHECK_CODE(debug_, glEnable(GL_CULL_FACE));
             GL_CHECK_CODE(debug_, glCullFace(
-                convert_culling_mode(rs.culling())));
+                convert_culling_face(cs.face())));
         } else {
             GL_CHECK_CODE(debug_, glDisable(GL_CULL_FACE));
         }
-        GL_CHECK_CODE(debug_, glFrontFace(rs.front_face_ccw() ? GL_CCW : GL_CW));
+        GL_CHECK_CODE(debug_, glFrontFace(
+            convert_culling_mode(cs.mode())));
     }
 
     void render::internal_state::set_blending_state_(const blending_state& bs) noexcept {

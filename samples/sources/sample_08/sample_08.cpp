@@ -203,9 +203,8 @@ namespace
             const auto projection = math::make_orthogonal_lh_matrix4(
                 framebuffer_size, 0.f, 1.f);
             
-            render::property_map props;
-            props.assign("u_matrix_vp", projection);
-            the<render>().update_buffer(rpass_cbuffer_, props);
+            the<render>().update_buffer(rpass_cbuffer_,
+                render::property_map().assign("u_matrix_vp", projection));
 
             the<render>().begin_pass(
                 render::renderpass_desc()
@@ -217,9 +216,9 @@ namespace
                 rpass_cbuffer_,
                 {});
 
-            batcher::material mtr1 = batcher::material()
+            render::material mtr1 = render::material()
                 .shader(shader1_)
-                .blending(batcher::blending_state()
+                .blending(render::blending_state()
                     .src_factor(render::blending_factor::src_alpha)
                     .dst_factor(render::blending_factor::one_minus_src_alpha)
                     .enable(true))
@@ -228,9 +227,9 @@ namespace
                     .min_filter(render::sampler_min_filter::linear)
                     .mag_filter(render::sampler_mag_filter::linear));
 
-            batcher::material mtr2 = batcher::material()
+            render::material mtr2 = render::material()
                 .shader(shader1_)
-                .blending(batcher::blending_state()
+                .blending(render::blending_state()
                     .src_factor(render::blending_factor::src_alpha)
                     .dst_factor(render::blending_factor::one_minus_src_alpha)
                     .enable(true))
@@ -239,7 +238,7 @@ namespace
                     .min_filter(render::sampler_min_filter::linear)
                     .mag_filter(render::sampler_mag_filter::linear));
             
-            batcher::material mtr3 = batcher::material()
+            render::material mtr3 = render::material()
                 .shader(shader1_)
                 .sampler("u_texture", render::sampler_state()
                     .texture(texture3_)
@@ -247,8 +246,8 @@ namespace
                     .mag_filter(render::sampler_mag_filter::linear));
 
             auto batch = the<batcher>().alloc_batch<vertex2>(4, 6,
-                batcher::topology::triangles,
-                batcher::material().shader(shader2_));
+                render::topology::triangles,
+                render::material().shader(shader2_));
             batch.vertices[0] = vertex2(v3f(- 90.0f,  170.0f, 0.0f), color32::red());
             batch.vertices[1] = vertex2(v3f(-120.0f, -210.0f, 0.0f), color32::green());
             batch.vertices[2] = vertex2(v3f( 120.0f,  230.0f, 0.0f), color32::blue());

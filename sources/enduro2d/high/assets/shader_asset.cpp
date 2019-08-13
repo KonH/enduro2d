@@ -37,8 +37,10 @@ namespace
                 "render_pass_block" : { "$ref": "#/common_definitions/address" },
                 "material_block" : { "$ref": "#/common_definitions/address" },
                 "draw_command_block" : { "$ref": "#/common_definitions/address" },
-                "gles2" : { "$ref": "#/definitions/shader_src" },
-                "gles3" : { "$ref": "#/definitions/shader_src" }
+                "opengl" : {
+                    "type" : "array",
+                    "items" : { "$ref": "#/definitions/shader_src" }
+                }
             },
             "definitions" : {
                 "shader_src" : {
@@ -47,7 +49,11 @@ namespace
                     "additionalProperties" : false,
                     "properties" : {
                         "vertex" : { "$ref": "#/common_definitions/address" },
-                        "fragment" : { "$ref": "#/common_definitions/address" }
+                        "fragment" : { "$ref": "#/common_definitions/address" },
+                        "requires" : {
+                            "type" : "array",
+                            "items" : { "$ref": "#/common_definitions/name" }
+                        }
                     }
                 },
                 "sampler" : {
@@ -156,11 +162,13 @@ namespace
 
         u32 index;
         if ( !json_utils::try_parse_value(root["index"], index) ) {
+            the<debug>().error("SHADER: Incorrect formatting of 'attribute.index' property");
             return false;
         }
 
         shader_source::value_type type;
         if ( !parse_attribute_type(root["type"].GetString(), type) ) {
+            the<debug>().error("SHADER: Incorrect formatting of 'attribute.type' property");
             return false;
         }
 
@@ -175,17 +183,19 @@ namespace
 
         u32 unit;
         if ( !json_utils::try_parse_value(root["unit"], unit) ) {
+            the<debug>().error("SHADER: Incorrect formatting of 'sampler.unit' property");
             return false;
         }
 
         auto scope = shader_source::scope_type::material;
         if ( root.HasMember("scope") && !parse_scope_type(root["scope"].GetString(), scope) ) {
+            the<debug>().error("SHADER: Incorrect formatting of 'sampler.scope' property");
             return false;
         }
 
         auto type = shader_source::sampler_type::_2d;
         if ( root.HasMember("type") && !parse_sampler_type(root["type"].GetString(), type) ) {
-            return false;
+            the<debug>().warning("SHADER: Incorrect formatting of 'sampler.type' property");
         }
 
         E2D_ASSERT(root["name"].IsString());
@@ -229,13 +239,24 @@ namespace
         str_view parent_address,
         const rapidjson::Value& root)
     {
-        // TODO: check is 'gles3' supported
-        if ( root.HasMember("gles3") ) {
-            return parse_shader_src(library, parent_address, root);
+        if ( root.HasMember("opengl") ) {
+            auto& gl_shaders = root["opengl"];
+            E2D_ASSERT(gl_shaders.IsArray());
+            for ( rapidjson::SizeType i = 0; i < gl_shaders.Size(); ++i ) {
+                auto& item = gl_shaders[i];
+                bool supported = true;
+                if ( item.HasMember("requires") ) {
+                    auto& requires = item["requires"];
+                    for ( rapidjson::SizeType j = 0; j < requires.Size(); ++j ) {
+                        //supported |= library.environment(requires[j]);  // TODO
+                    }
+                } 
+                if ( supported ) {
+                    return parse_shader_src(library, parent_address, root);
+                }
+            }
         }
-        if ( root.HasMember("gles2") ) {
-            return parse_shader_src(library, parent_address, root);
-        }
+        the<debug>().error("SHADER: Can't find suitable shader version");
         return stdex::make_tuple_promise(std::make_tuple(
             stdex::make_rejected_promise<text_asset::load_result>(shader_asset_loading_exception()),
             stdex::make_rejected_promise<text_asset::load_result>(shader_asset_loading_exception())));

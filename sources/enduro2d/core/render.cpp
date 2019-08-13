@@ -118,6 +118,22 @@ namespace
         void operator()(const render::scissor_command& command) const {
             render_.execute(command);
         }
+        
+        void operator()(const render::blending_state_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::culling_state_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::stencil_state_command& command) const {
+            render_.execute(command);
+        }
+
+        void operator()(const render::depth_state_command& command) const {
+            render_.execute(command);
+        }
 
         void operator()(const render::draw_command& command) const {
             render_.execute(command);
@@ -408,39 +424,34 @@ namespace e2d
     }
 
     //
-    // rasterization_state
+    // culling_state
     //
+
+    render::culling_state& render::culling_state::face(culling_face value) noexcept {
+        face_ = value;
+        return *this;
+    }
     
-    /*render::rasterization_state& render::rasterization_state::polygon_offset(float factor, float units) noexcept {
-        polygon_offset_factor_ = factor;
-        polygon_offset_units_ = units;
-        return *this;
-    }*/
-
-    render::rasterization_state& render::rasterization_state::culling(culling_mode mode) noexcept {
-        culling_ = mode;
+    render::culling_state& render::culling_state::mode(culling_mode mode) noexcept {
+        mode_ = mode;
         return *this;
     }
-
-    render::rasterization_state& render::rasterization_state::front_face_ccw(bool value) noexcept {
-        front_face_ccw_ = value;
+    
+    render::culling_state& render::culling_state::enable(bool value) noexcept {
+        enabled_ = value;
         return *this;
     }
 
-    /*float render::rasterization_state::polygon_offset_factor() const noexcept {
-        return polygon_offset_factor_;
+    render::culling_face render::culling_state::face() const noexcept {
+        return face_;
     }
-
-    float render::rasterization_state::polygon_offset_units() const noexcept {
-        return polygon_offset_units_;
-    }*/
-
-    render::culling_mode render::rasterization_state::culling() const noexcept {
-        return culling_;
+    
+    render::culling_mode render::culling_state::mode() const noexcept {
+        return mode_;
     }
-
-    bool render::rasterization_state::front_face_ccw() const noexcept {
-        return front_face_ccw_;
+    
+    bool render::culling_state::enabled() const noexcept {
+        return enabled_;
     }
 
     //
@@ -569,8 +580,8 @@ namespace e2d
         return *this;
     }
 
-    render::state_block& render::state_block::rasterization(const rasterization_state& state) noexcept {
-        rasterization_ = state;
+    render::state_block& render::state_block::culling(const culling_state& state) noexcept {
+        culling_ = state;
         return *this;
     }
 
@@ -587,8 +598,8 @@ namespace e2d
         return stencil_;
     }
 
-    render::rasterization_state& render::state_block::rasterization() noexcept {
-        return rasterization_;
+    render::culling_state& render::state_block::culling() noexcept {
+        return culling_;
     }
 
     render::blending_state& render::state_block::blending() noexcept {
@@ -607,8 +618,8 @@ namespace e2d
         return blending_;
     }
     
-    const render::rasterization_state& render::state_block::rasterization() const noexcept {
-        return rasterization_;
+    const render::culling_state& render::state_block::culling() const noexcept {
+        return culling_;
     }
 
     //
@@ -877,6 +888,60 @@ namespace e2d
     }
 
     //
+    // render::material
+    //
+    
+    render::material& render::material::blending(const blending_state& value) noexcept {
+        blending_ = value;
+        return *this;
+    }
+
+    render::material& render::material::culling(const culling_state& value) noexcept {
+        culling_ = value;
+        return *this;
+    }
+
+    render::material& render::material::shader(const shader_ptr& value) noexcept {
+        shader_ = value;
+        return *this;
+    }
+
+    render::material& render::material::constants(const const_buffer_ptr& value) noexcept {
+        constants_ = value;
+        return *this;
+    }
+    
+    render::material& render::material::sampler(str_hash name, const sampler_state& sampler) noexcept {
+        sampler_block_.bind(name, sampler);
+        return *this;
+    }
+    
+    render::material& render::material::samplers(const sampler_block& value) noexcept {
+        sampler_block_ = value;
+        return *this;
+    }
+
+    const std::optional<render::blending_state>& render::material::blending() const noexcept {
+        return blending_;
+    }
+
+    const std::optional<render::culling_state>& render::material::culling() const noexcept {
+        return culling_;
+    }
+
+    const shader_ptr& render::material::shader() const noexcept {
+        return shader_;
+    }
+
+    const const_buffer_ptr& render::material::constants() const noexcept {
+        return constants_;
+    }
+
+    const render::sampler_block& render::material::samplers() const noexcept {
+        return sampler_block_;
+    }
+
+    //
     // render::bind_vertex_buffers_command
     //
 
@@ -925,40 +990,12 @@ namespace e2d
     //
     // render::material_command
     //
-        
-    render::material_command::material_command(
-        const shader_ptr& shader,
-        const sampler_block& block,
-        const const_buffer_ptr& constants)
-    : shader_(shader)
-    , cbuffer_(constants)
-    , sampler_block_(block) {}
-            
-    render::material_command& render::material_command::sampler(str_hash name, const sampler_state& sampler) noexcept {
-        sampler_block_.bind(name, sampler);
-        return *this;
-    }
     
-    render::material_command& render::material_command::blending(const blending_state& value) noexcept {
-        blending_state_ = value;
-        has_blending_state_ = true;
-        return *this;
-    }
+    render::material_command::material_command(const material_cptr& value)
+    : material_(value) {}
 
-    const render::sampler_block& render::material_command::samplers() const noexcept {
-        return sampler_block_;
-    }
-
-    const shader_ptr& render::material_command::shader() const noexcept {
-        return shader_;
-    }
-
-    const const_buffer_ptr& render::material_command::constants() const noexcept {
-        return cbuffer_;
-    }
-    
-    const render::blending_state* render::material_command::blending() const noexcept {
-        return has_blending_state_ ? &blending_state_ : nullptr;
+    const render::material_cptr& render::material_command::material() const noexcept {
+        return material_;
     }
 
     //
@@ -1106,7 +1143,7 @@ namespace e2d
     bool operator==(const render::state_block& l, const render::state_block& r) noexcept {
         return l.depth() == r.depth()
             && l.stencil() == r.stencil()
-            && l.rasterization() == r.rasterization()
+            && l.culling() == r.culling()
             && l.blending() == r.blending();
     }
 
@@ -1141,14 +1178,16 @@ namespace e2d
         return !(l == r);
     }
 
-    bool operator==(const render::rasterization_state& l, const render::rasterization_state& r) noexcept {
-        //return l.polygon_offset_factor() == r.polygon_offset_factor()
-        //    && l.polygon_offset_units() == r.polygon_offset_units()
-        return l.culling() == r.culling()
-            && l.front_face_ccw() == r.front_face_ccw();
+    bool operator==(const render::culling_state& l, const render::culling_state& r) noexcept {
+        if ( !l.enabled() ) {
+            return !r.enabled();
+        }
+        return l.enabled() == r.enabled()
+            && l.face() == r.face()
+            && l.mode() == r.mode();
     }
 
-    bool operator!=(const render::rasterization_state& l, const render::rasterization_state& r) noexcept {
+    bool operator!=(const render::culling_state& l, const render::culling_state& r) noexcept {
         return !(l == r);
     }
 
@@ -1195,6 +1234,18 @@ namespace e2d
     }
 
     bool operator!=(const render::sampler_block& l, const render::sampler_block& r) noexcept {
+        return !(l == r);
+    }
+    
+    bool operator==(const render::material& l, const render::material& r) noexcept {
+        return l.blending() == r.blending()
+            && l.culling() == r.culling()
+            && l.shader() == r.shader()
+            && l.constants() == r.constants()
+            && l.samplers() == r.samplers();
+    }
+
+    bool operator!=(const render::material& l, const render::material& r) noexcept {
         return !(l == r);
     }
 }
