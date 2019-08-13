@@ -66,9 +66,10 @@ namespace
         const mesh& mesh,
         std::array<vertex_buffer_ptr, render_cfg::max_attribute_count>& buffers,
         std::array<vertex_attribs_ptr, render_cfg::max_attribute_count>& attributes,
-        std::size_t& vertices_count)
+        std::size_t& buffer_count)
     {
-        vertices_count = 0;
+        buffer_count = 0;
+        std::size_t vert_count = 0;
 
         if ( const vector<v3f>& vertices = mesh.vertices(); vertices.size() ) {
             const vertex_buffer_ptr vertex_buffer = render.create_vertex_buffer(
@@ -78,9 +79,10 @@ namespace
                 vertex_buffer_decl);
 
             if ( vertex_buffer && vertex_attribs ) {
-                buffers[vertices_count] = vertex_buffer;
-                attributes[vertices_count] = vertex_attribs;
-                ++vertices_count;
+                vert_count = vertices.size();
+                buffers[buffer_count] = vertex_buffer;
+                attributes[buffer_count] = vertex_attribs;
+                ++buffer_count;
             }
         }
 
@@ -97,9 +99,14 @@ namespace
                         uv_buffer_decls[i]);
 
                     if ( uv_buffer && uv_attribs ) {
-                        buffers[vertices_count] = uv_buffer;
-                        attributes[vertices_count] = uv_attribs;
-                        ++vertices_count;
+                        if ( vert_count ) {
+                            E2D_ASSERT(vert_count == uvs.size());
+                        } else {
+                            vert_count = uvs.size();
+                        }
+                        buffers[buffer_count] = uv_buffer;
+                        attributes[buffer_count] = uv_attribs;
+                        ++buffer_count;
                     }
                 }
             }
@@ -118,9 +125,14 @@ namespace
                         color_buffer_decls[i]);
 
                     if ( color_buffer && color_attribs ) {
-                        buffers[vertices_count] = color_buffer;
-                        attributes[vertices_count] = color_attribs;
-                        ++vertices_count;
+                        if ( vert_count ) {
+                            E2D_ASSERT(vert_count == colors.size());
+                        } else {
+                            vert_count = colors.size();
+                        }
+                        buffers[buffer_count] = color_buffer;
+                        attributes[buffer_count] = color_attribs;
+                        ++buffer_count;
                     }
                 }
             }
@@ -134,9 +146,14 @@ namespace
                 normal_buffer_decl);
 
             if ( normal_buffer && normal_attribs ) {
-                buffers[vertices_count] = normal_buffer;
-                attributes[vertices_count] = normal_attribs;
-                ++vertices_count;
+                if ( vert_count ) {
+                    E2D_ASSERT(vert_count == normals.size());
+                } else {
+                    vert_count = normals.size();
+                }
+                buffers[buffer_count] = normal_buffer;
+                attributes[buffer_count] = normal_attribs;
+                ++buffer_count;
             }
         }
         
@@ -148,9 +165,14 @@ namespace
                 tangent_buffer_decl);
 
             if ( tangent_buffer && tangent_attribs ) {
-                buffers[vertices_count] = tangent_buffer;
-                attributes[vertices_count] = tangent_attribs;
-                ++vertices_count;
+                if ( vert_count ) {
+                    E2D_ASSERT(vert_count == tangents.size());
+                } else {
+                    vert_count = tangents.size();
+                }
+                buffers[buffer_count] = tangent_buffer;
+                attributes[buffer_count] = tangent_attribs;
+                ++buffer_count;
             }
         }
         
@@ -162,9 +184,14 @@ namespace
                 bitangent_buffer_decl);
 
             if ( bitangent_buffer && bitangent_attribs ) {
-                buffers[vertices_count] = bitangent_buffer;
-                attributes[vertices_count] = bitangent_attribs;
-                ++vertices_count;
+                if ( vert_count ) {
+                    E2D_ASSERT(vert_count == bitangents.size());
+                } else {
+                    vert_count = bitangents.size();
+                }
+                buffers[buffer_count] = bitangent_buffer;
+                attributes[buffer_count] = bitangent_attribs;
+                ++buffer_count;
             }
         }
     }

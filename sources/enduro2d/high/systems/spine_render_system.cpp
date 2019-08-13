@@ -19,8 +19,6 @@
 
 #include <enduro2d/high/node.hpp>
 
-#include "render_system_impl/render_system_batcher.hpp"
-
 #include <spine/Skeleton.h>
 #include <spine/VertexEffect.h>
 #include <spine/SkeletonClipping.h>
@@ -39,11 +37,10 @@ namespace
     };
 
     struct vertex_v3f_t2f_c32b {
-        struct type {
-            v3f v;
-            v2f t;
-            color32 c;
-        };
+        v3f v;
+        v2f t;
+        color32 c;
+        
         static vertex_declaration decl() noexcept {
             return vertex_declaration()
                 .add_attribute<v3f>("a_vertex")
@@ -51,50 +48,20 @@ namespace
                 .add_attribute<color32>("a_tint").normalized();
         }
     };
-
-    using batcher_type = render_system_impl::batcher<
-        index_u16,
-        vertex_v3f_t2f_c32b>;
-}
-
-namespace e2d
-{
-    using batcher_type = render_system_impl::batcher<
-        index_u16,
-        vertex_v3f_t2f_c32b>;
-
-    class spine_render_system::internal_state {
-    public:
-        internal_state()
-        : batcher_(the<debug>(), the<render>()) {}
-
-        batcher_type& batcher() noexcept {
-            return batcher_;
-        }
-    private:
-        batcher_type batcher_;
-    };
 }
 
 namespace
 {
-    const str_hash matrix_v_property_hash = "u_matrix_v";
-    const str_hash matrix_p_property_hash = "u_matrix_p";
-    const str_hash matrix_vp_property_hash = "u_matrix_vp";
-    const str_hash game_time_property_hash = "u_game_time";
-    const str_hash spine_texture_sampler_hash = "u_texture";
-
     void draw_spine(
-        batcher_type& batcher,
+        batcher& the_batcher,
         const spine_renderer& spine_r,
         const renderer& node_r,
-        const actor& actor,
-        render::property_block& property_cache)
+        const actor& actor)
     {
-        static std::vector<batcher_type::vertex_type> temp_vertices;
+        static std::vector<vertex_v3f_t2f_c32b> temp_vertices;
 
-        static_assert(sizeof(batcher_type::vertex_type) % sizeof(float) == 0, "invalid stride");
-        constexpr int stride = sizeof(batcher_type::vertex_type) / sizeof(float);
+        static_assert(sizeof(vertex_v3f_t2f_c32b) % sizeof(float) == 0, "invalid stride");
+        constexpr int stride = sizeof(vertex_v3f_t2f_c32b) / sizeof(float);
 
         if ( !actor.node() || !node_r.enabled() ) {
             return;
@@ -210,16 +177,6 @@ namespace
                     break;
             }
 
-            /*const float* vertices = temp_vertices.data();
-            if ( spSkeletonClipping_isClipping(clipper) ) {
-                spSkeletonClipping_clipTriangles(clipper, vertices, vertex_count, indices, index_count, uvs, 2);
-                vertices = clipper->clippedVertices->items;
-                vertex_count = clipper->clippedVertices->size >> 1;
-                uvs = clipper->clippedUVs->items;
-                indices = clipper->clippedTriangles->items;
-                index_count = clipper->clippedTriangles->size;
-            }*/
-
             if ( effect ) {
                 E2D_ASSERT(false);
             } else {
@@ -231,24 +188,6 @@ namespace
                     vert.c = vert_color;
                 }
             }
-            
-            try {
-                property_cache
-                    .sampler(spine_texture_sampler_hash, render::sampler_state()
-                        .texture(texture)
-                        .min_filter(render::sampler_min_filter::linear)
-                        .mag_filter(render::sampler_mag_filter::linear))
-                    .merge(node_r.properties());
-
-                batcher.batch(
-                    mat_a,
-                    property_cache,
-                    indices, index_count,
-                    temp_vertices.data(), vertex_count);
-            } catch (...) {
-                property_cache.clear();
-                throw;
-            }
 
             spSkeletonClipping_clipEnd(clipper, slot);
         }
@@ -258,51 +197,21 @@ namespace
         if ( effect ) {
             effect->end(effect);
         }
-        
-        property_cache.clear();
     }
     
-    void for_all_components(
-        batcher_type& batcher,
-        ecs::registry& owner,
-        const ecs::const_entity& cam_e,
-        const camera& cam)
-    {
-        const actor* const cam_a = cam_e.find_component<actor>();
-        const const_node_iptr cam_n = cam_a ? cam_a->node() : nullptr;
-        
-        const m4f& cam_w = cam_n
-            ? cam_n->world_matrix()
-            : m4f::identity();
-        const std::pair<m4f,bool> cam_w_inv = math::inversed(cam_w);
-
-        const m4f& m_v = cam_w_inv.second
-            ? cam_w_inv.first
-            : m4f::identity();
-        const m4f& m_p = cam.projection();
-
-        render::property_block property_cache;
-
-        batcher.flush()
-            .property(matrix_v_property_hash, m_v)
-            .property(matrix_p_property_hash, m_p)
-            .property(matrix_vp_property_hash, m_v * m_p)
-            .property(game_time_property_hash, the<engine>().time());
-
-        owner.for_joined_components<spine_renderer, renderer, actor>([&batcher, &property_cache](
+    void for_all_components(ecs::registry& owner) {
+        batcher& the_batcher = the<batcher>();
+        owner.for_joined_components<spine_renderer, renderer, actor>([&the_batcher](
             const ecs::const_entity&,
             const spine_renderer& spine_r,
             const renderer& node_r,
             const actor& actor)
         {
-            draw_spine(batcher, spine_r, node_r, actor, property_cache);
+            draw_spine(the_batcher, spine_r, node_r, actor);
         });
     }
 
-    void for_all_cameras(
-        batcher_type& batcher,
-        ecs::registry& owner)
-    {
+    void for_all_cameras(ecs::registry& owner) {
         static vector<std::pair<ecs::const_entity,camera>> temp_components;
         try {
             temp_components.reserve(owner.component_count<camera>());
@@ -316,7 +225,7 @@ namespace
                     return l.second.depth() < r.second.depth();
                 });
             for ( auto& p : temp_components ) {
-                for_all_components(batcher, owner, p.first, p.second);
+                for_all_components(owner);
             }
         } catch (...) {
             temp_components.clear();
@@ -328,14 +237,11 @@ namespace
 
 namespace e2d
 {
-    spine_render_system::spine_render_system()
-    : state_(new internal_state()) {}
+    spine_render_system::spine_render_system() = default;
 
     spine_render_system::~spine_render_system() noexcept = default;
 
     void spine_render_system::process(ecs::registry& owner) {
-        for_all_cameras(state_->batcher(), owner);
-        state_->batcher().flush();
-        state_->batcher().clear(true);
+        for_all_cameras(owner);
     }
 }

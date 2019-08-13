@@ -103,8 +103,6 @@ namespace
     }
 
     stdex::promise<cbuffer_template_cptr> parse_cbuffer_template(
-        const library& library,
-        str_view parent_address,
         const rapidjson::Value& root)
     {
         if ( !root.HasMember("uniforms") ) {
@@ -135,11 +133,7 @@ namespace e2d
         const library& library, str_view address)
     {
         return library.load_asset_async<json_asset>(address)
-        .then([
-            &library,
-            address = str(address),
-            parent_address = path::parent_path(address)
-        ](const json_asset::load_result& cbuffer_template_data){
+        .then([address = str(address)](const json_asset::load_result& cbuffer_template_data){
             return the<deferrer>().do_in_worker_thread([address, cbuffer_template_data](){
                 const rapidjson::Document& doc = *cbuffer_template_data->content();
                 rapidjson::SchemaValidator validator(cbuffer_template_asset_schema());
@@ -163,9 +157,9 @@ namespace e2d
 
                 throw cbuffer_template_asset_loading_exception();
             })
-            .then([&library, parent_address, cbuffer_template_data](){
+            .then([cbuffer_template_data](){
                 return parse_cbuffer_template(
-                    library, parent_address, *cbuffer_template_data->content());
+                    *cbuffer_template_data->content());
             })
             .then([](auto&& content){
                 return cbuffer_template_asset::create(

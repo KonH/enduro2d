@@ -43,12 +43,17 @@ namespace
                         the<window>().real_size());
                     cam.projection(math::make_orthogonal_lh_matrix4(
                         the<window>().real_size().cast_to<f32>(), 0.f, 1000.f));
-
-                    the<render>().execute(render::command_block<3>()
-                        .add_command(render::target_command(cam.target()))
-                        .add_command(render::viewport_command(cam.viewport()))
-                        .add_command(render::clear_command()
-                            .color_value(cam.background())));
+                    
+                    the<render>().begin_pass(
+                        render::renderpass_desc()
+                            .target(cam.target())
+                            .color_clear(cam.background())
+                            .color_store()
+                            .depth_clear(1.0f)
+                            .depth_discard()
+                            .viewport(cam.viewport()),
+                        cam.constants(),
+                        {});
                 }
             });
         }
@@ -151,10 +156,14 @@ namespace
         }
 
         bool create_camera() {
+            auto cb_templ = the<library>().load_asset<cbuffer_template_asset>("shaders/block/pass_1.json");
+            auto cbuffer = the<render>().create_const_buffer(cb_templ->content(), const_buffer::scope::render_pass);
+
             auto camera_i = the<world>().instantiate();
             camera_i->entity_filler()
                 .component<camera>(camera()
-                    .background({1.f, 0.4f, 0.f, 1.f}))
+                    .background({1.f, 0.4f, 0.f, 1.f})
+                    .constants(cbuffer))
                 .component<actor>(node::create(camera_i));
             return true;
         }

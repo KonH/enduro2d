@@ -1090,14 +1090,14 @@ namespace e2d
         return *this;
     }
 
-    render::draw_indexed_command& render::draw_indexed_command::index_range(u32 count, size_t offset) noexcept {
+    /*render::draw_indexed_command& render::draw_indexed_command::index_range(u32 count, size_t offset) noexcept {
         index_offset_ = offset;
         index_count_ = count;
         return *this;
-    }
+    }*/
 
-    render::draw_indexed_command& render::draw_indexed_command::index_offset(size_t value) noexcept {
-        index_offset_ = value;
+    render::draw_indexed_command& render::draw_indexed_command::index_offset(size_t offsetInBytes) noexcept {
+        index_offset_ = offsetInBytes;
         return *this;
     }
 

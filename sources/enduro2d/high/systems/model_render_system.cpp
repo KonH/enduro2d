@@ -19,20 +19,14 @@
 namespace
 {
     using namespace e2d;
-
+    
     const str_hash matrix_m_property_hash = "u_matrix_m";
-    const str_hash matrix_v_property_hash = "u_matrix_v";
-    const str_hash matrix_p_property_hash = "u_matrix_p";
-    const str_hash matrix_vp_property_hash = "u_matrix_vp";
-    const str_hash game_time_property_hash = "u_game_time";
-    const str_hash sprite_texture_sampler_hash = "u_texture";
 
     void draw_mesh(
         render& the_render,
         const model_renderer& mdl_r,
         const renderer& node_r,
-        const actor& actor,
-        render::property_block& property_cache)
+        const actor& actor)
     {
         if ( !actor.node() || !node_r.enabled() ) {
             return;
@@ -45,68 +39,52 @@ namespace
         const model& mdl = mdl_r.model()->content();
         const mesh& msh = mdl.mesh()->content();
             
-        try {
-            property_cache
-                .property(matrix_m_property_hash, actor.node()->world_matrix())
-                .merge(node_r.properties());
+        E2D_ASSERT(msh.indices_submesh_count() == node_r.materials().size());
+        const std::size_t submesh_count = math::min(
+            msh.indices_submesh_count(),
+            node_r.materials().size());
 
-            const std::size_t submesh_count = math::min(
-                msh.indices_submesh_count(),
-                node_r.materials().size());
-
-            for ( std::size_t i = 0, first_index = 0; i < submesh_count; ++i ) {
-                const std::size_t index_count = msh.indices(i).size();
-                const material_asset::ptr& mat = node_r.materials()[i];
-                if ( mat ) {
-                    the_render.execute(render::draw_command(
-                        mat->content(),
-                        mdl.geometry(),
-                        property_cache
-                    ).index_range(first_index, index_count));
-                }
-                first_index += index_count;
-            }
-        } catch (...) {
-            property_cache.clear();
-            throw;
+        if ( mdl_r.constants() ) {
+            the_render.update_buffer(
+                mdl_r.constants(),
+                render::property_map()
+                    .assign(matrix_m_property_hash, actor.node()->world_matrix()));
         }
-        property_cache.clear();
+
+        render::bind_vertex_buffers_command vb_cmd;
+        for ( std::size_t i = 0; i < mdl.vertices_count(); ++i ) {
+            vb_cmd.add(mdl.vertices(i), mdl.attribute(i));
+        }
+        the_render.execute(vb_cmd);
+
+        for ( std::size_t i = 0, index_offset = 0; i < submesh_count; ++i ) {
+            const u32 index_count = math::numeric_cast<u32>(msh.indices(i).size());
+            const material_asset::ptr& mat = node_r.materials()[i];
+            E2D_ASSERT(mat);
+            if ( mat ) {
+                the_render.set_material(mat->content());
+                the_render.execute(render::draw_indexed_command()
+                    .constants(mdl_r.constants())
+                    .topo(mdl.topo())
+                    .indices(mdl.indices())
+                    .index_count(index_count)
+                    .index_offset(index_offset));
+            }
+            index_offset += index_count * mdl.indices()->decl().bytes_per_index();
+        }
     }
     
-    void for_all_components(
-        ecs::registry& owner,
-        const ecs::const_entity& cam_e,
-        const camera& cam)
+    void for_all_components(ecs::registry& owner)
     {
         render& the_render = the<render>();
 
-        const actor* const cam_a = cam_e.find_component<actor>();
-        const const_node_iptr cam_n = cam_a ? cam_a->node() : nullptr;
-        
-        const m4f& cam_w = cam_n
-            ? cam_n->world_matrix()
-            : m4f::identity();
-        const std::pair<m4f,bool> cam_w_inv = math::inversed(cam_w);
-
-        const m4f& m_v = cam_w_inv.second
-            ? cam_w_inv.first
-            : m4f::identity();
-        const m4f& m_p = cam.projection();
-
-        render::property_block property_cache;
-        property_cache
-            .property(matrix_v_property_hash, m_v)
-            .property(matrix_p_property_hash, m_p)
-            .property(matrix_vp_property_hash, m_v * m_p)
-            .property(game_time_property_hash, the<engine>().time());
-
-        owner.for_joined_components<model_renderer, renderer, actor>([&the_render, &property_cache](
+        owner.for_joined_components<model_renderer, renderer, actor>([&the_render](
             const ecs::const_entity&,
             const model_renderer& mdl_r,
             const renderer& node_r,
             const actor& actor)
         {
-            draw_mesh(the_render, mdl_r, node_r, actor, property_cache);
+            draw_mesh(the_render, mdl_r, node_r, actor);
         });
     }
 
@@ -124,7 +102,7 @@ namespace
                     return l.second.depth() < r.second.depth();
                 });
             for ( auto& p : temp_components ) {
-                for_all_components(owner, p.first, p.second);
+                for_all_components(owner);
             }
         } catch (...) {
             temp_components.clear();

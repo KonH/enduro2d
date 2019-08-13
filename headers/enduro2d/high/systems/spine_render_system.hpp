@@ -15,8 +15,5 @@ namespace e2d
         spine_render_system();
         ~spine_render_system() noexcept final;
         void process(ecs::registry& owner) override;
-    private:
-        class internal_state;
-        std::unique_ptr<internal_state> state_;
     };
 }

@@ -614,44 +614,18 @@ namespace e2d
             return nullptr;
         }
 
-        gl_buffer_id buf_id(state_->dbg());
-        const size_t block_size = block_info.templ->block_size();
-
         if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
             E2D_ASSERT(block_info.is_buffer); // TODO: exception
-
-            buf_id = gl_buffer_id::create(state_->dbg(), GL_UNIFORM_BUFFER);
-            if ( buf_id.empty() ) {
-                state_->dbg().error("RENDER: Failed to create uniform buffer:\n"
-                    "--> Info: failed to create uniform buffer id");
-                return nullptr;
-            }
-
-            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size, scope]() {
-                GL_CHECK_CODE(state_->dbg(), glBufferData(
-                    buf_id.target(),
-                    math::numeric_cast<GLsizeiptr>(block_size),
-                    nullptr,
-                    scope == const_buffer::scope::draw_command
-                        ? GL_STREAM_DRAW
-                        : GL_DYNAMIC_DRAW));
-            });
         } else {
             E2D_ASSERT(!block_info.is_buffer); // TODO: exception
-            E2D_ASSERT(block_size % 16 == 0);
         }
 
-        return std::make_shared<const_buffer>(
-            std::make_unique<const_buffer::internal_state>(
-                state_->dbg(),
-                std::move(buf_id),
-                0,
-                scope,
-                block_info.templ));
+        return create_const_buffer(block_info.templ, scope);
     }
 
-    /*const_buffer_ptr render::create_const_buffer(
-        const cbuffer_template_cptr& templ)
+    const_buffer_ptr render::create_const_buffer(
+        const cbuffer_template_cptr& templ,
+        const_buffer::scope scope)
     {
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(templ);
@@ -666,13 +640,15 @@ namespace e2d
                     "--> Info: failed to create uniform buffer id");
                 return nullptr;
             }
-
-            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size]() {
+            
+            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size, scope]() {
                 GL_CHECK_CODE(state_->dbg(), glBufferData(
                     buf_id.target(),
                     math::numeric_cast<GLsizeiptr>(block_size),
                     nullptr,
-                    GL_STREAM_DRAW));
+                    scope == const_buffer::scope::draw_command
+                        ? GL_STREAM_DRAW
+                        : GL_DYNAMIC_DRAW));
             });
         } else {
             E2D_ASSERT(block_size % 16 == 0);
@@ -683,9 +659,9 @@ namespace e2d
                 state_->dbg(),
                 std::move(buf_id),
                 0,
-                const_buffer::scope::draw_command, // TODO
+                scope,
                 templ));
-    }*/
+    }
 
     render_target_ptr render::create_render_target(
         const v2u& size,

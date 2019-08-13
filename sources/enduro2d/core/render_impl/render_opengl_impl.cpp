@@ -1129,6 +1129,8 @@ namespace e2d
         const GLchar* message,
         const void* userParam)
     {
+        E2D_UNUSED(id);
+
         if ( !userParam ) {
             return;
         }

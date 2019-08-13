@@ -122,11 +122,13 @@ namespace e2d
             render_.set_material(batch.mtr);
 
             render_.execute(render::draw_indexed_command()
-                .index_range(batch.idx_count, batch.idx_offset)
+                .index_count(batch.idx_count)
+                .index_offset(batch.idx_offset)
                 .indices(index_buffers[batch.ib_index])
                 .topo(batch.topo));
         }
 
+        // TODO: optimize
         vertex_buffers_.clear();
         index_buffers_.clear();
         batches_.clear();

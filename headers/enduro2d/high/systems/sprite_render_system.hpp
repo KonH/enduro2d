@@ -15,8 +15,5 @@ namespace e2d
         sprite_render_system();
         ~sprite_render_system() noexcept final;
         void process(ecs::registry& owner) override;
-    private:
-        class internal_state;
-        std::unique_ptr<internal_state> state_;
     };
 }

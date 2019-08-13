@@ -891,8 +891,8 @@ namespace e2d
             draw_indexed_command& indices(const index_buffer_ptr& value) noexcept;
             draw_indexed_command& topo(topology value) noexcept;
 
-            draw_indexed_command& index_range(u32 count, size_t offset) noexcept;
-            draw_indexed_command& index_offset(size_t value) noexcept;
+            //draw_indexed_command& index_range(u32 count, size_t offset) noexcept;
+            draw_indexed_command& index_offset(size_t offsetInBytes) noexcept;
             draw_indexed_command& index_count(u32 value) noexcept;
             
             size_t index_offset() const noexcept;
@@ -1021,8 +1021,9 @@ namespace e2d
         const_buffer_ptr create_const_buffer(
             const shader_ptr& shader,
             const_buffer::scope scope);
-        //const_buffer_ptr create_const_buffer(
-        //    const cbuffer_template_cptr& templ);
+        const_buffer_ptr create_const_buffer(
+            const cbuffer_template_cptr& templ,
+            const_buffer::scope scope);
 
         render_target_ptr create_render_target(
             const v2u& size,

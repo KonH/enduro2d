@@ -16,8 +16,6 @@
 
 #include <enduro2d/high/node.hpp>
 
-#include "render_system_impl/render_system_batcher.hpp"
-
 namespace
 {
     using namespace e2d;
@@ -30,11 +28,10 @@ namespace
     };
 
     struct vertex_v3f_t2f_c32b {
-        struct type {
-            v3f v;
-            v2f t;
-            color32 c;
-        };
+        v3f v;
+        v2f t;
+        color32 c;
+
         static vertex_declaration decl() noexcept {
             return vertex_declaration()
                 .add_attribute<v3f>("a_vertex")
@@ -42,41 +39,17 @@ namespace
                 .add_attribute<color32>("a_tint").normalized();
         }
     };
-
-    using batcher_type = render_system_impl::batcher<
-        index_u16,
-        vertex_v3f_t2f_c32b>;
-}
-
-namespace e2d
-{
-    class sprite_render_system::internal_state {
-    public:
-        internal_state()
-        : batcher_(the<debug>(), the<render>()) {}
-
-        batcher_type& batcher() noexcept {
-            return batcher_;
-        }
-    private:
-        batcher_type batcher_;
-    };
 }
 
 namespace
 {
-    const str_hash matrix_v_property_hash = "u_matrix_v";
-    const str_hash matrix_p_property_hash = "u_matrix_p";
-    const str_hash matrix_vp_property_hash = "u_matrix_vp";
-    const str_hash game_time_property_hash = "u_game_time";
     const str_hash sprite_texture_sampler_hash = "u_texture";
 
     void draw_sprite(
-        batcher_type& batcher,
+        batcher& the_batcher,
         const sprite_renderer& spr_r,
         const renderer& node_r,
-        const actor& actor,
-        render::property_block& property_cache)
+        const actor& actor)
     {
         if ( !actor.node() || !node_r.enabled() ) {
             return;
@@ -116,15 +89,6 @@ namespace
         const m4f& sm = actor.node()->world_matrix();
         const color32& tc = spr_r.tint();
 
-        const batcher_type::index_type indices[] = {
-            0u, 1u, 2u, 2u, 3u, 0u};
-
-        const batcher_type::vertex_type vertices[] = {
-            { v3f(p1 * sm), {tx + 0.f, ty + 0.f}, tc },
-            { v3f(p2 * sm), {tx + tw,  ty + 0.f}, tc },
-            { v3f(p3 * sm), {tx + tw,  ty + th }, tc },
-            { v3f(p4 * sm), {tx + 0.f, ty + th }, tc }};
-
         const render::sampler_min_filter min_filter = spr_r.filtering()
             ? render::sampler_min_filter::linear
             : render::sampler_min_filter::nearest;
@@ -133,67 +97,36 @@ namespace
             ? render::sampler_mag_filter::linear
             : render::sampler_mag_filter::nearest;
 
-        try {
-            property_cache
+        auto batch = the_batcher.alloc_batch<vertex_v3f_t2f_c32b>(4, 6,
+            render::topology::triangles,
+            render::material(mat_a->content())
                 .sampler(sprite_texture_sampler_hash, render::sampler_state()
                     .texture(tex_a->content())
                     .min_filter(min_filter)
-                    .mag_filter(mag_filter))
-                .merge(node_r.properties());
+                    .mag_filter(mag_filter)));
 
-            batcher.batch(
-                mat_a,
-                property_cache,
-                indices, std::size(indices),
-                vertices, std::size(vertices));
-        } catch (...) {
-            property_cache.clear();
-            throw;
-        }
-        property_cache.clear();
+        batch.vertices++ = { v3f(p1 * sm), {tx + 0.f, ty + 0.f}, tc };
+        batch.vertices++ = { v3f(p2 * sm), {tx + tw,  ty + 0.f}, tc };
+        batch.vertices++ = { v3f(p3 * sm), {tx + tw,  ty + th }, tc };
+        batch.vertices++ = { v3f(p4 * sm), {tx + 0.f, ty + th }, tc };
+
+        batch.indices++ = 0;  batch.indices++ = 1;  batch.indices++ = 2;
+        batch.indices++ = 2;  batch.indices++ = 3;  batch.indices++ = 0;
     }
     
-    void for_all_components(
-        batcher_type& batcher,
-        ecs::registry& owner,
-        const ecs::const_entity& cam_e,
-        const camera& cam)
-    {
-        const actor* const cam_a = cam_e.find_component<actor>();
-        const const_node_iptr cam_n = cam_a ? cam_a->node() : nullptr;
-        
-        const m4f& cam_w = cam_n
-            ? cam_n->world_matrix()
-            : m4f::identity();
-        const std::pair<m4f,bool> cam_w_inv = math::inversed(cam_w);
-
-        const m4f& m_v = cam_w_inv.second
-            ? cam_w_inv.first
-            : m4f::identity();
-        const m4f& m_p = cam.projection();
-
-        render::property_block property_cache;
-
-        batcher.flush()
-            .property(matrix_v_property_hash, m_v)
-            .property(matrix_p_property_hash, m_p)
-            .property(matrix_vp_property_hash, m_v * m_p)
-            .property(game_time_property_hash, the<engine>().time());
-
-        owner.for_joined_components<sprite_renderer, renderer, actor>([&batcher, &property_cache](
+    void for_all_components(ecs::registry& owner) {
+        batcher& the_batcher = the<batcher>();
+        owner.for_joined_components<sprite_renderer, renderer, actor>([&the_batcher](
             const ecs::const_entity&,
             const sprite_renderer& spr_r,
             const renderer& node_r,
             const actor& actor)
         {
-            draw_sprite(batcher, spr_r, node_r, actor, property_cache);
+            draw_sprite(the_batcher, spr_r, node_r, actor);
         });
     }
 
-    void for_all_cameras(
-        batcher_type& batcher,
-        ecs::registry& owner)
-    {
+    void for_all_cameras(ecs::registry& owner) {
         static vector<std::pair<ecs::const_entity,camera>> temp_components;
         try {
             temp_components.reserve(owner.component_count<camera>());
@@ -207,7 +140,7 @@ namespace
                     return l.second.depth() < r.second.depth();
                 });
             for ( auto& p : temp_components ) {
-                for_all_components(batcher, owner, p.first, p.second);
+                for_all_components(owner);
             }
         } catch (...) {
             temp_components.clear();
@@ -219,14 +152,11 @@ namespace
 
 namespace e2d
 {
-    sprite_render_system::sprite_render_system()
-    : state_(new internal_state()) {}
+    sprite_render_system::sprite_render_system() = default;
 
     sprite_render_system::~sprite_render_system() noexcept = default;
 
     void sprite_render_system::process(ecs::registry& owner) {
-        for_all_cameras(state_->batcher(), owner);
-        state_->batcher().flush();
-        state_->batcher().clear(true);
+        for_all_cameras(owner);
     }
 }
