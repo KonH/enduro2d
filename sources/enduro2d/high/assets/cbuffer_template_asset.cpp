@@ -36,7 +36,7 @@ namespace
                     "name" : { "$ref": "#/common_definitions/name" },
                     "offset" : { "type" : "integer", "minimum" : 0 },
                     "type" : { "$ref" : "#/definitions/uniform_type" }
-                },
+                }
             },
             "uniform_type" : {
                 "type" : "string",
@@ -85,30 +85,34 @@ namespace
     }
 
     bool parse_uniform(const rapidjson::Value& root, cbuffer_template& content) noexcept {
+        E2D_ASSERT(root.IsObject());
         if ( root.HasMember("name") &&
              root.HasMember("offset") &&
              root.HasMember("type") )
         {
             u32 offset;
             if ( !json_utils::try_parse_value(root["offset"], offset) ) {
+                the<debug>().error("CBUFFER_TEMPLATE: Incorrect formatting of 'uniform.offset' property");
                 return false;
             }
             cbuffer_template::value_type type;
             if ( !parse_uniform_type(root["type"].GetString(), type) ) {
+                the<debug>().error("CBUFFER_TEMPLATE: Incorrect formatting of 'uniform.type' property");
                 return true;
             }
+            E2D_ASSERT(root["name"].IsString());
             content.add_uniform(root["name"].GetString(), offset, type);
+            return true;
         }
         return false;
     }
 
-    stdex::promise<cbuffer_template_cptr> parse_cbuffer_template(
-        const library& library,
-        str_view parent_address,
+    stdex::promise<cbuffer_template_ptr> parse_cbuffer_template(
         const rapidjson::Value& root)
     {
         if ( !root.HasMember("uniforms") ) {
-            return stdex::make_rejected_promise<cbuffer_template_cptr>(
+            the<debug>().error("CBUFFER_TEMPLATE: Property 'uniforms' does not exists");
+            return stdex::make_rejected_promise<cbuffer_template_ptr>(
                 cbuffer_template_asset_loading_exception());
         }
 
@@ -119,7 +123,8 @@ namespace
         for ( rapidjson::SizeType i = 0; i < json_uniforms.Size(); ++i ) {
             auto& item = json_uniforms[i];
             if ( !parse_uniform(item, content) ) {
-                return stdex::make_rejected_promise<cbuffer_template_cptr>(
+                the<debug>().error("CBUFFER_TEMPLATE: Incorrect formatting of 'uniform' property");
+                return stdex::make_rejected_promise<cbuffer_template_ptr>(
                     cbuffer_template_asset_loading_exception());
             }
         }
@@ -135,11 +140,7 @@ namespace e2d
         const library& library, str_view address)
     {
         return library.load_asset_async<json_asset>(address)
-        .then([
-            &library,
-            address = str(address),
-            parent_address = path::parent_path(address)
-        ](const json_asset::load_result& cbuffer_template_data){
+        .then([address = str(address)](const json_asset::load_result& cbuffer_template_data){
             return the<deferrer>().do_in_worker_thread([address, cbuffer_template_data](){
                 const rapidjson::Document& doc = *cbuffer_template_data->content();
                 rapidjson::SchemaValidator validator(cbuffer_template_asset_schema());
@@ -163,9 +164,9 @@ namespace e2d
 
                 throw cbuffer_template_asset_loading_exception();
             })
-            .then([&library, parent_address, cbuffer_template_data](){
+            .then([cbuffer_template_data](){
                 return parse_cbuffer_template(
-                    library, parent_address, *cbuffer_template_data->content());
+                    *cbuffer_template_data->content());
             })
             .then([](auto&& content){
                 return cbuffer_template_asset::create(

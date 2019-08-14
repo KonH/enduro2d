@@ -11,12 +11,12 @@
 #include <enduro2d/high/components/scene.hpp>
 
 #include "render_system_impl/render_system_base.hpp"
-#include "render_system_impl/render_system_batcher.hpp"
 #include "render_system_impl/render_system_drawer.hpp"
 
 namespace
 {
     using namespace e2d;
+    using namespace e2d::render_system_impl;
 
     template < typename F >
     void for_each_by_nodes(const const_node_iptr& root, F&& f) {
@@ -59,31 +59,31 @@ namespace
         temp_components.clear();
     }
 
-    void for_all_scenes(ecs::registry& owner) {
+    void for_all_scenes(drawer::context& ctx, ecs::registry& owner) {
         const auto comp = [](const scene& l, const scene& r) noexcept {
             return l.depth() < r.depth();
         };
-        const auto func = [](const ecs::const_entity& scn_e, const scene&) {
+        const auto func = [&ctx](const ecs::const_entity& scn_e, const scene&) {
             const actor* scn_a = scn_e.find_component<actor>();
             if ( scn_a && scn_a->node() ) {
-                for_each_by_nodes(scn_a->node(), [](const const_node_iptr& node){
-                    //ctx.draw(node);
+                for_each_by_nodes(scn_a->node(), [&ctx](const const_node_iptr& node){
+                    ctx.draw(node);
                 });
             }
         };
         for_each_by_sorted_components<scene>(owner, comp, func);
     }
 
-    void for_all_cameras(ecs::registry& owner) {
+    void for_all_cameras(drawer& drawer, ecs::registry& owner) {
         const auto comp = [](const camera& l, const camera& r) noexcept {
             return l.depth() < r.depth();
         };
-        const auto func = [&owner](const ecs::const_entity& cam_e, const camera& cam) {
+        const auto func = [&drawer, &owner](const ecs::const_entity& cam_e, const camera& cam) {
             const actor* const cam_a = cam_e.find_component<actor>();
             const const_node_iptr cam_n = cam_a ? cam_a->node() : nullptr;
-            //drawer.with(cam, cam_n, [&owner](){
-            //    for_all_scenes(,owner);
-            //});
+            drawer.with(cam, cam_n, [&owner](drawer::context& ctx){
+                for_all_scenes(ctx, owner);
+            });
         };
         for_each_by_sorted_components<camera>(owner, comp, func);
     }
@@ -97,13 +97,15 @@ namespace e2d
 
     class render_system::internal_state final : private noncopyable {
     public:
-        internal_state() {}
+        internal_state()
+        : drawer_(the<render>()) {}
         ~internal_state() noexcept = default;
 
         void process(ecs::registry& owner) {
-            for_all_cameras(owner);
+            for_all_cameras(drawer_, owner);
         }
     private:
+        drawer drawer_;
     };
 
     //

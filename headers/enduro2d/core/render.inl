@@ -165,17 +165,15 @@ namespace e2d
     }
 
     //
-    // render::change_sate_command_
+    // render::change_state_command_
     //
     
     template < typename T >
-    render::change_sate_command_<T>::change_sate_command_(const T& state) {
-        state_ = state;
-        return *this;
-    }
+    render::change_state_command_<T>::change_state_command_(const T& state)
+    : state_(state) {}
 
     template < typename T >
-    const std::optional<T>& render::change_sate_command_<T>::state() const noexcept {
+    const std::optional<T>& render::change_state_command_<T>::state() const noexcept {
         return state_;
     }
 

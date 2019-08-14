@@ -7,9 +7,7 @@
 #include "render_opengl_base.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || \
-    E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || \
-    E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
 
 namespace
 {
@@ -1117,18 +1115,6 @@ namespace e2d::opengl
         }
         #undef DEFINE_CASE
     }
-    
-    GLenum convert_culling_mode(render::culling_mode cm) noexcept {
-        #define DEFINE_CASE(x,y) case render::culling_mode::x: return y;
-        switch ( cm ) {
-            DEFINE_CASE(cw, GL_CW);
-            DEFINE_CASE(ccw, GL_CCW);
-            default:
-                E2D_ASSERT_MSG(false, "unexpected render culling mode");
-                return 0;
-        }
-        #undef DEFINE_CASE
-    }
 
     GLenum convert_culling_face(render::culling_face cm) noexcept {
         #define DEFINE_CASE(x,y) case render::culling_face::x: return y;
@@ -1450,6 +1436,7 @@ namespace e2d::opengl
         vs = vertex_shader_header_cstr(caps.profile);
         fs = fragment_shader_header_cstr(caps.profile);
 
+        // TODO: remove
         if ( ext.uniform_buffer_supported ) {
             vs += "#define E2D_SUPPORTS_UBO 1\n";
             fs += "#define E2D_SUPPORTS_UBO 1\n";
@@ -1461,7 +1448,7 @@ namespace e2d::opengl
         GL_CHECK_CODE(debug, glDepthRange(
             math::numeric_cast<GLclampd>(math::saturate(near)),
             math::numeric_cast<GLclampd>(math::saturate(far))));
-    #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
+    #elif E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
         GL_CHECK_CODE(debug, glDepthRangef(
             math::numeric_cast<GLclampf>(math::saturate(near)),
             math::numeric_cast<GLclampf>(math::saturate(far))));

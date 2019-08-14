@@ -7,9 +7,7 @@
 #include "render_opengl_impl.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || \
-    E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || \
-    E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
 
 namespace
 {
@@ -100,7 +98,7 @@ namespace
         const gl_program_id& id,
         shader::internal_state::block_info& block,
         u32 binding_index,
-        const cbuffer_template_cptr& templ,
+        const cbuffer_template_ptr& templ,
         bool uniform_buffer_supported) noexcept
     {
         GLint loc;
@@ -360,7 +358,7 @@ namespace e2d
         gl_buffer_id id,
         std::size_t offset,
         scope scope,
-        const cbuffer_template_cptr& templ)
+        const cbuffer_template_ptr& templ)
     : debug_(debug)
     , id_(std::move(id))
     , offset_(offset)
@@ -402,7 +400,7 @@ namespace e2d
         return version_;
     }
     
-    const cbuffer_template_cptr& const_buffer::internal_state::block_template() const noexcept {
+    const cbuffer_template_ptr& const_buffer::internal_state::block_template() const noexcept {
         return templ_;
     }
 
@@ -491,6 +489,15 @@ namespace e2d
         gl_trace_limits(debug_);
         gl_fill_device_caps(debug_, device_caps_, device_caps_ext_);
 
+        const u32 max_cb_index = math::max(cb_pass_index,
+            math::max(cb_material_index, cb_command_index)) + 1;
+
+        if ( device_caps_ext_.uniform_buffer_supported &&
+             device_caps_ext_.max_uniform_buffer_bindings < max_cb_index )
+        {
+            device_caps_ext_.uniform_buffer_supported = false;
+        }
+
         gl_build_shader_headers(
             device_caps_, device_caps_ext_,
             vertex_shader_header_, fragment_shader_header_);
@@ -552,6 +559,9 @@ namespace e2d
         set_depth_state_(state_block_.depth());
         set_stencil_state_(state_block_.stencil());
         set_blending_state_(state_block_.blending());
+        set_culling_state_(state_block_.culling());
+        
+        GL_CHECK_CODE(debug_, glFrontFace(GL_CW));
         return *this;
     }
 
@@ -707,10 +717,6 @@ namespace e2d
         for ( size_t i = 0; i < render_cfg::max_attribute_count; ++i ) {
             GL_CHECK_CODE(debug_, glDisableVertexAttribArray(GLuint(i)));
         }
-        //GL_CHECK_CODE(debug_, glBindBuffer(
-        //    GL_ARRAY_BUFFER, 0));
-        //GL_CHECK_CODE(debug_, glBindBuffer(
-        //    GL_ELEMENT_ARRAY_BUFFER, 0));
 
         index_buffer_ = nullptr;
         vertex_buffers_ = {};
@@ -763,25 +769,15 @@ namespace e2d
         if ( !cbuffer ) {
             return;
         }
-
         switch ( cbuffer->binding_scope() ) {
             case const_buffer::scope::render_pass:
-                if ( cbuffers_[cb_pass_index] != cbuffer ) {
-                    cbuffers_[cb_pass_index] = cbuffer;
-                    set_flag_inplace(dirty_flags_, dirty_flag_bits::pass_cbuffer);
-                }
+                cbuffers_[cb_pass_index] = cbuffer;
                 break;
             case const_buffer::scope::material:
-                if ( cbuffers_[cb_material_index] != cbuffer ) {
-                    cbuffers_[cb_material_index] = cbuffer;
-                    set_flag_inplace(dirty_flags_, dirty_flag_bits::mtr_cbuffer);
-                }
+                cbuffers_[cb_material_index] = cbuffer;
                 break;
             case const_buffer::scope::draw_command:
-                if ( cbuffers_[cb_command_index] != cbuffer ) {
-                    cbuffers_[cb_command_index] = cbuffer;
-                    set_flag_inplace(dirty_flags_, dirty_flag_bits::draw_cbuffer);
-                }
+                cbuffers_[cb_command_index] = cbuffer;
                 break;
         }
     }
@@ -852,25 +848,18 @@ namespace e2d
             }
         }
         enabled_attribs_ = new_attribs;
-        
-        //GL_CHECK_CODE(debug_, glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
 
     void render::internal_state::bind_cbuffers_() noexcept {
-        auto& prog = shader_program_->state();
-        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::pass_cbuffer) ) {
-            prog.set_constants(const_buffer::scope::render_pass, cbuffers_[cb_pass_index]);
-        }
-        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::mtr_cbuffer) ) {
-            prog.set_constants(const_buffer::scope::material, cbuffers_[cb_material_index]);
-        }
-        if ( check_flag_and_reset(dirty_flags_, dirty_flag_bits::draw_cbuffer) ) {
-            prog.set_constants(const_buffer::scope::draw_command, cbuffers_[cb_command_index]);
-        }
         if ( device_caps_ext_.uniform_buffer_supported ) {
             bind_cbuffer_(cb_pass_index, cbuffers_[cb_pass_index]);
             bind_cbuffer_(cb_material_index, cbuffers_[cb_material_index]);
             bind_cbuffer_(cb_command_index, cbuffers_[cb_command_index]);
+        } else {
+            auto& prog = shader_program_->state();
+            prog.set_constants(const_buffer::scope::render_pass, cbuffers_[cb_pass_index]);
+            prog.set_constants(const_buffer::scope::material, cbuffers_[cb_material_index]);
+            prog.set_constants(const_buffer::scope::draw_command, cbuffers_[cb_command_index]);
         }
     }
     
@@ -933,13 +922,9 @@ namespace e2d
 
     void render::internal_state::commit_changes_() noexcept {
         E2D_ASSERT(shader_program_);
-
-        if ( dirty_flags_ == dirty_flag_bits::none ) {
-            return;
-        }
-
-        bind_vertex_attributes_();
+        
         bind_cbuffers_();
+        bind_vertex_attributes_();
         bind_textures_();
 
         E2D_ASSERT(dirty_flags_ == dirty_flag_bits::none);
@@ -989,11 +974,22 @@ namespace e2d
         }
     }
 
-    void render::internal_state::set_depth_state(const std::optional<depth_state>& state) noexcept {
-        const auto& new_state = state.has_value() ? *state : render_pass_state_block_.depth();
-        if ( new_state != state_block_.depth() ) {
-            set_depth_state_(new_state);
-            state_block_.depth(new_state);
+    void render::internal_state::set_depth_state(const std::optional<depth_dynamic_state>& state) noexcept {
+        const bool depth_test = state.has_value() ? state->test() : render_pass_state_block_.depth().test();
+        const bool depth_write = state.has_value() ? state->write() : render_pass_state_block_.depth().write();
+        
+        if ( depth_write != state_block_.depth().write() ) {
+            GL_CHECK_CODE(debug_, glDepthMask(
+                depth_write ? GL_TRUE : GL_FALSE));
+            state_block_.depth().write(depth_write);
+        }
+        if ( depth_test != state_block_.depth().test() ) {
+            if ( depth_test ) {
+                GL_CHECK_CODE(debug_, glEnable(GL_DEPTH_TEST));
+            } else {
+                GL_CHECK_CODE(debug_, glDisable(GL_DEPTH_TEST));
+            }
+            state_block_.depth().test(depth_test);
         }
     }
 
@@ -1005,6 +1001,14 @@ namespace e2d
         }
     }
     
+    void render::internal_state::set_blend_constant(const color& value) noexcept {
+        GL_CHECK_CODE(debug_, glBlendColor(
+            math::numeric_cast<GLclampf>(math::saturate(value.r)),
+            math::numeric_cast<GLclampf>(math::saturate(value.g)),
+            math::numeric_cast<GLclampf>(math::saturate(value.b)),
+            math::numeric_cast<GLclampf>(math::saturate(value.a))));
+    }
+
     void render::internal_state::set_scissor(bool enable, const b2u& rect) noexcept {
         if ( enable ) {
             GL_CHECK_CODE(debug_, glScissor(
@@ -1070,8 +1074,6 @@ namespace e2d
         } else {
             GL_CHECK_CODE(debug_, glDisable(GL_CULL_FACE));
         }
-        GL_CHECK_CODE(debug_, glFrontFace(
-            convert_culling_mode(cs.mode())));
     }
 
     void render::internal_state::set_blending_state_(const blending_state& bs) noexcept {
@@ -1129,6 +1131,8 @@ namespace e2d
         const GLchar* message,
         const void* userParam)
     {
+        E2D_UNUSED(id);
+
         if ( !userParam ) {
             return;
         }

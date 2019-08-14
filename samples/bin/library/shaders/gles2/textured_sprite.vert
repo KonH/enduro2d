@@ -3,7 +3,7 @@ attribute vec2 a_uv;
 attribute vec4 a_color;
 
 uniform vec4 cb_pass[4];
-#define u_matrix_vp mat4(cb_pass[0], cb_pass[1], cb_pass[2], cb_pass[3]);
+#define u_matrix_vp mat4(cb_pass[0], cb_pass[1], cb_pass[2], cb_pass[3])
 
 varying vec4 v_color;
 varying vec2 v_uv;

@@ -3,17 +3,17 @@
 		{ "name": "a_position", "index": 0, "type": "v3f" },
 		{ "name": "a_color",    "index": 1, "type": "v4f" }
 	],
-	"render_pass_block" : "shaders/block/pass_1.json",
+	"render_pass_block" : "block/pass_1.json",
 	
 	"opengl" : [
         {
-            "vertex" : "shaders/gles3/colored_sprite.vert",
-            "fragment" : "shaders/gles3/colored_sprite.frag",
+            "vertex" : "gles3/colored_sprite.vert",
+            "fragment" : "gles3/colored_sprite.frag",
             "requires" : [ "uniform_buffer" ]
         },
         {
-            "vertex" : "shaders/gles2/colored_sprite.vert",
-            "fragment" : "shaders/gles2/colored_sprite.frag",
+            "vertex" : "gles2/colored_sprite.vert",
+            "fragment" : "gles2/colored_sprite.frag",
             "requires" : []
         }
     ]

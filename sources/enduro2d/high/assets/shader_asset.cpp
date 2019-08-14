@@ -1,4 +1,5 @@
 /*******************************************************************************
+/*******************************************************************************
  * This file is part of the "Enduro2D"
  * For conditions of distribution and use, see copyright notice in LICENSE.md
  * Copyright (C) 2018-2019, by Matvey Cherevko (blackmatov@gmail.com)
@@ -23,7 +24,7 @@ namespace
     const char* shader_asset_schema_source = R"json(
         {
             "type" : "object",
-            "required" : [ "gles2" ],
+            "required" : [],
             "additionalProperties" : false,
             "properties" : {
                 "attributes" : {
@@ -100,7 +101,7 @@ namespace
                 "sampler_type" : {
                     "type" : "string",
                     "enum" : [
-                        "_2d",
+                        "2d",
                         "cube_map"
                     ]
                 }
@@ -148,14 +149,15 @@ namespace
     }
 
     bool parse_sampler_type(str_view str, shader_source::sampler_type& value) noexcept {
-    #define DEFINE_IF(x) if ( str == #x ) { value = shader_source::sampler_type::x; return true; }
-        DEFINE_IF(_2d);
-        DEFINE_IF(cube_map);
+    #define DEFINE_IF(x,y) if ( str == #x ) { value = shader_source::sampler_type::y; return true; }
+        DEFINE_IF(2d, _2d);
+        DEFINE_IF(cube_map, cube_map);
     #undef DEFINE_IF
         return false;
     }
 
     bool parse_attribute(const rapidjson::Value& root, shader_source& shader_src) {
+        E2D_ASSERT(root.IsObject());
         E2D_ASSERT(root.HasMember("name"));
         E2D_ASSERT(root.HasMember("index"));
         E2D_ASSERT(root.HasMember("type"));
@@ -178,6 +180,7 @@ namespace
     }
 
     bool parse_sampler(const rapidjson::Value& root, shader_source& shader_src) {
+        E2D_ASSERT(root.IsObject());
         E2D_ASSERT(root.HasMember("name"));
         E2D_ASSERT(root.HasMember("unit"));
 
@@ -221,6 +224,8 @@ namespace
         str_view parent_address,
         const rapidjson::Value& root)
     {
+        E2D_ASSERT(root.IsObject());
+
         E2D_ASSERT(root.HasMember("vertex") && root["vertex"].IsString());
         auto vertex_p = library.load_asset_async<text_asset>(
             path::combine(parent_address, root["vertex"].GetString()));
@@ -252,7 +257,7 @@ namespace
                     }
                 } 
                 if ( supported ) {
-                    return parse_shader_src(library, parent_address, root);
+                    return parse_shader_src(library, parent_address, item);
                 }
             }
         }
@@ -307,7 +312,7 @@ namespace
                 return the<deferrer>().do_in_main_thread([results, shader_src]() {
                     auto& source = std::get<0>(results);
                     shader_src->vertex_shader(std::get<0>(source)->content());
-                    shader_src->fragment_shader(std::get<0>(source)->content());
+                    shader_src->fragment_shader(std::get<1>(source)->content());
 
                     if ( auto& pass_block = std::get<1>(results) ) {
                         shader_src->set_block(pass_block->content(), shader_source::scope_type::render_pass);

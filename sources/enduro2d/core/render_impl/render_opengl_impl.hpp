@@ -10,9 +10,7 @@
 #include "render_opengl_base.hpp"
 
 #if defined(E2D_RENDER_MODE)
-#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || \
-    E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES || \
-    E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES3
+#if E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGL || E2D_RENDER_MODE == E2D_RENDER_MODE_OPENGLES
 
 namespace e2d
 {
@@ -23,7 +21,7 @@ namespace e2d
     class shader::internal_state final : private e2d::noncopyable {
     public:
         struct block_info {
-            cbuffer_template_cptr templ;
+            cbuffer_template_ptr templ;
             u32 index = ~0u; // uniform array location or uniform buffer binding
             bool is_buffer = false;
         };
@@ -203,7 +201,7 @@ namespace e2d
             opengl::gl_buffer_id id,
             std::size_t offset,
             scope scope,
-            const cbuffer_template_cptr& templ);
+            const cbuffer_template_ptr& templ);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
@@ -213,7 +211,7 @@ namespace e2d
         float* data() const noexcept;
         scope binding_scope() const noexcept;
         u32 version() const noexcept;
-        const cbuffer_template_cptr& block_template() const noexcept;
+        const cbuffer_template_ptr& block_template() const noexcept;
         bool is_compatible_with(const shader_ptr& shader) const noexcept;
         void on_content_update(u32 frame_id) const noexcept;
     private:
@@ -221,7 +219,7 @@ namespace e2d
         opengl::gl_buffer_id id_;
         std::size_t offset_ = 0; // of buffer is part of another buffer
         scope binding_scope_ = scope::last_;
-        cbuffer_template_cptr templ_;
+        cbuffer_template_ptr templ_;
         mutable std::unique_ptr<float[]> content_;
         mutable u32 version_ = 0;
         mutable u32 last_update_frame_id_ = 0;
@@ -318,8 +316,9 @@ namespace e2d
 
         void set_blending_state(const std::optional<blending_state>& state) noexcept;
         void set_culling_state(const std::optional<culling_state>& state) noexcept;
-        void set_depth_state(const std::optional<depth_state>& state) noexcept;
+        void set_depth_state(const std::optional<depth_dynamic_state>& state) noexcept;
         void set_stencil_state(const std::optional<stencil_state>& state) noexcept;
+        void set_blend_constant(const color& value) noexcept;
         void set_scissor(bool enable, const b2u& rect = b2u()) noexcept;
 
         void insert_message(str_view msg) noexcept;
@@ -350,16 +349,11 @@ namespace e2d
             none = 0,
             vertex_attribs = 1 << 0,
 
-            pass_cbuffer = 1 << 2,
-            mtr_cbuffer = 1 << 3,
-            draw_cbuffer = 1 << 4,
-            cbuffers = pass_cbuffer | mtr_cbuffer | draw_cbuffer,
-
-            pass_textures = 1 << 5,
-            mtr_textures = 1 << 6,
+            pass_textures = 1 << 1,
+            mtr_textures = 1 << 2,
             textures = pass_textures | mtr_textures,
 
-            pipeline = vertex_attribs | cbuffers | textures,
+            pipeline = vertex_attribs | textures,
         };
         using enabled_attribs_t = std::bitset<render_cfg::max_attribute_count>;
     private:

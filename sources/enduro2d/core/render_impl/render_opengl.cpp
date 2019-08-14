@@ -51,24 +51,26 @@ namespace
         void operator ()(const m2f& v) noexcept {
             E2D_ASSERT(offset_ % 4 == 0);
             E2D_ASSERT(offset_ + 2*4 <= f32count_);
-            std::memcpy(dst_ + offset_ + 0, v.data() + 0, sizeof(float)*2);
-            std::memcpy(dst_ + offset_ + 4, v.data() + 2, sizeof(float)*2);
+            dst_[offset_ + 0] = v.data()[0];  dst_[offset_ + 1] = v.data()[2];
+            dst_[offset_ + 4] = v.data()[1];  dst_[offset_ + 5] = v.data()[3];
         }
 
         void operator ()(const m3f& v) noexcept {
             E2D_ASSERT(offset_ % 4 == 0);
             E2D_ASSERT(offset_ + 3*4 <= f32count_);
-            std::memcpy(dst_ + offset_ + 0, v.data() + 0, sizeof(float)*3);
-            std::memcpy(dst_ + offset_ + 4, v.data() + 3, sizeof(float)*3);
-            std::memcpy(dst_ + offset_ + 8, v.data() + 6, sizeof(float)*3);
+            dst_[offset_ + 0] = v.data()[0];  dst_[offset_ + 1] = v.data()[3];  dst_[offset_ + 2] = v.data()[6];
+            dst_[offset_ + 4] = v.data()[1];  dst_[offset_ + 5] = v.data()[4];  dst_[offset_ + 6] = v.data()[7];
+            dst_[offset_ + 8] = v.data()[2];  dst_[offset_ + 9] = v.data()[5];  dst_[offset_ + 10] = v.data()[8];
         }
 
         void operator ()(const m4f& v) noexcept {
             E2D_ASSERT(offset_ % 4 == 0);
             E2D_ASSERT(offset_ + 4*4 <= f32count_);
-            std::memcpy(dst_ + offset_, v.data(), sizeof(float)*4*4);
+            dst_[offset_ +  0] = v.data()[0];  dst_[offset_ +  1] = v.data()[4];  dst_[offset_ +  2] = v.data()[ 8];  dst_[offset_ +  3] = v.data()[12];
+            dst_[offset_ +  4] = v.data()[1];  dst_[offset_ +  5] = v.data()[5];  dst_[offset_ +  6] = v.data()[ 9];  dst_[offset_ +  7] = v.data()[13];
+            dst_[offset_ +  8] = v.data()[2];  dst_[offset_ +  9] = v.data()[6];  dst_[offset_ + 10] = v.data()[10];  dst_[offset_ + 11] = v.data()[14];
+            dst_[offset_ + 12] = v.data()[3];  dst_[offset_ + 13] = v.data()[7];  dst_[offset_ + 14] = v.data()[11];  dst_[offset_ + 15] = v.data()[15];
         }
-
     private:
         float* dst_;
         size_t f32count_; // number of floats in buffer
@@ -464,6 +466,7 @@ namespace e2d
         index_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(indices.size() > 0);
         E2D_ASSERT(indices.size() % decl.bytes_per_index() == 0);
 
         if ( !is_index_supported(decl) ) {
@@ -500,6 +503,7 @@ namespace e2d
         index_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(size > 0);
         E2D_ASSERT(size % decl.bytes_per_index() == 0);
         E2D_ASSERT(usage != index_buffer::usage::static_draw);
 
@@ -536,6 +540,7 @@ namespace e2d
         vertex_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(vertices.size() > 0);
 
         gl_buffer_id id = gl_buffer_id::create(state_->dbg(), GL_ARRAY_BUFFER);
         if ( id.empty() ) {
@@ -562,6 +567,7 @@ namespace e2d
         vertex_buffer::usage usage)
     {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(size > 0);
         E2D_ASSERT(usage != vertex_buffer::usage::static_draw);
 
         gl_buffer_id id = gl_buffer_id::create(state_->dbg(), GL_ARRAY_BUFFER);
@@ -610,44 +616,18 @@ namespace e2d
             return nullptr;
         }
 
-        gl_buffer_id buf_id(state_->dbg());
-        const size_t block_size = block_info.templ->block_size();
-
         if ( state_->device_capabilities_ext().uniform_buffer_supported ) {
             E2D_ASSERT(block_info.is_buffer); // TODO: exception
-
-            buf_id = gl_buffer_id::create(state_->dbg(), GL_UNIFORM_BUFFER);
-            if ( buf_id.empty() ) {
-                state_->dbg().error("RENDER: Failed to create uniform buffer:\n"
-                    "--> Info: failed to create uniform buffer id");
-                return nullptr;
-            }
-
-            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size, scope]() {
-                GL_CHECK_CODE(state_->dbg(), glBufferData(
-                    buf_id.target(),
-                    math::numeric_cast<GLsizeiptr>(block_size),
-                    nullptr,
-                    scope == const_buffer::scope::draw_command
-                        ? GL_STREAM_DRAW
-                        : GL_DYNAMIC_DRAW));
-            });
         } else {
             E2D_ASSERT(!block_info.is_buffer); // TODO: exception
-            E2D_ASSERT(block_size % 16 == 0);
         }
 
-        return std::make_shared<const_buffer>(
-            std::make_unique<const_buffer::internal_state>(
-                state_->dbg(),
-                std::move(buf_id),
-                0,
-                scope,
-                block_info.templ));
+        return create_const_buffer(block_info.templ, scope);
     }
 
-    /*const_buffer_ptr render::create_const_buffer(
-        const cbuffer_template_cptr& templ)
+    const_buffer_ptr render::create_const_buffer(
+        const cbuffer_template_ptr& templ,
+        const_buffer::scope scope)
     {
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(templ);
@@ -662,13 +642,15 @@ namespace e2d
                     "--> Info: failed to create uniform buffer id");
                 return nullptr;
             }
-
-            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size]() {
+            
+            with_gl_bind_buffer(state_->dbg(), buf_id, [this, &buf_id, block_size, scope]() {
                 GL_CHECK_CODE(state_->dbg(), glBufferData(
                     buf_id.target(),
                     math::numeric_cast<GLsizeiptr>(block_size),
                     nullptr,
-                    GL_STREAM_DRAW));
+                    scope == const_buffer::scope::draw_command
+                        ? GL_STREAM_DRAW
+                        : GL_DYNAMIC_DRAW));
             });
         } else {
             E2D_ASSERT(block_size % 16 == 0);
@@ -679,9 +661,9 @@ namespace e2d
                 state_->dbg(),
                 std::move(buf_id),
                 0,
-                const_buffer::scope::draw_command, // TODO
+                scope,
                 templ));
-    }*/
+    }
 
     render_target_ptr render::create_render_target(
         const v2u& size,
@@ -832,7 +814,12 @@ namespace e2d
         
     render& render::present() {
         E2D_ASSERT(is_in_main_thread());
-        E2D_ASSERT(!state_->inside_render_pass());
+
+        if ( state_->inside_render_pass() ) {
+            state_->end_render_pass();
+        }
+
+        //E2D_ASSERT(!state_->inside_render_pass());
         // TODO: check unpresented changes
 
         state_->on_present();
@@ -859,11 +846,13 @@ namespace e2d
     
     render& render::set_material(const material& mtr) {
         E2D_ASSERT(is_in_main_thread());
+        E2D_ASSERT(state_->inside_render_pass());
         state_->set_shader_program(mtr.shader());
         state_->bind_textures(sampler_block::scope::material, mtr.samplers());
         state_->bind_const_buffer(mtr.constants());
         state_->set_blending_state(mtr.blending());
         state_->set_culling_state(mtr.culling());
+        state_->set_depth_state(mtr.depth());
         return *this;
     }
 
@@ -899,6 +888,11 @@ namespace e2d
         E2D_ASSERT(is_in_main_thread());
         E2D_ASSERT(state_->inside_render_pass());
         state_->set_depth_state(command.state());
+        return *this;
+    }
+   
+    render& render::execute(const blend_constant_command& command) {
+        E2D_UNUSED(command);
         return *this;
     }
 

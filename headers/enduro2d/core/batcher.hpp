@@ -111,6 +111,7 @@ namespace e2d
             u32 idx_count = 0;
             u8 vb_index = 0xFF;
             u8 ib_index = 0xFF;
+            // TODO: add scissor
         };
 
         class buffer_ final {

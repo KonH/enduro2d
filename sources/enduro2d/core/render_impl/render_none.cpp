@@ -347,6 +347,11 @@ namespace e2d
         E2D_UNUSED(command);
         return *this;
     }
+    
+    render& render::execute(const blend_constant_command& command) {
+        E2D_UNUSED(command);
+        return *this;
+    }
 
     render& render::execute(const draw_command& command) {
         E2D_UNUSED(command);
