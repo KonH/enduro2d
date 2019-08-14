@@ -688,6 +688,8 @@ namespace e2d
 
             property_value* find(str_hash key) noexcept;
             const property_value* find(str_hash key) const noexcept;
+            template< typename T >
+            const T* find(str_hash key) const noexcept;
 
             property_map& assign(str_hash key, property_value&& value);
             property_map& assign(str_hash key, const property_value& value);
@@ -697,7 +699,7 @@ namespace e2d
 
             template < typename F >
             void foreach(F&& f) const;
-            void merge(const property_map& other);
+            property_map& merge(const property_map& other);
             bool equals(const property_map& other) const noexcept;
         private:
             flat_map<str_hash, property_value> values_; // TODO: use static memory

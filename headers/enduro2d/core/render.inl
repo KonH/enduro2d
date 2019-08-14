@@ -482,6 +482,14 @@ namespace e2d
             ? &iter->second
             : nullptr;
     }
+    
+    template< typename T >
+    inline const T* render::property_map::find(str_hash key) const noexcept {
+        const property_value* prop = find(key);
+        return prop
+            ? stdex::get_if<T>(prop)
+            : nullptr;
+    }
 
     inline render::property_map& render::property_map::assign(str_hash key, property_value&& value) {
         values_[key] = std::move(value);
@@ -508,12 +516,13 @@ namespace e2d
         }
     }
 
-    inline void render::property_map::merge(const property_map& other) {
+    inline render::property_map& render::property_map::merge(const property_map& other) {
         if ( this != &other ) {
             other.foreach([this](str_hash name, const property_value& value){
                 assign(name, value);
             });
         }
+        return *this;
     }
 
     inline bool render::property_map::equals(const property_map& other) const noexcept {
