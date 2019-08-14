@@ -987,6 +987,8 @@ namespace e2d
             u32 attachment_store_count = 0;
             u32 draw_calls = 0;
         };
+        
+        class batchr;
     public:
         render(debug& d, window& w);
         ~render() noexcept final;
@@ -1085,6 +1087,8 @@ namespace e2d
             const texture_ptr& tex,
             buffer_view pixels,
             const b2u& region);
+
+        batchr& batcher() noexcept;
 
         const device_caps& device_capabilities() const noexcept;
         const statistics& frame_statistic() const noexcept;

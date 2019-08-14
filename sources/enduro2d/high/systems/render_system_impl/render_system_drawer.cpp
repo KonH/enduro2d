@@ -42,7 +42,6 @@ namespace e2d::render_system_impl
     }
 
     drawer::context::~context() noexcept {
-        the<batcher>().flush();
         render_.end_pass();
     }
 
@@ -172,7 +171,7 @@ namespace e2d::render_system_impl
             ? render::sampler_mag_filter::linear
             : render::sampler_mag_filter::nearest;
 
-        auto batch = the<batcher>().alloc_batch<vertex_v3f_t2f_c32b>(4, 6,
+        auto batch = render_.batcher().alloc_batch<vertex_v3f_t2f_c32b>(4, 6,
             render::topology::triangles,
             render::material(mat_a->content())
                 .sampler(sprite_texture_sampler_hash, render::sampler_state()
@@ -190,7 +189,7 @@ namespace e2d::render_system_impl
     }
 
     void drawer::context::flush() {
-        the<batcher>().flush();
+        render_.batcher().flush();
     }
 
     //

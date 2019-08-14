@@ -266,11 +266,13 @@ namespace e2d
     public:
         internal_state(
             debug& debug,
-            window& window);
+            window& window,
+            render& render);
         ~internal_state() noexcept = default;
     public:
         debug& dbg() const noexcept;
         window& wnd() const noexcept;
+        batchr& batcher() noexcept;
 
         const device_caps& device_capabilities() const noexcept;
         const opengl::gl_device_caps& device_capabilities_ext() const noexcept;
@@ -405,6 +407,8 @@ namespace e2d
             bool operator()(const vertex_attribs_ptr& l, const vertex_attribs_ptr& r) const noexcept;
         };
         flat_set<vertex_attribs_ptr, vert_attrib_less> vertex_attrib_cache_;
+        
+        batchr batcher_;
     };
 }
 

@@ -471,11 +471,12 @@ namespace e2d
     // render::internal_state
     //
     
-    render::internal_state::internal_state(debug& debug, window& window)
+    render::internal_state::internal_state(debug& debug, window& window, render& render)
     : debug_(debug)
     , window_(window)
     , default_sp_(gl_program_id::current(debug))
     , default_fb_(gl_framebuffer_id::current(debug, GL_FRAMEBUFFER))
+    , batcher_(debug, render)
     {
         //textures_.fill({0, 0});
 
@@ -515,6 +516,10 @@ namespace e2d
 
     window& render::internal_state::wnd() const noexcept {
         return window_;
+    }
+    
+    render::batchr& render::internal_state::batcher() noexcept {
+        return batcher_;
     }
 
     const render::device_caps& render::internal_state::device_capabilities() const noexcept {
@@ -664,6 +669,9 @@ namespace e2d
 
     void render::internal_state::end_render_pass() noexcept {
         E2D_ASSERT(inside_render_pass_);
+
+        batcher_.flush();
+
         inside_render_pass_ = false;
         
         const bool is_default_fb = !render_target_;

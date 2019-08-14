@@ -236,7 +236,7 @@ namespace e2d
     //
 
     render::render(debug& ndebug, window& nwindow)
-    : state_(new internal_state(ndebug, nwindow)) {
+    : state_(new internal_state(ndebug, nwindow, *this)) {
         E2D_ASSERT(main_thread() == nwindow.main_thread());
     }
     render::~render() noexcept = default;
@@ -1063,6 +1063,10 @@ namespace e2d
                 });
         }
         return *this;
+    }
+    
+    render::batchr& render::batcher() noexcept {
+        return state_->batcher();
     }
 
     const render::device_caps& render::device_capabilities() const noexcept {

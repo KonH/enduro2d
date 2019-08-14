@@ -65,11 +65,9 @@ namespace
         }
 
         void frame_render() final {
-            the<render>().execute(render::command_block<64>()
-                .add_command(render::viewport_command(
-                    the<window>().real_size()))
-                .add_command(render::clear_command()
-                    .color_value({1.f, 0.4f, 0.f, 1.f})));
+            the<render>().begin_pass(render::renderpass_desc()
+                .viewport(the<window>().real_size())
+                .color_clear({1.f, 0.4f, 0.f, 1.f}));
         }
     private:
         sound_source_ptr sound_src1_;

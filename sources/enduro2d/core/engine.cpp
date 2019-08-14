@@ -16,7 +16,6 @@
 #include <enduro2d/core/render.hpp>
 #include <enduro2d/core/vfs.hpp>
 #include <enduro2d/core/window.hpp>
-#include <enduro2d/core/batcher.hpp>
 
 namespace
 {
@@ -445,10 +444,6 @@ namespace e2d
             safe_module_initialize<render>(
                 the<debug>(),
                 the<window>());
-
-            safe_module_initialize<batcher>(
-                the<debug>(),
-                the<render>());
 
             // setup dbgui
 
