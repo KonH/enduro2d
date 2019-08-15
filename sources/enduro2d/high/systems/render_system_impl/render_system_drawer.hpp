@@ -28,7 +28,6 @@ namespace e2d::render_system_impl
         public:
             context(
                 const camera& cam,
-                const const_node_iptr& cam_n,
                 render& render);
             ~context() noexcept;
 
@@ -58,7 +57,7 @@ namespace e2d::render_system_impl
         drawer(render& r);
 
         template < typename F >
-        void with(const camera& cam, const const_node_iptr& cam_n, F&& f);
+        void with(const camera& cam, F&& f);
     private:
         render& render_;
     };
@@ -67,8 +66,8 @@ namespace e2d::render_system_impl
 namespace e2d::render_system_impl
 {
     template < typename F >
-    void drawer::with(const camera& cam, const const_node_iptr& cam_n, F&& f) {
-        context ctx{cam, cam_n, render_};
+    void drawer::with(const camera& cam, F&& f) {
+        context ctx{cam, render_};
         std::forward<F>(f)(ctx);
         ctx.flush();
     }

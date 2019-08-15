@@ -29,6 +29,9 @@ namespace e2d::render_system_impl
         v2f t;
         color32 c;
 
+        vertex_v3f_t2f_c32b(const v3f& v, const v2f& t, color32 c)
+        : v(v), t(t), c(c) {}
+
         static vertex_declaration decl() noexcept {
             return vertex_declaration()
                 .add_attribute<v3f>("a_vertex")

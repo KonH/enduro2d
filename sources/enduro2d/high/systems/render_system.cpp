@@ -78,10 +78,8 @@ namespace
         const auto comp = [](const camera& l, const camera& r) noexcept {
             return l.depth() < r.depth();
         };
-        const auto func = [&drawer, &owner](const ecs::const_entity& cam_e, const camera& cam) {
-            const actor* const cam_a = cam_e.find_component<actor>();
-            const const_node_iptr cam_n = cam_a ? cam_a->node() : nullptr;
-            drawer.with(cam, cam_n, [&owner](drawer::context& ctx){
+        const auto func = [&drawer, &owner](const ecs::const_entity&, const camera& cam) {
+            drawer.with(cam, [&owner](drawer::context& ctx){
                 for_all_scenes(ctx, owner);
             });
         };
