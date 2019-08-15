@@ -9,6 +9,15 @@
 #include <enduro2d/high/components/renderer.hpp>
 #include <enduro2d/high/components/model_renderer.hpp>
 #include <enduro2d/high/components/sprite_renderer.hpp>
+#include <enduro2d/high/components/spine_renderer.hpp>
+#include <enduro2d/high/components/spine_player.hpp>
+
+#include <spine/AnimationState.h>
+#include <spine/Skeleton.h>
+#include <spine/VertexEffect.h>
+#include <spine/SkeletonClipping.h>
+#include <spine/RegionAttachment.h>
+#include <spine/MeshAttachment.h>
 
 namespace
 {
@@ -16,6 +25,24 @@ namespace
 
     const str_hash matrix_m_property_hash = "u_matrix_m";
     const str_hash sprite_texture_sampler_hash = "u_texture";
+
+    const render::blending_state blend_normal = render::blending_state()
+        .factor(render::blending_factor::src_alpha, render::blending_factor::one_minus_src_alpha);
+    const render::blending_state blend_additive = render::blending_state()
+        .factor(render::blending_factor::src_alpha, render::blending_factor::one);
+    const render::blending_state blend_multiply = render::blending_state()
+        .factor(render::blending_factor::dst_color, render::blending_factor::one_minus_src_alpha);
+    const render::blending_state blend_screen = render::blending_state()
+        .factor(render::blending_factor::one, render::blending_factor::one_minus_src_color);
+    
+    const render::blending_state blend_normal_pma = render::blending_state()
+        .factor(render::blending_factor::one, render::blending_factor::one_minus_src_alpha);
+    const render::blending_state blend_additive_pma = render::blending_state()
+        .factor(render::blending_factor::one, render::blending_factor::one);
+    const render::blending_state blend_multiply_pma = render::blending_state()
+        .factor(render::blending_factor::dst_color, render::blending_factor::one_minus_src_alpha);
+    const render::blending_state blend_screen_pma = render::blending_state()
+        .factor(render::blending_factor::one, render::blending_factor::one_minus_src_color);
 }
 
 namespace e2d::render_system_impl
@@ -64,6 +91,10 @@ namespace e2d::render_system_impl
             const sprite_renderer* spr_r = node_e.find_component<sprite_renderer>();
             if ( spr_r ) {
                 draw(node, *node_r, *spr_r);
+            }
+            const spine_renderer* spine_r = node_e.find_component<spine_renderer>();
+            if ( spine_r ) {
+                draw(node, *node_r, *spine_r);
             }
         }
     }
@@ -186,6 +217,191 @@ namespace e2d::render_system_impl
 
         batch.indices++ = 0;  batch.indices++ = 1;  batch.indices++ = 2;
         batch.indices++ = 2;  batch.indices++ = 3;  batch.indices++ = 0;
+    }
+    
+    void drawer::context::draw(
+        const const_node_iptr& node,
+        const renderer& node_r,
+        const spine_renderer& spine_r)
+    {
+        constexpr int stride = 2;
+        std::vector<batcher_type::vertex_type> batch_vertices; // TODO: optimize
+        std::vector<float> temp_vertices;
+
+        if ( !node || !node_r.enabled() ) {
+            return;
+        }
+
+        if ( node_r.materials().empty() ) {
+            return;
+        }
+
+        spSkeleton* skeleton = spine_r.skeleton().operator->();
+        spSkeletonClipping* clipper = spine_r.clipper().operator->();
+        spVertexEffect* effect = spine_r.effect().operator->();
+        const material_asset::ptr& src_mat = node_r.materials().front();
+        const bool use_premultiplied_alpha = spine_r.model()->content().premultiplied_alpha();
+
+        if ( !skeleton || !clipper || !src_mat ) {
+            return;
+        }
+
+        const u16 quad_indices[6] = { 0, 1, 2, 2, 3, 0 };
+
+        if ( skeleton->color.a == 0 ) {
+            return;
+        }
+
+        if ( effect ) {
+            effect->begin(effect, skeleton);
+        }
+        
+        const m4f& sm = node->world_matrix();
+
+        for ( int i = 0; i < skeleton->slotsCount; ++i ) {
+            spSlot* slot = skeleton->drawOrder[i];
+            spAttachment* attachment = slot->attachment;
+            if ( !attachment ) {
+                continue;
+            }
+            if ( slot->color.a == 0 ) {
+                spSkeletonClipping_clipEnd(clipper, slot);
+                continue;
+            }
+
+            int vertex_count = 0;
+            const float* uvs = nullptr;
+            const u16* indices = nullptr;
+            int index_count = 0;
+            const spColor* attachment_color;
+            texture_ptr texture;
+
+            if ( attachment->type == SP_ATTACHMENT_REGION ) {
+                spRegionAttachment* region = reinterpret_cast<spRegionAttachment*>(attachment);
+                attachment_color = &region->color;
+
+                if ( attachment_color->a == 0 ) {
+                    spSkeletonClipping_clipEnd(clipper, slot);
+                    continue;
+                }
+                if ( temp_vertices.size() < 8 ) {
+                    temp_vertices.resize(8);
+                }
+                spRegionAttachment_computeWorldVertices(region, slot->bone, temp_vertices.data(), 0, stride);
+                vertex_count = 8;
+                uvs = region->uvs;
+                indices = quad_indices;
+                index_count = 6;
+                if ( texture_asset* asset = static_cast<texture_asset*>(static_cast<spAtlasRegion*>(region->rendererObject)->page->rendererObject) ) {
+                    texture = asset->content();
+                }
+            } else if ( attachment->type == SP_ATTACHMENT_MESH ) {
+                spMeshAttachment* mesh = reinterpret_cast<spMeshAttachment*>(attachment);
+                attachment_color = &mesh->color;
+
+                if ( attachment_color->a == 0 ) {
+                    spSkeletonClipping_clipEnd(clipper, slot);
+                    continue;
+                }
+                vertex_count = mesh->super.worldVerticesLength;
+                if ( vertex_count > int(temp_vertices.size()) ) {
+                    temp_vertices.resize(vertex_count);
+                }
+                spVertexAttachment_computeWorldVertices(&mesh->super, slot, 0, mesh->super.worldVerticesLength, temp_vertices.data(), 0, stride);
+                uvs = mesh->uvs;
+                indices = mesh->triangles;
+                index_count = mesh->trianglesCount;
+                if ( texture_asset* asset = static_cast<texture_asset*>(static_cast<spAtlasRegion*>(mesh->rendererObject)->page->rendererObject) ) {
+                    texture = asset->content();
+                }
+            } else if ( attachment->type == SP_ATTACHMENT_CLIPPING ) {
+                spClippingAttachment* clip = reinterpret_cast<spClippingAttachment*>(attachment);
+                spSkeletonClipping_clipStart(clipper, slot, clip);
+                continue;
+            } else {
+                continue;
+            }
+
+            const color32 vert_color(
+                color(skeleton->color.r, skeleton->color.g, skeleton->color.b, skeleton->color.a) *
+                color(slot->color.r, slot->color.g, slot->color.b, slot->color.a) *
+                color(attachment_color->r, attachment_color->g, attachment_color->b, attachment_color->a));
+
+            render::blending_state blend_mode;
+            switch ( slot->data->blendMode ) {
+                case SP_BLEND_MODE_NORMAL :
+                    blend_mode = use_premultiplied_alpha ? blend_normal_pma : blend_normal;
+                    break;
+                case SP_BLEND_MODE_ADDITIVE :
+                    blend_mode = use_premultiplied_alpha ? blend_additive_pma : blend_additive;
+                    break;
+                case SP_BLEND_MODE_MULTIPLY :
+                    blend_mode = use_premultiplied_alpha ? blend_multiply_pma : blend_multiply;
+                    break;
+                case SP_BLEND_MODE_SCREEN :
+                    blend_mode = use_premultiplied_alpha ? blend_screen_pma : blend_screen;
+                    break;
+                default :
+                    E2D_ASSERT_MSG(false, "unexpected blend mode for slot");
+                    break;
+            }
+            
+            material_asset::ptr mat_a = material_asset::create(src_mat->content());
+            const_cast<render::state_block&>(mat_a->content().pass(0).states()).blending(blend_mode);
+            
+            const float* vertices = temp_vertices.data();
+            if ( spSkeletonClipping_isClipping(clipper) ) {
+                spSkeletonClipping_clipTriangles(
+                    clipper,
+                    temp_vertices.data(), vertex_count,
+                    const_cast<u16*>(indices), index_count,
+                    const_cast<float*>(uvs),
+                    stride);
+                vertices = clipper->clippedVertices->items;
+                vertex_count = clipper->clippedVertices->size;
+                uvs = clipper->clippedUVs->items;
+                indices = clipper->clippedTriangles->items;
+                index_count = clipper->clippedTriangles->size;
+            }
+
+            batch_vertices.resize(vertex_count >> 1);
+            for ( size_t j = 0; j < batch_vertices.size(); ++j ) {
+                auto& vert = batch_vertices[j];
+                v2f v(vertices[j*2], vertices[j*2+1]);
+                vert.v = v3f(v4f(v.x, v.y, 0.0f, 1.0f) * sm);
+                vert.t = v2f(uvs[j*2], uvs[j*2+1]);
+                vert.c = vert_color;
+            }
+
+            if ( index_count ) {
+                try {
+                    property_cache_
+                        .sampler(sprite_texture_sampler_hash, render::sampler_state()
+                            .texture(texture)
+                            .min_filter(render::sampler_min_filter::linear)
+                            .mag_filter(render::sampler_mag_filter::linear))
+                        .merge(node_r.properties());
+
+                    batcher_.batch(
+                        mat_a,
+                        property_cache_,
+                        indices, index_count,
+                        batch_vertices.data(), batch_vertices.size());
+                } catch (...) {
+                    property_cache_.clear();
+                    throw;
+                }
+            }
+            spSkeletonClipping_clipEnd(clipper, slot);
+        }
+
+        spSkeletonClipping_clipEnd2(clipper);
+
+        if ( effect ) {
+            effect->end(effect);
+        }
+        
+        property_cache_.clear();
     }
 
     void drawer::context::flush() {

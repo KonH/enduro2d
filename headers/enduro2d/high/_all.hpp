@@ -34,9 +34,12 @@
 #include "components/renderer.hpp"
 #include "components/scene.hpp"
 #include "components/sprite_renderer.hpp"
+#include "components/spine_renderer.hpp"
+#include "components/spine_player.hpp"
 
 #include "systems/flipbook_system.hpp"
 #include "systems/render_system.hpp"
+#include "systems/spine_system.hpp"
 
 #include "address.hpp"
 #include "asset.hpp"
